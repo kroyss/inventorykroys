@@ -99,7 +99,7 @@ export default function PublicacionesClient() {
                 <input type="checkbox" className="ml-3" aria-label="Elegir" checked={todasBusqueda || elegidas.has(f.item_id)} onChange={() => marcar(f.item_id)} />
                 <Link href={`/publicaciones/${f.item_id}`} className="flex flex-1 min-w-0 items-center gap-3 px-3 py-2.5 hover:bg-neutral-50">
                   <span className="w-12 h-12 shrink-0 rounded-md bg-neutral-50 border border-neutral-200 overflow-hidden">
-                    {f.thumbnail && <img src={f.thumbnail.replace(/^http:/, 'https:')} alt="" className="w-full h-full object-contain" />}
+                    {f.thumbnail && <img src={f.thumbnail.replace(/^http:/, 'https:')} alt="" loading="lazy" decoding="async" width={48} height={48} className="w-full h-full object-contain" />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm text-neutral-900 truncate">{f.titulo}</span>

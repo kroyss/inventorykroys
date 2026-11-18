@@ -161,7 +161,7 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
               </Seccion>
             )}
             {caen != null && (
-              <Link href="/reportes?tab=stock&sub=declive"
+              <Link href="/inventario/reponer?sub=declive"
                 className="group flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm transition hover:-translate-y-px hover:shadow-md">
                 <div>
                   <div className="text-xs font-medium text-neutral-500">Se están cayendo</div>

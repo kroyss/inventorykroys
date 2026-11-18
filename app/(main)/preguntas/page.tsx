@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { tieneModulo } from '@/lib/modulos'
+import { moduloPrendido, tieneModulo } from '@/lib/modulos'
 import PreguntasClient from '@/components/preguntas/PreguntasClient'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
@@ -32,5 +32,5 @@ export default async function PreguntasPage({ searchParams }: { searchParams: Pr
     iaAutomatica={tieneModulo(session!.user, 'ia_automatica')}
     miIA={tieneModulo(session!.user, 'mi_ia') && puede(session!.user, 'automatizaciones_config')}
     verAvisosInternos={session!.user.organizacionId === ORGANIZACION_PLATAFORMA}
-    envioPorPeso={tieneModulo(session!.user, 'promociones') && session!.user.country === 'VE'} />
+    envioPorPeso={moduloPrendido(session!.user, 'promociones') && session!.user.country === 'VE'} />
 }

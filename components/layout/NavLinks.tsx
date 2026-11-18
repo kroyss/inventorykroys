@@ -6,7 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual, type Espacio } from '@/lib/espacios'
-import { pestanasML, enPublicaciones } from '@/components/productos/PublicacionesMLTabs'
+import { pestanasML, enPublicaciones, inicioPublicaciones } from '@/components/productos/PublicacionesMLTabs'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
 
 const allLinks: { href: string; label: string; countries: Country[]; espacio?: Espacio; soloDesdeML?: boolean }[] = [
@@ -65,6 +65,8 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
       && (!l.soloDesdeML || ventasDesdeML({ modulos }))
       && (l.href !== '/publicaciones' || pestanasML({ ...u, modulos, country }).length > 0)
   )
+  // 18-11: «Publicaciones» lleva a su primera pestaña (Stock vs inventario si la tiene); la clave del menú sigue siendo /publicaciones.
+  const destino = (href: string) => href === '/publicaciones' ? inicioPublicaciones({ ...u, modulos, country }) : href
   const activo = (href: string) => enPublicaciones(pathname) ? href === '/publicaciones' :
     pathname === href || (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href))
   const etiqueta = (l: typeof links[number]) => (
@@ -128,7 +130,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
       </div>
 
       {visibles.map(l => (
-        <Link key={l.href} href={l.href} title={ES_INICIO(l.href) ? 'Inicio' : undefined}
+        <Link key={l.href} href={destino(l.href)} title={ES_INICIO(l.href) ? 'Inicio' : undefined}
           className={`${CLASE_LINK} ${ES_INICIO(l.href) ? '!px-3.5' : ''} ${activo(l.href) ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}`}>
           {etiqueta(l)}
         </Link>
@@ -146,7 +148,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
           {abierto && (
             <div className="absolute right-0 top-full mt-1 z-30 min-w-[12rem] bg-white rounded-lg border border-neutral-200 shadow-lg py-1">
               {ocultos.map(l => (
-                <Link key={l.href} href={l.href}
+                <Link key={l.href} href={destino(l.href)}
                   className={`flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium ${activo(l.href) ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}>
                   {etiqueta(l)}
                 </Link>

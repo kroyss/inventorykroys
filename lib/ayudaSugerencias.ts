@@ -29,6 +29,7 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Para qué es la nota de la venta?', respuesta: 'Es una nota interna que se guarda en MercadoLibre; el comprador **no la ve**. Sirve para dejar dicho, por ejemplo, «cambia a talla L».' },
   ],
   '/inventario/stock-ml': [
+    { pregunta: '¿Dónde quedó Vincular y MercadoEnvíos?', respuesta: 'En **Preparar** (la última pestaña de Publicaciones): **Vincular** y **Pesos y envío gratis**. El numerito gris dice cuánto falta. Lo que se manda a ML en segundo plano está en **Historial de tareas** (a la derecha).' },
     { pregunta: '¿Por qué dice «va por la cola de MercadoLibre»?', respuesta: 'Cuando arreglas o pausas **más de 10 publicaciones** juntas, van por la cola (60 por minuto) para que ML no las rechace. Arriba ves el avance y sigue aunque cierres la pantalla; cada una toma el stock del momento en que le toca.' },
     { pregunta: '¿Cómo está ordenada Stock en ML?', respuesta: 'Arriba hay 3 tarjetas: **Vende de más** (rojo, riesgo de reclamo), **Tienes y no vendes** (celeste, ventas perdidas) y **Por ajustar** (ámbar). Cada producto está en un solo grupo. **Arreglar N productos** te muestra la lista de cambios antes de aplicar. Lo que el sistema no resuelve solo está en **Para decidir**; la configuración, en **⚙ Ajustes**.' },
     { pregunta: '¿Qué es «Tienes y no vendes»?', respuesta: 'Es el revés de «Vende de más»: productos con unidades en el inventario que ninguna publicación activa ofrece (pausadas o en 0). Toca **Aplicar en ML** para ponerles stock y reactivarlas; si alguna la pausaste a mano a propósito, déjala así.' },
@@ -56,6 +57,7 @@ const S: Record<string, Sugerencia[]> = {
       respuesta: 'Son los productos en 0 que una publicación activa sigue ofreciendo en ML. Entra a **Publicaciones → Stock**, tarjeta roja **Vende de más**, y toca **Arreglar**.' },
   ],
   '/alertas-stock': [
+    { pregunta: '¿Por qué hay dos «Stock»?', respuesta: 'Aquí ves **lo que dice MercadoLibre** (agotadas, por agotarse, pausadas). Si tu empresa lleva Inventario, **Publicaciones → Stock vs inventario** lo compara con lo que tienes y lo arregla en un clic.' },
     { pregunta: '¿Cómo actualizo el stock en ML?', video: 'Calificaciones y Stock',
       respuesta: 'Escribe el stock nuevo en cada fila (✎) y toca **Actualizar en MercadoLibre**. Solo cambia la cantidad disponible, nada más. Si tu inventario está marcado como al día y pones más de lo que tienes, la casilla se pone ámbar y te pide «Actualizar igual».' },
     { pregunta: '¿Qué significa «en 0 a propósito»?',
@@ -113,6 +115,10 @@ const S: Record<string, Sugerencia[]> = {
   ],
   '/productos/importar-ml': [
     { pregunta: 'Son muchos productos, ¿tengo que poner cada costo?', respuesta: 'No. En la barra de abajo usa **Costo estimado**: pones un % del precio (por ejemplo 50 %) y toca **Poner en N**. Quedan marcados **est.** y los completas después en **Productos → Completar costos**: al poner el real, las ventas se corrigen solas.' },
+  ],
+  '/inventario/reponer': [
+    { pregunta: '¿Qué tengo que comprar?', respuesta: '**Reponer** te dice cuánto pedir de cada producto según lo que vendes y tus reglas (cuánto tarda en llegarte, para cuántos meses comprar). Marca los productos y toca **Crear compra**: se abre la compra con cantidades y último costo.' },
+    { pregunta: '¿Dónde quedó Reportes → Stock?', respuesta: 'Ahora es **Inventario → Reponer**: es lo mismo (Reponer, Se están cayendo, Parados, Recién llegados y ⚙ Reglas), junto a tu stock, porque termina en una compra.' },
   ],
   '/productos/costos': [
     { pregunta: '¿Por cuáles empiezo?', respuesta: 'Por arriba: están ordenados por lo que más vendiste en 30 días. Con unos pocos costos reales ya cubres casi toda tu ganancia; los que casi no se venden pueden esperar.' },

@@ -183,12 +183,12 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
       <div>
         <h2 className="text-sm font-semibold text-neutral-700 mb-2">Requiere atención</h2>
         <div className={`grid grid-cols-2 md:grid-cols-3 gap-3 ${analisisStock ? 'lg:grid-cols-6' : 'lg:grid-cols-4'}`}>
-          {analisisStock && <KPICard label="Reposición"           value={summary.reposicion_count} tone={summary.reposicion_count > 0 ? 'atencion' : 'apagado'} href="/reportes?tab=stock&sub=reposicion" />}
+          {analisisStock && <KPICard label="Reposición"           value={summary.reposicion_count} tone={summary.reposicion_count > 0 ? 'atencion' : 'apagado'} href="/inventario/reponer?sub=reposicion" />}
           <KPICard label="Sin stock"            value={summary.no_stock}        tone={summary.no_stock > 0 ? 'problema' : 'apagado'} href="/inventario?estado=SIN_STOCK" />
           <KPICard label="Stock bajo"           value={summary.low_stock_alerts} tone={summary.low_stock_alerts > 0 ? 'atencion' : 'apagado'} href="/inventario?estado=BAJO" />
           <KPICard label="Ventas borrador"      value={summary.pending_sales}   tone={summary.pending_sales > 0 ? 'atencion' : 'apagado'} href="/ventas?estado=BORRADOR" />
           {etapas && <KPICard label="Compras en tránsito"  value={summary.in_transit}      tone={summary.in_transit > 0 ? 'neutro' : 'apagado'} href="/reportes?tab=transito" />}
-          {analisisStock && <KPICard label="En revisión (remate)" value={summary.remate_count}    tone={summary.remate_count > 0 ? 'atencion' : 'apagado'} href="/reportes?tab=stock&sub=remate" />}
+          {analisisStock && <KPICard label="En revisión (remate)" value={summary.remate_count}    tone={summary.remate_count > 0 ? 'atencion' : 'apagado'} href="/inventario/reponer?sub=remate" />}
         </div>
       </div>
 

@@ -8,6 +8,9 @@ import { useEffect, useSyncExternalStore } from 'react'
 export const NUEVOS = {
   mi_ia: '2026-12-10',
   seguimiento: '2026-12-11',
+  // 18-11 (Fase 1, orden de Publicaciones e Inventario).
+  preparar: '2026-12-18',
+  reponer: '2026-12-18',
 } as const
 export type ClaveNuevo = keyof typeof NUEVOS
 
@@ -41,4 +44,10 @@ export function Nuevo({ clave, className = '' }: { clave: ClaveNuevo; className?
   const ver = useNuevo(clave)
   if (!ver) return null
   return <span className={`ml-1.5 inline-block rounded-full bg-lime-100 px-1.5 py-px align-middle text-[10px] font-semibold uppercase leading-4 text-lime-800 ${className}`}>Nuevo</span>
+}
+
+/** Para usar desde un componente del servidor: quita la marca al abrir la pantalla (no dibuja nada). */
+export function VistoNuevo({ clave }: { clave: ClaveNuevo }) {
+  useVistoNuevo(clave)
+  return null
 }

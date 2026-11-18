@@ -233,7 +233,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
               <div className="flex items-start gap-3 border-b border-neutral-100 px-4 py-3">
                 {g.thumbnail
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={g.thumbnail} alt="" className="h-14 w-14 shrink-0 rounded-md border object-contain" />
+                  ? <img src={g.thumbnail.replace(/^http:/, 'https:')} alt="" loading="lazy" decoding="async" width={56} height={56} className="h-14 w-14 shrink-0 rounded-md border object-contain" />
                   : <div className="h-14 w-14 shrink-0 rounded-md bg-neutral-100" />}
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-neutral-900">{g.titulo}</div>
@@ -473,7 +473,7 @@ function SelectorCelular({ f, productos, ocupado, onElegir, onCerrar }: {
       {recordar && (
         <div className="flex items-center gap-2 text-xs text-neutral-600">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {f.thumbnail && <img src={f.thumbnail} alt="" className="h-8 w-8 shrink-0 rounded border bg-white object-contain" />}
+          {f.thumbnail && <img src={f.thumbnail.replace(/^http:/, 'https:')} alt="" loading="lazy" decoding="async" width={32} height={32} className="h-8 w-8 shrink-0 rounded border bg-white object-contain" />}
           <span className="line-clamp-2">{f.titulo}</span>
         </div>
       )}

@@ -9,7 +9,7 @@
 // Los módulos de la empresa mandan por encima: un permiso de una sección cuyo módulo la empresa
 // no tiene no sirve de nada (ni se muestra en Usuarios).
 import type { UserRole } from '@/lib/types'
-import type { Modulo } from '@/lib/modulos'
+import { tieneModulo, type Modulo } from '@/lib/modulos'
 
 interface DefPermiso {
   tipo: 'seccion' | 'accion'
@@ -98,7 +98,8 @@ export function puede(user: { role?: UserRole; permisos?: string[] } | null | un
 export function permisosDeEmpresa(modulos: string[], country: string) {
   return TODOS.filter(p => {
     const d: DefPermiso = PERMISOS[p]
-    return (!d.modulo || modulos.includes(d.modulo)) && (!d.soloVE || country === 'VE')
+    // 18-11: con lo que viene implícito con el Inventario (Editar publicaciones, Promociones), como el menú.
+    return (!d.modulo || tieneModulo({ modulos }, d.modulo)) && (!d.soloVE || country === 'VE')
   })
 }
 

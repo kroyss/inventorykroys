@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import InventarioClient from '@/components/inventario/InventarioClient'
+import InventarioTabs from '@/components/inventario/InventarioTabs'
 import type { InventoryItem } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
@@ -81,6 +82,7 @@ export default async function InventarioPage() {
   const fecha = (d: Date) => new Intl.DateTimeFormat('es-VE', { day: 'numeric', month: 'short', timeZone: COUNTRY_TZ[session!.user.country] }).format(d)
 
   return (<>
+    <InventarioTabs user={session!.user} actual="stock" />
     {emp && (
       <div className="mb-4">
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

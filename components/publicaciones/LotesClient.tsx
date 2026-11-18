@@ -8,7 +8,7 @@ interface Lote { id: number; tipo: string; titulo: string; estado: string; total
   ok: number; sin_cambio: number; saltadas: number; errores: number; pendientes: number }
 interface Item { item_id: string; estado: string; mensaje: string | null; datos: Record<string, unknown> | null; resultado: Record<string, unknown> | null
   hecho_at: string | null; titulo: string | null; cuenta: string | null }
-const TIPO: Record<string, string> = { promocion: 'Promoción', descripcion: 'Descripción', precio: 'Precio', leer: 'Lectura' }
+const TIPO: Record<string, string> = { promocion: 'Promoción', descripcion: 'Descripción', precio: 'Precio', leer: 'Lectura', stock: 'Stock', estado: 'Pausar/activar' }
 
 const ESTADO_ITEM: Record<string, [string, string]> = {
   ok: ['Hecho', 'text-emerald-700'], sin_cambio: ['Ya estaba', 'text-neutral-500'], saltada: ['Saltada', 'text-amber-700'],

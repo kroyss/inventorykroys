@@ -101,7 +101,16 @@ export function soloRadar(modulos: string[]) {
 
 /** 14-11 (el dueño): Reportes → Resumen y → Stock (con sus reglas) vienen con el Inventario, para todas las empresas
  *  que lo llevan. No hace falta prenderlos aparte (siguen en la lista por las empresas viejas que ya los tenían). */
-export const CON_INVENTARIO: readonly Modulo[] = ['analisis_stock', 'metricas']
+// 18-11 (el dueño, entrada de los Fundadores al inventario): también Editar publicaciones y Promociones vienen con el
+// Inventario. OJO: el envío gratis por transportista en Preguntas, Mensajes y la IA (empresaConPromociones), la vigilancia
+// de campañas del cron y sus avisos de Telegram siguen mirando el módulo PRENDIDO DE VERDAD (moduloPrendido): eso no
+// cambia para nadie hasta que se prenda Promociones en Plataforma.
+export const CON_INVENTARIO: readonly Modulo[] = ['analisis_stock', 'metricas', 'publicaciones', 'promociones']
+
+/** El módulo prendido en Plataforma (sin contar lo que viene implícito con el Inventario). */
+export function moduloPrendido(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {
+  return !!user?.modulos?.includes(modulo)
+}
 
 /** Conteos físicos (Reportes → Conteos): todavía solo para quien tiene «analisis_stock» prendido DE VERDAD (SolucionesMC),
  *  no por venir con el Inventario (14-11, el dueño). */
@@ -117,7 +126,7 @@ export function tieneModulo(user: { modulos?: string[] } | null | undefined, mod
 /** ¿La ruta del menú está habilitada para estos módulos? */
 export function rutaHabilitada(href: string, modulos: string[]) {
   const m = MODULO_DE_RUTA[href]
-  return !m || modulos.includes(m)
+  return !m || tieneModulo({ modulos }, m)
 }
 
 /** ¿La empresa lleva inventario? Si no, las ventas salen de MercadoLibre (ver MODULOS.inventario). */

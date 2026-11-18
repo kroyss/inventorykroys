@@ -7,7 +7,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual } from '@/lib/espacios'
-import { pestanasML, enPublicaciones } from '@/components/productos/PublicacionesMLTabs'
+import { pestanasML, enPublicaciones, inicioPublicaciones } from '@/components/productos/PublicacionesMLTabs'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
 
 // Barra inferior del celular. Íconos de línea (mismo trazo en todos, estilo Lucide) en lugar de
@@ -131,6 +131,8 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   const tieneAuto = modulos.includes('despachos') || modulos.includes('reportador') || modulos.includes('preguntas')
   const primary = visible(auto ? PRIMARY_AUTO : PRIMARY)
   const more    = visible(auto ? MORE_AUTO : MORE).filter(i => i.href !== '/automatizaciones' || tieneAuto)
+  // 18-11: «Publicaciones» lleva a su primera pestaña (Stock vs inventario si la tiene); la clave del menú sigue siendo /publicaciones.
+  const destino = (href: string) => href === '/publicaciones' ? inicioPublicaciones({ ...u, modulos, country }) : href
   const activo  = (href: string) => enPublicaciones(pathname) ? href === '/publicaciones' : pathname === href ||
     (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href + '/'))
   const enMas   = more.some(i => activo(i.href))
@@ -143,7 +145,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
     const on = activo(i.href)
     const aviso = AVISO_DE_RUTA[i.href]
     return (
-      <Link key={i.href} href={i.href} onClick={() => setShowMore(false)}
+      <Link key={i.href} href={destino(i.href)} onClick={() => setShowMore(false)}
         className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 ${on ? 'text-neutral-900' : 'text-neutral-500'}`}>
         <span className={`relative flex items-center justify-center h-8 w-14 rounded-full transition-colors ${on ? 'bg-lime-200/80' : ''}`}>
           <Icono nombre={i.icon} />
@@ -165,7 +167,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
               const on = activo(i.href)
               const aviso = AVISO_DE_RUTA[i.href]
               return (
-                <Link key={i.href} href={i.href} onClick={() => setShowMore(false)}
+                <Link key={i.href} href={destino(i.href)} onClick={() => setShowMore(false)}
                   className={`relative flex flex-col items-center gap-1.5 py-3 px-1 rounded-xl text-center ${on ? 'bg-lime-100 text-neutral-900' : 'text-neutral-600 active:bg-neutral-100'}`}>
                   <Icono nombre={i.icon} className="w-6 h-6" />
                   <span className="text-xs font-medium leading-tight">{etiqueta(i)}</span>

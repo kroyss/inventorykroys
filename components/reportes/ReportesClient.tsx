@@ -2,7 +2,6 @@
 import PorProducto from '@/components/reportes/PorProducto'
 import { FotoProducto } from '@/components/ui/FotoProducto'
 import { useRouter, useSearchParams } from 'next/navigation'
-import StockReport from '@/components/reportes/StockReport'
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import {
   DateRangeBar, presetRange, type DatePreset,
@@ -26,7 +25,6 @@ const PERIOD_TABS: { key: Tab; label: string }[] = [
 ]
 const STATE_TABS: { key: Tab; label: string }[] = [
   { key: 'inventario', label: 'Inventario' },
-  { key: 'stock',      label: 'Stock' },
   { key: 'transito',   label: 'En tránsito' },
   { key: 'conteos',    label: 'Conteos' },
 ]
@@ -41,8 +39,9 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
   const router = useRouter()
   const sp = useSearchParams()
   const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', 'ventas')
+  // 18-11: Stock (Reponer) se mudó a Inventario → Reponer; una pestaña recordada «stock» cae en Ventas.
   const tab: Tab = tabGuardada === 'resumen' || tabGuardada === 'atencion' || tabGuardada === 'top'
-    || (!analisisStock && tabGuardada === 'stock') || (!conteos && tabGuardada === 'conteos') ? 'ventas' : tabGuardada
+    || tabGuardada === 'stock' || (!conteos && tabGuardada === 'conteos') ? 'ventas' : tabGuardada
   // Ventas: «Por venta» (la lista) o «Por producto» (el top, con las mismas fechas).
   const [vista, setVista] = useState<'venta' | 'producto'>(sp.get('vista') === 'producto' || sp.get('tab')?.toLowerCase() === 'top' ? 'producto' : 'venta')
   const stateTabs = STATE_TABS.filter(t => (analisisStock || t.key !== 'stock') && (conteos || t.key !== 'conteos'))
@@ -56,8 +55,6 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
   const [error,    setError]    = useState<string | null>(null)
   const [search,   setSearch]   = useState('')
 
-  // Stock subtab
-  const [stockSub, setStockSub] = useState<'reposicion' | 'remate' | 'nuevos' | 'declive'>('reposicion')
   // Top params
   // Ventas status / Compras tipo / Tránsito tipo filters
   const [ventaStatus, setVentaStatus] = useState('')
@@ -72,22 +69,11 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
     if (!urlTab) return
     if (urlTab === 'RESUMEN' || urlTab === 'ATENCION') { router.replace('/dashboard'); return }
     if (urlTab === 'TOP') { setTab('ventas'); setVista('producto'); return }
+    if (urlTab === 'STOCK') { router.replace(`/inventario/reponer${urlSub ? `?sub=${urlSub.toLowerCase()}` : ''}`); return }
     setTab(urlTab.toLowerCase() as Tab)
   }, [urlTab]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (urlSub) setStockSub(urlSub.toLowerCase() as typeof stockSub) }, [urlSub])
 
   useEffect(() => { load() }, [tab, dateFrom, dateTo, vista])
-  // 17-11: Stock se actualiza por detrás (sin pantalla en blanco ni perder filtros) tras «No volver a pedir» / Devolver.
-  const refrescarStock = async () => {
-    const myId = ++reqIdRef.current
-    try {
-      const res = await fetch('/api/reports/stock-analysis', { cache: 'no-store' })
-      if (!res.ok || myId !== reqIdRef.current) return
-      const json = await res.json()
-      if (myId === reqIdRef.current) setData(json)
-    } catch { /* queda lo que se ve */ }
-  }
-
   const handlePreset = (p: DatePreset) => {
     setPreset(p)
     if (p !== 'custom') { const r = presetRange(p); setDateFrom(r.from); setDateTo(r.to) }
@@ -105,7 +91,6 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
     if (tab === 'ventas' && vista === 'venta') url = `/api/reports/sales?date_from=${dateFrom}&date_to=${dateTo}`
     if (tab === 'compras')     url = `/api/reports/purchases?date_from=${dateFrom}&date_to=${dateTo}`
     if (tab === 'inventario')  url = `/api/reports/inventory`
-    if (tab === 'stock')       url = `/api/reports/stock-analysis`
     if (tab === 'transito')    url = `/api/reports/in-transit`
     if (tab === 'conteos')     url = `/api/reports/counts`
     if (!url) { setLoading(false); return }       // Ventas → Por producto carga solo (PorProducto)
@@ -164,9 +149,6 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
       )}
       {!loading && data && tab === 'inventario' && data.items       && (
         <InventoryReport data={data} search={search} setSearch={setSearch} />
-      )}
-      {!loading && data && tab === 'stock'      && data.reposicion  && (
-        <StockReport data={data} sub={stockSub} setSub={setStockSub} onReload={load} onRefrescar={refrescarStock} />
       )}
       {!loading && data && tab === 'transito' && Array.isArray(data) && (
         <InTransitReport rows={data} tipo={importaciones ? transTipo : ''} setTipo={setTransTipo} importaciones={importaciones} />

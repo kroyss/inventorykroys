@@ -2,7 +2,7 @@ import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { NextRequest, NextResponse } from 'next/server'
 import { sinEnteraVieja } from '@/lib/vinculoEntero'
 import { sqlDisponible, sqlPesoPublicacion, sqlPesosVinculados, sqlSituacion } from '@/lib/promocionesSesion'
-import { tieneModulo } from '@/lib/modulos'
+import { moduloPrendido, tieneModulo } from '@/lib/modulos'
 import { sugerenciasPara } from '@/lib/sugerenciasServidor'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // Envío gratis por transportista junto al precio: solo empresas con Promociones (las demás, como antes).
-    const conEnvio = s.session.user.country === 'VE' && tieneModulo(s.session.user, 'promociones')
+    const conEnvio = s.session.user.country === 'VE' && moduloPrendido(s.session.user, 'promociones')
     const filtroEstado = vista === 'pendientes' ? `p.estado = 'UNANSWERED'` : `p.estado <> 'UNANSWERED'`
     const params: unknown[] = []
     let filtroTexto = ''

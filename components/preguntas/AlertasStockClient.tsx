@@ -212,7 +212,7 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
       {f.imagen
         ? <AbrirFicha item={f.item_id} marcar={marca(f)} className="order-1 sm:order-none w-11 h-11 shrink-0 overflow-hidden rounded bg-neutral-100 ring-1 ring-transparent hover:ring-neutral-400">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={f.imagen.replace(/^http:/, 'https:')} alt="" className="h-full w-full object-cover" />
+            <img src={f.imagen.replace(/^http:/, 'https:')} alt="" loading="lazy" decoding="async" width={44} height={44} className="h-full w-full object-cover" />
           </AbrirFicha>
         : <span className="order-1 sm:order-none w-11 h-11 rounded bg-neutral-100 shrink-0" />}
       <div className="order-2 sm:order-none min-w-0 flex-1 basis-0 sm:basis-auto">

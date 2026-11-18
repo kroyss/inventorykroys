@@ -458,7 +458,8 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 - **No hay para reponer:** deja de avisar de ese producto hasta que lo repongas y vuelva a agotarse.
 - **Revisar ahora:** busca en ML en el momento (se puede cada 10 minutos). Además se revisa sola cada hora.
 - Si la empresa lleva Inventario, cada fila muestra cuánto tienes en inventario y un botón «usar» para ponerlo
-  como stock nuevo.
+  como stock nuevo. Arriba sale un aviso: aquí ves **lo que dice MercadoLibre**; para **compararlo con tu inventario**
+  y arreglarlo en un clic está **Publicaciones → Stock vs inventario** (son dos pantallas distintas a propósito).
 - «MercadoLibre la frenó (en revisión)»: ML la tiene en revisión; hay que verla en MercadoLibre.
 
 **Video:** «Calificaciones y Stock».
@@ -469,16 +470,21 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 
 *Cómo lo pregunta la gente:* editar publicación, cambiar precio en ML, cambiar fotos, características, ficha técnica, descripción, variantes, pausar publicación, cambiar precios a muchas, subir precios en lote, pie de descripción, encabezado, condiciones de compra, plantilla de descripción, cambiar la info de abajo de la descripción en todas.
 
-Todo lo de tus publicaciones de MercadoLibre en un solo menú, con pestañas (cada una aparece si tu empresa y tu
-usuario la tienen):
-- **Editar** (en prueba, solo algunas empresas; permiso **Publicaciones (editar en MercadoLibre)**): ver abajo.
-- **Vincular:** unir cada publicación (o variante) con su producto.
-- **Stock:** el stock que muestra cada cuenta de ML contra tu inventario.
-- **Promociones** (Venezuela): campañas de ML y hasta dónde puede bajar el precio sin perder el envío gratis. La
+Todo lo de tus publicaciones de MercadoLibre en un solo menú, con pestañas ordenadas por trabajo (18-11; cada una
+aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones** en el menú se abre la primera:
+- **Stock vs inventario:** el stock que muestra cada cuenta de ML contra tu inventario (lo de todos los días).
+- **Editar** (viene con el Inventario; permiso **Publicaciones (editar en MercadoLibre)**): ver abajo.
+- **Preparar:** lo que se hace al empezar y de vez en cuando: **Vincular** (unir cada publicación o variante con su
+  producto) y **Pesos y envío gratis** (Venezuela; antes la pestaña MercadoEnvíos). El numerito gris dice cuánto falta:
+  publicaciones activas sin vincular y productos sin peso.
+- **Historial de tareas** (enlace a la derecha): lo que se mandó a MercadoLibre en segundo plano. Mientras algo se
+  está enviando, el avance sale abajo a la derecha de cualquier pantalla (también lo de Stock vs inventario cuando
+  son más de 10 publicaciones).
+- **Promociones** (Venezuela, viene con el Inventario): campañas de ML y hasta dónde puede bajar el precio sin perder el envío gratis. La
   columna **Rentabilidad** es lo que te queda al precio de la promo ÷ lo que te costó el producto (como en Productos);
   **Rentabilidad mínima** (20 % por defecto) marca en naranja las que quedan por debajo y las filtra con «Rentabilidad < X %».
   Campañas propias: **Editar** cambia la fecha de fin (máx. 31 días desde que empezó; una vencida ya no se puede editar).
-  **Pausar** les quita el descuento a todas sus publicaciones sin borrar la campaña y recuerda cuáles eran (va a la cola: se puede seguir trabajando o pausar otra; avance en Publicaciones → Tareas); **Reanudar**
+  **Pausar** les quita el descuento a todas sus publicaciones sin borrar la campaña y recuerda cuáles eran (va a la cola: se puede seguir trabajando o pausar otra; avance abajo a la derecha y en Publicaciones → Historial de tareas); **Reanudar**
   las vuelve a poner con el mismo %. **Renovar** (vencida o por vencer en 3 días) crea una campaña nueva desde hoy con
   el mismo nombre y % y propone las mismas publicaciones. **Borrar campaña** la quita para siempre (primero les quita el
   descuento). Por Telegram avisa 3 días antes de que venza una campaña propia.
@@ -875,7 +881,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   modelo; si está en varias publicaciones, la activa con más stock). En la ficha del producto: **Cambiar foto** (o
   **Subir foto**) pone una tuya, y **Usar la de MercadoLibre** vuelve a la de ML. Sin foto: cuadro gris «Sin foto».
   Las hojas impresas (recepción y conteo) no llevan fotos.
-- **Pesos (Publicaciones → MercadoEnvíos, Venezuela):** el peso de cada producto sale **solo** del portal de
+- **Pesos (Publicaciones → Preparar → Pesos y envío gratis, Venezuela):** el peso de cada producto sale **solo** del portal de
   MercadoEnvíos (el que usa ML para el envío gratis), por medio de sus vínculos: Pagos ME lo trae en la primera traída
   del día. En la ficha y en MercadoEnvíos se ve con la marca **ME** y no se edita a mano. El peso es **solo** el del portal (nunca el que declara la
   publicación). Pasa al producto al crear, importar o vincular, y si a alguna publicación vinculada le falta, el sistema
@@ -888,7 +894,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   ficha del producto). Precios, rentabilidad, Promociones y Costos ML usan ese mismo peso.
 - **Publicaciones de MercadoLibre en la ficha del producto:** se ven los códigos MLV vinculados (cuenta, variante,
   «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
-  (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
+  (abre Publicaciones → Preparar → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
 - **Stock en ML: cómo está ordenada (17-11).** Arriba, **3 tarjetas** con lo que hay que hacer; cada producto cae en UN
   solo grupo (por prioridad), así los números suman lo que falta sin repetir:
   🔴 **Vende de más** (ML ofrece lo que no tienes: riesgo de reclamo) · 🔵 **Tienes y no vendes** (hay unidades y ninguna
@@ -940,7 +946,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   se crea otro). Si ninguno coincide lo dice, y se crea como nueva. Clic en una fila abre la ficha; Editar en el pie.
   En Venezuela, la columna **Peso ME** muestra el peso de cada producto y de dónde sale: solo el número = del portal de
   MercadoEnvíos (al pasar el mouse, la fecha en que se leyó), **a mano**, **⚠ distintos** (sus publicaciones pesan
-  distinto en el portal: revisar en Publicaciones → MercadoEnvíos) o **Sin peso**. Se puede ordenar por peso.
+  distinto en el portal: revisar en Publicaciones → Preparar → Pesos y envío gratis) o **Sin peso**. Se puede ordenar por peso.
 - **Recargo y rentabilidad (cómo se lee la ganancia; desde el 14-11, en todo el sistema):** son tres palabras.
   - **Recargo sobre costo:** lo que **le sumas** a lo que te costó para sacar el precio (lo decides tú, en el medidor).
     Precio = costo × (1 + recargo). Ej.: costo $2,40 con recargo 80 % → precio $4,32.
@@ -968,7 +974,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   - Si el precio es el que publicas en ML, el medidor arranca en el recargo **real** que lleva tu precio de hoy y, al
     moverlo, dice a qué precio publicar para ese recargo: **Usar este precio** lo pone en la ficha.
   - **Guardar y publicar en ML** (si puedes editar publicaciones y el producto está vinculado): guarda y manda el
-    precio a sus publicaciones de 1 unidad en MercadoLibre (por la cola: se ve en Publicaciones → Tareas). Pide
+    precio a sus publicaciones de 1 unidad en MercadoLibre (por la cola: se ve abajo a la derecha y en Publicaciones → Historial de tareas). Pide
     confirmación; los packs no se tocan. Si la publicación tiene variantes de otros productos, cambia el precio de
     toda la publicación.
   - La lista de Productos tiene las columnas **Recargo** (el % que le sumaste) y **Rentabilidad** (lo que te queda
@@ -994,7 +1000,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos
   datos» los deja para la próxima vez.
 - **Publicaciones** (menú propio, con pestañas Editar · Vincular · Stock · Promociones · MercadoEnvíos (Venezuela) · Tareas; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
-- **Vincular** (Publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
+- **Vincular** (Publicaciones → Preparar → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.
   **Publicaciones nuevas:** al abrir Vincular, el sistema busca solo las publicaciones que creaste en ML (como mucho
   cada 5 minutos por cuenta). Las de los últimos 15 días sin producto salen en un aviso azul **«N publicaciones nuevas
@@ -1002,7 +1008,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   **Revisar con fotos** (filtro de Vincular): cada producto con las fotos de todas sus publicaciones vinculadas; si una
   no corresponde, **Corregir** abre esa publicación para cambiar el vínculo. La foto del producto en todo el sistema
   sale de estos vínculos: al corregir aquí se arregla sola en todos lados (no hay que actualizar nada).
-- **Stock en ML** (Publicaciones → Stock): cada producto con todas sus publicaciones; pone en ML lo que hay y reactiva las pausadas en todas tus
+- **Stock en ML** (Publicaciones → Stock vs inventario): cada producto con todas sus publicaciones; pone en ML lo que hay y reactiva las pausadas en todas tus
   cuentas de una vez. Cada producto con algo por cambiar tiene su botón **Aplicar en ML** (manda lo que dice «Quedará»,
   sin marcar nada). Para varios: márcalos y **Poner en ML lo que hay** (abajo); si alguno vende de más, avisa cuáles antes.
   **A mano** (sin aceptar la sugerencia): toca el número de **Quedará** (✎) y el producto pasa a «A mano»: cada publicación
@@ -1129,13 +1135,15 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   (10% por defecto, lo subes tú). Las demás campañas de ML no traen sugerido (ML solo da el precio mínimo que acepta):
   ahí se usa tu %. Si pones menos de lo que pide ML, salen marcadas «ML pide al menos X%» y no se mandan.
 - **Reportes:** el detalle con Excel. Dos grupos de pestañas: **por fechas** (Ventas, Compras) y **cómo estás hoy**
-  (Inventario, Stock, En tránsito, Conteos). El resumen del negocio ya no está aquí: está en el **Inicio**. Ya no
+  (Inventario, En tránsito, Conteos). **Stock se mudó a Inventario → Reponer** (18-11: termina en una compra, no es
+  un reporte; los enlaces viejos llevan ahí). El resumen del negocio ya no está aquí: está en el **Inicio**. Ya no
   existen las pestañas Resumen, Top productos ni Atención ML (un enlace viejo lleva al Inicio o a Por producto).
 - **Reportes → Ventas** tiene dos vistas: **Por venta** (cada venta con total, costo, comisión y ganancia; arriba la ganancia total con su rentabilidad) y **Por
   producto** (el top completo de las fechas elegidas): podio con los 3 primeros, el resto con barra, ordenar por
   **Unidades, Venta o Ganancia**, cuánto subió o bajó cada uno contra los mismos días justo antes («nuevo» si antes
   no vendía), qué % se llevan los 10 primeros, buscar, totales y **Excel**. Ganancia (con su rentabilidad debajo) solo con el permiso de costos.
-- **Reportes → Stock** (toda empresa con Inventario): arriba 4 tarjetas que son los filtros: **Reponer** (cuántos y
+- **Inventario → Reponer** (antes Reportes → Stock; toda empresa con Inventario, con permiso de ver Inventario y
+  Reportes): pestaña junto a **Stock** dentro de Inventario. Arriba 4 tarjetas que son los filtros: **Reponer** (cuántos y
   cuántos urgentes), **Se están cayendo**, **Parados** (con la plata que tienes sin moverse) y **Recién llegados**.
   Debajo, una frase explica la regla con tus números y cuántos productos «van bien».
   **Reponer** va agrupado en Urgente / Pedir / Ya viene en camino, con: Tienes (y lo que viene en camino), Vendes al
