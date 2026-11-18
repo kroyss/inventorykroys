@@ -18,6 +18,11 @@ import { LoQueSeHablo } from './PagoYContexto'
 import { NotasVenta } from '@/components/preguntas/MensajesClient'
 import EnlazarLocal from './EnlazarLocal'
 import { useTraidaME } from '@/components/pagosme/useTraidaME'
+import { useSession } from 'next-auth/react'
+import Link from '@/components/ui/Link'
+import { rutaHabilitada } from '@/lib/modulos'
+import { rutaPermitida } from '@/lib/permisos'
+import { NumeritoAviso } from '@/components/layout/Avisos'
 
 const chipCls = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset transition-colors'
 
@@ -889,6 +894,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
           </>}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
+          <IrADespachos />
           {datos.pagosME && (
             <button type="button" onClick={() => setBanco(true)} title="Sube los estados de cuenta y el sistema dice qué pagos llegaron de verdad"
               className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 shadow-sm hover:border-sky-400 hover:bg-sky-100">
@@ -1065,4 +1071,17 @@ export function usePorConfirmar(activo: boolean) {
   }, [activo])
   useEffect(() => { cargar() }, [cargar])
   return { datos, cargar }
+}
+
+/** 18-11 (el dueño): salto directo de Por confirmar (y Pagos ME) a Despachos, su paso siguiente, sin pasar por el menú.
+ *  Solo si la empresa tiene Despachos y el usuario lo ve. El numerito es el mismo del menú. */
+function IrADespachos() {
+  const u = useSession().data?.user as { role?: 'admin' | 'user'; permisos?: string[]; modulos?: string[]; country?: string } | undefined
+  if (!u || u.country !== 'VE' || !rutaHabilitada('/despachos', u.modulos ?? []) || !rutaPermitida('/despachos', u)) return null
+  return (
+    <Link href="/despachos" title="Imprimir las guías de lo que ya confirmaste"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-50">
+      Ir a Despachos<NumeritoAviso clave="despachos" urgente={false} /> →
+    </Link>
+  )
 }

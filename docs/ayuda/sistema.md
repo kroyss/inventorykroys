@@ -1073,6 +1073,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   queda verificado como cuando cuadra con el banco y el botón pasa a «Registrar venta»; «deshacer» lo vuelve atrás.
   **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
   toca **Registrar venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).
+  **Ir a Despachos →** (arriba, junto a «Comprobar con el banco»; en Venezuela con Despachos): salta directo a imprimir
+  las guías sin pasar por el menú.
   Abajo de la lista: **Vencidas** = ventas de más de N días (el plazo de «no concretada» de Calificaciones) sin pago y
   **todavía sin calificar**: Calificaciones las sugiere como no concretadas; se ven hasta los 8 días de la compra y las
   ya calificadas salen solas. **Calificadas como concretadas sin venta registrada** (aviso amarillo, con Inventario):
