@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { localCostFactor } from '@/lib/localCost'
+import { leerReglas } from '@/lib/stockReglas'
+import { nivelStockSQL, estadoStock } from '@/lib/nivelStock'
 import { COUNTRY_TZ, DEFAULT_TZ, currentDate } from '@/lib/tz'
 import * as XLSX from 'xlsx'
 
@@ -12,11 +14,12 @@ export async function GET(_: NextRequest) {
   try {
     // CO: costo (USD) a pesos (×TRM) para que cuadre con el precio de venta en pesos.
     const costFactor = await localCostFactor(session.user.country)
+    const { reglas } = await leerReglas(db)
     const { rows } = await db.query(`
       SELECT
         p.code, p.name, p.is_active,
         COALESCE(i.quantity, 0)                                          AS quantity,
-        COALESCE(i.min_stock, 0)                                         AS min_stock,
+        COALESCE(ns.min_ef, 0)                                         AS min_stock,
         COALESCE(i.max_stock, 0)                                         AS max_stock,
         COALESCE(pp.total_cost, 0)                                       AS total_cost,
         COALESCE(i.sale_price, pp.final_price_usd, 0)                    AS sale_price,
@@ -25,6 +28,7 @@ export async function GET(_: NextRequest) {
       FROM products p
       LEFT JOIN product_pricing pp ON p.id = pp.product_id
       LEFT JOIN inventory i        ON p.id = i.product_id
+      LEFT JOIN ${nivelStockSQL(reglas)} ns ON ns.product_id = p.id   -- Fase 2: el mínimo que se usa (lib/nivelStock.ts)
       WHERE p.is_active = TRUE
       ORDER BY p.code ASC
     `)
@@ -32,9 +36,7 @@ export async function GET(_: NextRequest) {
     const data = rows.map(r => {
       const qty = parseInt(r.quantity, 10) || 0
       const min = parseInt(r.min_stock, 10) || 0
-      let estado = 'OK'
-      if (qty === 0) estado = 'SIN STOCK'
-      else if (qty <= min && min > 0) estado = 'BAJO'
+      const estado = estadoStock(qty, min).replace('_', ' ')
       return {
         CODIGO:       r.code,
         PRODUCTO:     r.name,

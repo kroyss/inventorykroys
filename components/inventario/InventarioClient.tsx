@@ -5,7 +5,6 @@ import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country }
 import { Pagination, KPICard, StatusBadge } from '@/components/ui'
 import Link from '@/components/ui/Link'
 import EtiquetasModal from './EtiquetasModal'
-import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useEscape } from '@/components/ui/useEscape'
 import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
@@ -150,9 +149,7 @@ export default function InventarioClient({ initialItems, acceso, country, etique
   const mlPriceVE = (it: InventoryItem) =>
     it.total_cost * (1 + (it.profit_percentage ?? 0) / 100) * (1 + veExcess / 100)
   const [items,    setItems]    = useState<InventoryItem[]>(initialItems)
-  const confirm = useConfirm()
   const [aviso, setAviso]       = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
-  const [aplicandoRec, setAplicandoRec] = useState(false)
   // Etiquetas (18-10): null = cerrada; 0 = todos con stock; id = solo ese producto.
   const [etiquetas, setEtiquetas] = useState<number | null>(null)
   const [selected, setSelected] = useState<InventoryItem | null>(null)
@@ -375,27 +372,8 @@ export default function InventarioClient({ initialItems, acceso, country, etique
     // Inactivos ya no se listan en Inventario (solo en Productos).
   ]
 
-  // Productos con mín o máx sin configurar (0) que tienen un recomendado por ventas.
-  const sinConfigurar = items.filter(i => i.is_active &&
-    ((i.min_stock === 0 && i.min_stock_rec > 0) || (i.max_stock === 0 && i.max_stock_rec > 0))).length
-
-  const usarRecomendados = async () => {
-    const ok = await confirm({
-      title: 'Usar los recomendados',
-      message: `Se guardará el stock mínimo y máximo recomendado (4 y 12 meses de ventas) en ${sinConfigurar} producto(s) que no lo tienen configurado. Lo que ya tiene un valor no se toca.\n\nDesde ese momento, los productos con stock igual o por debajo de su mínimo pasan a "Stock bajo" (también en las alertas del Inicio).`,
-      confirmText: 'Guardar recomendados',
-    })
-    if (!ok) return
-    setAplicandoRec(true); setAviso(null)
-    try {
-      const res = await fetch('/api/inventory/recomendados', { method: 'POST' })
-      const d = await res.json().catch(() => ({}))
-      if (!res.ok) { setAviso({ type: 'error', text: d.error ?? 'No se pudo guardar' }); return }
-      const listRes = await fetch('/api/inventory')
-      if (listRes.ok) setItems(await listRes.json())
-      setAviso({ type: 'ok', text: `Listo: mínimo y máximo guardados en ${d.productos} producto(s).` })
-    } finally { setAplicandoRec(false) }
-  }
+  // Fase 2 (18-11): «Usar recomendados» ya no va: el mínimo y máximo recomendados se usan SOLOS (siguen tus reglas de
+  // Reponer y se mueven con las ventas); guardarlos a mano los congelaba. Lo escrito a mano en un producto sigue mandando.
 
   const th = (key: SortKey, label: string, align: 'left' | 'right' | 'center' = 'left') => (
     <th onClick={() => toggleSort(key)}
@@ -409,7 +387,7 @@ export default function InventarioClient({ initialItems, acceso, country, etique
   return (
     <div className="space-y-4">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      <EncabezadoInfo info={<><li>El stock de cada producto con su mínimo y máximo; el color avisa lo que está bajo o agotado.</li><li>Cada venta registrada resta y cada compra recibida suma. En el detalle de un producto ves todos sus movimientos.</li><li><b className="font-medium text-neutral-800">Ajuste de stock</b>: si contaste y no cuadra, guarda el número real; queda como un ajuste en sus movimientos.</li><li><b className="font-medium text-neutral-800">Reponer</b>: qué comprar según lo que vendes. <b className="font-medium text-neutral-800">Stock en ML</b>: compara tu stock con tus publicaciones.</li></>} title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" actions={<>
+      <EncabezadoInfo info={<><li><b className="font-medium text-neutral-800">Bajo</b>: lo que tienes alcanza para menos de lo que tarda en llegar la mercancía (las reglas de Reponer, las mismas en todo el sistema). Si le escribiste un mínimo a mano a un producto, manda ese.</li><li>Mín y máx en gris = los recomendados según lo que vendes; se mueven solos con las ventas.</li><li>Cada venta registrada resta y cada compra recibida suma. En el detalle de un producto ves todos sus movimientos.</li><li><b className="font-medium text-neutral-800">Ajuste de stock</b>: si contaste y no cuadra, guarda el número real; queda como un ajuste en sus movimientos.</li><li><b className="font-medium text-neutral-800">Reponer</b>: qué comprar según lo que vendes. <b className="font-medium text-neutral-800">Stock en ML</b>: compara tu stock con tus publicaciones.</li></>} title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" actions={<>
         {stockML && (
           <Link href="/inventario/stock-ml" className="btn-secondary text-sm whitespace-nowrap"
             title="Cada producto con todas sus publicaciones de MercadoLibre: iguala el stock y reactiva en todas tus cuentas de una vez">
@@ -420,12 +398,6 @@ export default function InventarioClient({ initialItems, acceso, country, etique
           <button onClick={() => setEtiquetas(0)} className="btn-secondary text-sm whitespace-nowrap"
             title="Etiquetas con código, nombre y código de barras para estantes y cajas">
             🏷 Imprimir etiquetas
-          </button>
-        )}
-        {isAdmin && sinConfigurar > 0 && (
-          <button onClick={usarRecomendados} disabled={aplicandoRec} className="btn-secondary text-sm whitespace-nowrap"
-            title="Guarda el mínimo y máximo recomendado en los productos que no lo tienen configurado">
-            {aplicandoRec ? 'Guardando…' : `Usar recomendados (${sinConfigurar})`}
           </button>
         )}
       </>} />
@@ -513,8 +485,8 @@ export default function InventarioClient({ initialItems, acceso, country, etique
                   </td>
                   <td className={`px-3 py-2 text-right font-semibold num ${item.quantity === 0 && item.status !== 'INACTIVO' ? 'text-red-600' : 'text-neutral-900'}`}>{item.quantity}</td>
                   {/* Sin configurar (0): se muestra el recomendado por ventas, en gris y cursiva */}
-                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-600 num">{item.min_stock || <span className="text-neutral-400 italic" title="Sin configurar · recomendado según ventas de 6 meses (4 meses de stock)">{item.min_stock_rec || '—'}</span>}</td>}
-                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-600 num">{item.max_stock || <span className="text-neutral-400 italic" title="Sin configurar · recomendado según ventas de 6 meses (12 meses de stock)">{item.max_stock_rec || '—'}</span>}</td>}
+                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-600 num">{item.min_stock || <span className="text-neutral-400 italic" title="Sin escribir a mano: el recomendado según lo que vendes y lo que tarda en llegar (reglas de Reponer). Es el que se usa para «Bajo».">{item.min_stock_rec || '—'}</span>}</td>}
+                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-600 num">{item.max_stock || <span className="text-neutral-400 italic" title="Sin escribir a mano: el recomendado según lo que vendes y lo que compras al pedir (reglas de Reponer).">{item.max_stock_rec || '—'}</span>}</td>}
                   <td className="px-3 py-2 text-right text-neutral-700">{priceLabel(item.sale_price || item.final_price_usd)}</td>
                   {isVE && <td className="px-3 py-2 text-right font-medium text-neutral-900 num">${fmt(mlPriceVE(item))}</td>}
                   {isAdmin && <td className="px-3 py-2 text-right text-neutral-600">{item.ventas_6m}</td>}

@@ -949,7 +949,7 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
   producto con costo estimado guardan ese costo marcado; cuando pones el **costo real** (en **Productos → Completar
   costos**, en la ficha del producto o al recibir una compra) **esas ventas se corrigen solas**. Las ventas con costo
   real no cambian nunca.
-- **Completar costos** (Productos → aviso ámbar «N productos tienen costo estimado» → **Completar costos**, o
+- **Completar costos** (Productos → filtro **Costo estimado** → **Completar en lote →**, o
   `/productos/costos`; requiere el permiso de costos): lista los productos con costo estimado, **los más vendidos en 30
   días primero** (con pocos costos reales se cubre casi toda la ganancia). Por fila: el costo (prellenado con el
   estimado), qué % del precio es, cuántas ventas se van a corregir. **Guardar** pone el real y corrige sus ventas; si el
@@ -966,6 +966,14 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
   En Venezuela, la columna **Peso ME** muestra el peso de cada producto y de dónde sale: solo el número = del portal de
   MercadoEnvíos (al pasar el mouse, la fecha en que se leyó), **a mano**, **⚠ distintos** (sus publicaciones pesan
   distinto en el portal: revisar en Publicaciones → Preparar → Pesos y envío gratis) o **Sin peso**. Se puede ordenar por peso.
+- **Filtros de Productos (18-11):** debajo del buscador, solo los que tienen algo y con su número: **Costo estimado**
+  (importados con un % del precio; trae **Completar en lote →**), **Sin costo**, **Rentabilidad baja** (por debajo de
+  «sana», los cortes de Costos ML) y **Menos de $5** (Venezuela; trae **Revisar márgenes →**, antes un botón aparte).
+- **Stock bajo (18-11, una sola regla):** el mínimo de cada producto sale de las reglas de Inventario → Reponer: venta
+  por mes × lo que tarda en llegar la mercancía (si vende al menos el mínimo por mes). El máximo, × lo que compras al
+  pedir. Si le escribiste un mínimo a mano a un producto, manda ese. «Bajo» = con stock y por debajo de ese mínimo; lo
+  usan Inventario (estado y filtro), el Excel, Reportes → Inventario y el «Stock bajo» del Inicio. Ya no está el botón
+  «Usar recomendados»: los recomendados se usan solos y se mueven con las ventas.
 - **Recargo y rentabilidad (cómo se lee la ganancia; desde el 14-11, en todo el sistema):** son tres palabras.
   - **Recargo sobre costo:** lo que **le sumas** a lo que te costó para sacar el precio (lo decides tú, en el medidor).
     Precio = costo × (1 + recargo). Ej.: costo $2,40 con recargo 80 % → precio $4,32.

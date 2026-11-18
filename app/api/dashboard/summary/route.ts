@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { leerReglas } from '@/lib/stockReglas'
+import { nivelStockSQL } from '@/lib/nivelStock'
 import { noReponerSQL } from '@/lib/noReponer'
 
 export async function GET(_: NextRequest) {
@@ -11,12 +12,15 @@ export async function GET(_: NextRequest) {
   try {
     // 12-11 (rapidez): las 9 cifras en UNA consulta (cada una es la misma de antes, como subconsulta). Antes eran
     // 9 pedidos que, sobre la misma conexión del request, iban en fila (0,8–3,7 s con el server ocupado).
+    // «Stock bajo» (Fase 2, 18-11): el mismo mínimo que Inventario (reglas de Reponer, lib/nivelStock.ts), con stock > 0
+    // (los de 0 son «Sin stock»): el número coincide con el filtro Bajo de Inventario al que lleva.
+    const { reglas } = await leerReglas(db)
     const { rows: [t] } = await db.query(`
       SELECT a1.n AS a1_n, a2.cnt AS a2_cnt, a2.total AS a2_total, a3.total AS a3_total, a3.commission AS a3_commission, a4.n AS a4_n, a5.n AS a5_n, a6.n AS a6_n, a7.n AS a7_n, a8.total AS a8_total, a8c.total AS a8c_total, a8c.commission AS a8c_commission
       FROM (SELECT COUNT(*) AS n FROM products WHERE is_active = TRUE) a1,
            (SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS total FROM sales WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL') AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW())) a2,
            (SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total, COALESCE(SUM(si.quantity * COALESCE(si.unit_commission, 0)), 0) AS commission FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL') AND DATE_TRUNC('month', COALESCE(s.processed_at, s.created_at)) = DATE_TRUNC('month', NOW())) a3,
-           (SELECT COUNT(*) AS n FROM inventory i JOIN products p ON i.product_id = p.id WHERE p.is_active = TRUE AND i.quantity <= i.min_stock AND i.min_stock > 0) a4,
+           (SELECT COUNT(*) AS n FROM inventory i JOIN products p ON i.product_id = p.id JOIN ${nivelStockSQL(reglas)} ns ON ns.product_id = p.id WHERE p.is_active = TRUE AND i.quantity > 0 AND ns.min_ef > 0 AND i.quantity <= ns.min_ef) a4,
            (SELECT COUNT(*) AS n FROM inventory i JOIN products p ON i.product_id = p.id WHERE p.is_active = TRUE AND i.quantity = 0) a5,
            (SELECT COUNT(*) AS n FROM sales WHERE status = 'BORRADOR') a6,
            (SELECT COUNT(*) AS n FROM purchase_orders WHERE status IN ('PAGADA','EN_CAMINO','PAGO_PARCIAL','EN_TRANSITO','ADUANA','EN_IMPORTADOR_PAGAR')) a7,

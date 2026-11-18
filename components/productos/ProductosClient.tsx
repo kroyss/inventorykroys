@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { FotoProducto, FotoEditable } from '@/components/ui/FotoProducto'
 import type { Product, ProfitCategory, Country, MLCode } from '@/lib/types'
-import { int, KPICard, StatusBadge, RowMenu } from '@/components/ui'
+import { int, KPICard, StatusBadge, RowMenu, FilterPills } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
@@ -72,6 +72,7 @@ const netColor = (m: number, u: Umbrales) => colorRentab(m, u)
 const fmtPct = (n: number) => `${Number.isInteger(Math.round(n * 10) / 10) ? Math.round(n) : (Math.round(n * 10) / 10).toLocaleString('de-DE')}%`
 
 // ─── types ──────────────────────────────────────────────────────
+type FiltroProd = 'todos' | 'estimado' | 'sin_costo' | 'baja' | 'menos5'
 interface FormState {
   code: string
   name: string
@@ -150,7 +151,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const [batchPct,  setBatchPct]  = useState('')   // 14-11: recargo en lote (antes categoría)
   const [simPct,    setSimPct]    = useState<number | null>(null)   // modo simple: % que se está simulando en la ficha
   const [verCostos, setVerCostos] = useState(false)
-  const estimados = useMemo(() => products.filter(p => p.is_active && p.costo_estimado).length, [products])
+  const [filtroP, setFiltroP] = useState<FiltroProd>('todos')
   const [modal,     setModal]     = useState<'create' | 'edit' | null>(null)
   const [editId,    setEditId]    = useState<number | null>(null)
   const [form,      setForm]      = useState<FormState>(emptyForm())
@@ -537,9 +538,28 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const sortArrow = (k: SortKey) =>
     sortKey === k ? <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span> : null
 
+  // Fase 3 (18-11, el dueño: simplificar): lo que antes eran pantallas o avisos aparte (Completar costos, Márgenes < $5)
+  // son FILTROS de esta misma lista; cada uno con su herramienta en lote a un clic.
+  const finalDe = (p: Product) => simple ? p.sale_price : liveFinalVE(p, veRate?.excess ?? 0, effDiscountFor(p))
+  const cumple = (p: Product, f: FiltroProd): boolean => {
+    if (f === 'todos') return true
+    if (!p.is_active) return false
+    if (f === 'estimado') return !!p.costo_estimado
+    if (f === 'sin_costo') return !(p.total_cost > 0)
+    if (f === 'baja') { const n = p.total_cost > 0 ? netDe(p, effDiscountFor(p)) : null; return !!n && nivelDe(n.rentabilidad, umbr) !== 'sano' }
+    if (f === 'menos5') { const fin = finalDe(p); return fin > 0 && fin < 5 }
+    return true
+  }
+  const cuentas = useMemo(() => {
+    const c: Record<FiltroProd, number> = { todos: products.length, estimado: 0, sin_costo: 0, baja: 0, menos5: 0 }
+    for (const p of products) for (const f of ['estimado', 'sin_costo', 'baja', 'menos5'] as const) if (cumple(p, f)) c[f]++
+    return c
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, veRate, coTrm, mlSettings, globalDiscount, shipTable, simple, umbr])
   const filtered = useMemo(() => products.filter(p =>
-    matchTokens(search, p.code, p.name, p.category_name ?? '')
-  ), [products, search])
+    matchTokens(search, p.code, p.name, p.category_name ?? '') && cumple(p, filtroP)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [products, search, filtroP, veRate, coTrm, mlSettings, globalDiscount, shipTable, simple, umbr])
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
@@ -583,7 +603,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   return (
     <div className="space-y-4">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      <EncabezadoInfo info={<><li>Cada producto con su costo, precio y rentabilidad. Tócalo para ver su ficha; Editar va en el pie.</li><li><b className="font-medium text-neutral-800">+ Producto</b> o <b className="font-medium text-neutral-800">Importar desde ML</b>: crea los productos a partir de tus publicaciones de MercadoLibre.</li><li><b className="font-medium text-neutral-800">Recargo sobre costo</b>: lo que le sumas al costo para el precio. <b className="font-medium text-neutral-800">Rentabilidad</b>: lo que te queda después de MercadoLibre, sobre el costo.</li><li><b className="font-medium text-neutral-800">Costos ML</b>: la comisión y el envío que se usan en ese cálculo.</li></>} title="Productos" subtitle="Catálogo, precios y rentabilidad de cada producto" actions={<>
+      <EncabezadoInfo info={<><li>Cada producto con su costo, precio y rentabilidad. Tócalo para ver su ficha; Editar va en el pie.</li><li><b className="font-medium text-neutral-800">+ Producto</b> o <b className="font-medium text-neutral-800">Importar desde ML</b>: crea los productos a partir de tus publicaciones de MercadoLibre.</li><li><b className="font-medium text-neutral-800">Recargo sobre costo</b>: lo que le sumas al costo para el precio. <b className="font-medium text-neutral-800">Rentabilidad</b>: lo que te queda después de MercadoLibre, sobre el costo.</li><li><b className="font-medium text-neutral-800">Costos ML</b>: la comisión y el envío que se usan en ese cálculo.</li><li><b className="font-medium text-neutral-800">Filtros</b> (debajo del buscador, solo si hay algo): Costo estimado, Sin costo, Rentabilidad baja y Menos de $5. El que eliges trae su arreglo en lote (Completar costos, Revisar márgenes).</li></>} title="Productos" subtitle="Catálogo, precios y rentabilidad de cada producto" actions={<>
         {/* 14-11 (el dueño): Importar desde ML vive en Productos (es donde se crean); MercadoEnvíos sigue en Publicaciones. */}
         {importarML && products.length > 0 && (
           <Link href="/productos/importar-ml" className="btn-secondary text-sm whitespace-nowrap"
@@ -591,27 +611,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             Importar desde ML
           </Link>
         )}
-        {country === 'VE' && descuento && (
-          <Link href="/productos/margenes" className="btn-secondary text-sm whitespace-nowrap"
-            title="Productos de menos de $5: rentabilidad antes y después de la tabla nueva de envíos, con sugerencia de recargo">
-            Márgenes &lt; $5
-          </Link>
-        )}
         {costosML && <button onClick={() => setVerCostos(true)} className="btn-secondary text-sm whitespace-nowrap" title="Comisión de MercadoLibre, envío y colores de la rentabilidad">Costos ML</button>}
         {catalogo && <Link href="/productos/catalogo" className="btn-secondary text-sm whitespace-nowrap" title="Catálogo con logo, fotos y precios para mandar por WhatsApp">Catálogo PDF</Link>}
         <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Producto</button>
       </>} />
-
-      {/* Mig 180: importados con costo estimado (% del precio) → completar el real, los más vendidos primero. */}
-      {completarCostos && estimados > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-sm text-amber-900">
-          <span className="flex-1">
-            <b>{estimados}</b> {estimados === 1 ? 'producto tiene' : 'productos tienen'} <b>costo estimado</b>: la ganancia de sus ventas es aproximada.
-            Pon el real cuando puedas y las ventas se corrigen solas.
-          </span>
-          <Link href="/productos/costos" className="btn-secondary text-xs whitespace-nowrap">Completar costos</Link>
-        </div>
-      )}
 
       {/* Catálogo vacío (25-10): el primer paso de quien recién prende inventario es traer sus publicaciones. */}
       {importarML && products.length === 0 && (
@@ -665,6 +668,34 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           className="border border-neutral-300 rounded-lg px-3 py-2 text-sm w-full md:w-72 order-first"
         />
       </div>
+
+      {/* Filtros (Fase 3): solo los que tienen algo, con su conteo. El activo trae su herramienta en lote. */}
+      {products.length > 0 && (cuentas.estimado + cuentas.sin_costo + cuentas.baja + cuentas.menos5 > 0) && (
+        <div className="space-y-2">
+          <FilterPills value={filtroP} onChange={v => { setFiltroP(v); setVisible(PAGE_SIZE) }} options={[
+            { value: 'todos' as const, label: 'Todos' },
+            ...(completarCostos && cuentas.estimado ? [{ value: 'estimado' as const, label: 'Costo estimado', count: cuentas.estimado }] : []),
+            ...(cuentas.sin_costo ? [{ value: 'sin_costo' as const, label: 'Sin costo', count: cuentas.sin_costo }] : []),
+            ...(cuentas.baja ? [{ value: 'baja' as const, label: 'Rentabilidad baja', count: cuentas.baja }] : []),
+            ...(country === 'VE' && descuento && cuentas.menos5 ? [{ value: 'menos5' as const, label: 'Menos de $5', count: cuentas.menos5 }] : []),
+          ]} />
+          {filtroP === 'estimado' && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+              <span className="flex-1">Costo estimado (un % del precio, al importar de ML): la ganancia de sus ventas es aproximada. Pon el real y las ventas se corrigen solas.</span>
+              <Link href="/productos/costos" className="btn-secondary text-xs whitespace-nowrap">Completar en lote →</Link>
+            </div>
+          )}
+          {filtroP === 'baja' && (
+            <p className="text-xs text-neutral-500">Rentabilidad por debajo de «sana» ({umbr.sano} %), después de MercadoLibre. Los cortes se cambian en Costos ML.</p>
+          )}
+          {filtroP === 'menos5' && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-600">
+              <span className="flex-1">Precio final menor a $5: ahí el envío pesa más. La revisión compara la ganancia por unidad y sugiere el recargo.</span>
+              <Link href="/productos/margenes" className="btn-secondary text-xs whitespace-nowrap">Revisar márgenes →</Link>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── table (desktop) ── */}
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">

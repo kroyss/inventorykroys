@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { puede } from '@/lib/permisos'
+import { leerReglas } from '@/lib/stockReglas'
+import { nivelStockSQL } from '@/lib/nivelStock'
 
 // Llena de una vez el stock mínimo / máximo que NO está configurado (0) con el recomendado
 // por ventas de los últimos 6 meses — la misma fórmula que muestra Inventario:
@@ -14,20 +16,14 @@ export async function POST() {
   if (!puede(session.user, 'inventario_config')) return forbidden()
 
   try {
+    const { reglas } = await leerReglas(db)
     const { rows: [r] } = await db.query(`
       WITH rec AS (
-        SELECT inv.product_id,
-               ROUND(v.ventas_6m / 6.0 * 4)::int  AS min_rec,
-               ROUND(v.ventas_6m / 6.0 * 12)::int AS max_rec
+        -- Fase 2 (18-11): los mismos recomendados que muestra Inventario (reglas de Reponer, lib/nivelStock.ts).
+        SELECT inv.product_id, ns.min_rec, ns.max_rec
         FROM inventory inv
         JOIN products p ON p.id = inv.product_id AND p.is_active
-        CROSS JOIN LATERAL (
-          SELECT COALESCE(SUM(si.quantity), 0) AS ventas_6m
-          FROM sales s JOIN sale_items si ON s.id = si.sale_id
-          WHERE si.product_id = inv.product_id
-            AND s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-            AND s.created_at >= NOW() - INTERVAL '6 months'
-        ) v
+        JOIN ${nivelStockSQL(reglas)} ns ON ns.product_id = inv.product_id
       ), upd AS (
         UPDATE inventory i
         -- sin cruzarse con lo que ya estaba configurado (mín nunca por encima del máx)

@@ -436,7 +436,7 @@ function BarraPedido({ repo, pedido, limpiar, crear, noPedir }: { repo: P[]; ped
 
 // ── ⚙ Reglas: las decide cada empresa ───────────────────────────────────────────────────────────────────────────
 const CAMPOS: { k: keyof ReglasStock; t: string; ayuda: string; sufijo: string; paso: number }[] = [
-  { k: 'llegada', t: '¿Cuánto tarda en llegarte la mercancía?', ayuda: 'Desde que pides hasta que la tienes. Por debajo de esto te avisamos que repongas.', sufijo: 'meses', paso: 0.25 },
+  { k: 'llegada', t: '¿Cuánto tarda en llegarte la mercancía?', ayuda: 'Desde que pides hasta que la tienes. Por debajo de esto te avisamos que repongas, y el producto sale «Bajo» en Inventario y en el Inicio.', sufijo: 'meses', paso: 0.25 },
   { k: 'urgente', t: 'Es urgente si te alcanza para menos de', ayuda: 'Contando lo que ya viene en camino.', sufijo: 'meses', paso: 0.25 },
   { k: 'objetivo', t: 'Cuando pidas, compra para', ayuda: 'Lo sugerido llena este tiempo de ventas.', sufijo: 'meses', paso: 0.5 },
   { k: 'historia', t: 'Para saber cuánto vendes, mirar los últimos', ayuda: 'El promedio de ventas al mes sale de este período.', sufijo: 'meses', paso: 1 },
