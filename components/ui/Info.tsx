@@ -1,7 +1,8 @@
 'use client'
 // ⓘ junto al título de una pantalla (18-11, el dueño: «me gusta el símbolo para la info de ayuda»): lo fino de cómo
 // funciona va aquí en vez de párrafos sueltos. Se TOCA (también en el celular); abierto muestra el panel debajo.
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { PageHeader } from '@/components/ui'
 
 export function BotonInfo({ abierto, onClick }: { abierto: boolean; onClick: () => void }) {
   return (
@@ -17,4 +18,15 @@ export function PanelInfo({ children }: { children: ReactNode }) {
       <ul className="list-disc space-y-1 pl-5">{children}</ul>
     </div>
   )
+}
+
+/** Encabezado de pantalla con la ⓘ junto al título y su panel debajo (18-11: Preguntas, Mensajes, Despachos, Reportador).
+ *  Sirve también desde páginas de servidor: el estado abierto/cerrado vive aquí. */
+export function EncabezadoInfo({ title, subtitle, actions, info }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; info: ReactNode }) {
+  const [abierto, setAbierto] = useState(false)
+  return <>
+    <PageHeader title={<span className="inline-flex items-center gap-2">{title}<BotonInfo abierto={abierto} onClick={() => setAbierto(v => !v)} /></span>}
+      subtitle={subtitle} actions={actions} />
+    {abierto && <PanelInfo>{info}</PanelInfo>}
+  </>
 }

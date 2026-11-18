@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { tieneModulo } from '@/lib/modulos'
-import { PageHeader } from '@/components/ui'
+import { EncabezadoInfo } from '@/components/ui/Info'
 import GuiasTealca from '@/components/despachos/GuiasTealca'
 import ReportadorPanel from '@/components/despachos/ReportadorPanel'
 import ReportadorApi from '@/components/despachos/ReportadorApi'
@@ -47,7 +47,15 @@ export default async function ReportadorPage({ searchParams }: { searchParams: P
   ])
   return (
     <div className="space-y-4">
-      <PageHeader title="Reportador" subtitle="Le escribe a cada comprador su número de guía en MercadoLibre." />
+      {/* 18-11 (el dueño): cómo funciona en la ⓘ. */}
+      <EncabezadoInfo title="Reportador" subtitle="Le escribe a cada comprador su número de guía en MercadoLibre"
+        info={<>
+          <li>Se reportan las guías impresas en <b className="font-medium text-neutral-800">Despachos</b>, al cerrar la jornada. Las de TEALCA, cuando escribes su guía final.</li>
+          <li>Si imprimes directo desde MercadoLibre, el sistema no se entera y no las reporta.</li>
+          <li><b className="font-medium text-neutral-800">Reportar por API</b> trabaja en el servidor: puedes cerrar la pantalla o bloquear el teléfono. Antes de cada envío revisa la conversación para no repetir la guía.</li>
+          <li><b className="font-medium text-neutral-800">Vista previa</b> revisa todo sin mandar nada.</li>
+          <li>MercadoLibre corta los mensajes largos sin avisar y rechaza links de Facebook.</li>
+        </>} />
       <ReportadorVistas esperaInicial={espera?.espera ?? null} vistaInicial={sp.vista === 'historial' || jornada ? 'historial' : 'reportar'} jornadaInicial={jornada}
         reportar={<>
           <ReportadorApi inicial={iApi} conEscritorio={conEscritorio} />

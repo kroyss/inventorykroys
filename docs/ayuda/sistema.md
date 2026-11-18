@@ -200,7 +200,7 @@ El sistema nunca publica, cambia precios ni borra nada en ML sin que lo pidas.
 
 *Cómo lo pregunta la gente:* responder preguntas, IA, respuesta automática, que responda solo, respuestas rápidas, plantillas, políticas, datos del producto.
 
-Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
+Todas las preguntas sin responder de todas tus cuentas, en una sola lista. La **ⓘ** junto al título resume cómo funciona.
 
 **Cómo se usa:**
 1. Abre una pregunta: ves la publicación, la pregunta y las preguntas anteriores de ese comprador.
@@ -381,7 +381,7 @@ preguntas (spam, ofensivas).
 
 *Cómo lo pregunta la gente:* mensajes de compradores, posventa, chat, adjuntar foto, enviar comprobante, nota de la venta, mensaje de bienvenida, recordar el pago, pedir calificación.
 
-Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, para que ninguno quede sin respuesta.
+Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, para que ninguno quede sin respuesta. La **ⓘ** junto al título resume cómo funciona.
 
 **Cómo se usa:**
 - Elige una conversación. Ves los mensajes, los productos, el total de la venta y, si usas Despachos, si su guía ya
@@ -636,7 +636,7 @@ banco, no el que escribió el comprador.
 Imprime las etiquetas de MercadoEnvíos (ZOOM / TEALCA) **4 por hoja**, con la cantidad y la nota de cada paquete,
 y arma el **manifiesto** al final del día. Cuando un producto va **2 o más unidades**, la cantidad sale en un círculo
 negro y escrita en palabra y negrita («❷ DOS - …», «❸ TRES - …») para no equivocarse al armar el paquete; con 1
-unidad queda normal («1 - …»).
+unidad queda normal («1 - …»). La **ⓘ** junto al título resume cómo funciona.
 
 **Cómo se usa:**
 1. Las guías entran solas desde Pagos ME, o **arrastra los PDFs** de MercadoEnvíos (o pégalos con Ctrl+V, o haz
@@ -696,7 +696,7 @@ se reporta. Queda en Reportador → Historial como «Avisada por fuera», con **
 
 *Cómo lo pregunta la gente:* reporte de guías, reportar guías, mandar la guía al comprador, mensaje con la guía, número de guía, el Reportador, programa de escritorio.
 
-Le escribe a cada comprador su **número de guía** por MercadoLibre, después de cerrar la jornada en Despachos.
+Le escribe a cada comprador su **número de guía** por MercadoLibre, después de cerrar la jornada en Despachos. La **ⓘ** junto al título resume cómo funciona.
 
 **Cómo se usa:**
 1. **Antes del primer reporte, revisa el mensaje** que recibirá el comprador (Mensaje al comprador). Te dejamos uno

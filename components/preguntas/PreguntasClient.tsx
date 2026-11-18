@@ -13,7 +13,8 @@ import { RespuestasRapidas, LoAprendido } from './RespuestasRapidas'
 import { IaAutomatica } from './IaAutomatica'
 import { BotonDatos, CorregirIA } from '@/components/ia/CorregirIA'
 import { useSearchParams } from 'next/navigation'
-import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
+import { Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
+import { EncabezadoInfo } from '@/components/ui/Info'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -319,7 +320,14 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
   return (
     <TablasEnvioCtx.Provider value={datos?.tablasEnvio ?? undefined}>
     <div className="space-y-4">
-      <PageHeader title="Preguntas" subtitle="Todas las preguntas de tus cuentas de MercadoLibre en una bandeja, con respuesta sugerida por IA"
+      {/* 18-11 (el dueño, como en Stock y Calificaciones): cómo funciona va en la ⓘ. */}
+      <EncabezadoInfo title="Preguntas" subtitle="Las preguntas de todas tus cuentas de MercadoLibre en una bandeja"
+        info={<>
+          <li>Abre una pregunta: ves la publicación y lo que ese comprador preguntó antes.</li>
+          <li>Responde escribiendo, con una <b className="font-medium text-neutral-800">respuesta rápida</b> o con <b className="font-medium text-neutral-800">Proponer con IA</b>: lo que propone no sale sin que lo revises.</li>
+          <li>Si la IA no encuentra un dato en la publicación o en tus políticas, la propuesta sale con <b className="font-medium text-neutral-800">confianza baja</b> y te dice qué revisar.</li>
+          <li><b className="font-medium text-neutral-800">Historial</b>: lo ya respondido.{isAdmin ? <> <b className="font-medium text-neutral-800">Configuración</b>: Mi IA, datos de cada producto y respuestas rápidas.</> : null}</li>
+        </>}
         actions={<>
           <UsoIA />
           <button onClick={sincronizar} disabled={sincronizando || !!sinCuentas} className="btn-secondary text-sm">

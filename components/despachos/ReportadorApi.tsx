@@ -113,8 +113,7 @@ export default function ReportadorApi({ conEscritorio = false, inicial = null }:
             Reportar por API
           </h2>
           <p className="text-xs text-neutral-500 mt-0.5">
-            El sistema le escribe la guía a cada comprador directamente por MercadoLibre, con las mismas plantillas.
-            Trabaja en el servidor: puedes cerrar la pantalla o bloquear el teléfono.
+            Le escribe la guía a cada comprador por MercadoLibre; sigue solo aunque cierres la pantalla.
           </p>
         </div>
         <div className="flex gap-2">

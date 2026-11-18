@@ -4,7 +4,8 @@ import PrimeraJornada from '@/components/despachos/PrimeraJornada'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePrimera } from '@/lib/primera'
 import Link from '@/components/ui/Link'
-import { PageHeader, EmptyState } from '@/components/ui'
+import { EmptyState } from '@/components/ui'
+import { EncabezadoInfo } from '@/components/ui/Info'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 // ── Tipos de la API ─────────────────────────────────────────────────────────
@@ -358,8 +359,16 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false, 
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      {/* 18-11 (el dueño): el paso a paso en la ⓘ. */}
+      <EncabezadoInfo
         title="Despachos"
+        info={<>
+          <li>Arrastra los PDFs de MercadoEnvíos (o entran solos desde Pagos ME): forman un <b className="font-medium text-neutral-800">lote</b>.</li>
+          <li>Revisa cada etiqueta (venta, productos y nota; la nota se guarda también en MercadoLibre) y toca <b className="font-medium text-neutral-800">Generar PDF</b>: 4 por hoja.</li>
+          <li>Imprime a <b className="font-medium text-neutral-800">«Tamaño real» (100 %)</b>, no «Ajustar a la página».</li>
+          <li>Una guía ya impresa no sale dos veces: entra en rojo «Ya impresa». Si una no debe salir todavía, apártala (<b className="font-medium text-neutral-800">En espera</b>).</li>
+          <li>Al final del día: <b className="font-medium text-neutral-800">Cerrar jornada → Manifiesto</b>, uno por transportista. Si usas el Reportador, ahí entran a su cola.</li>
+        </>}
         subtitle={data.jornada
           ? `Jornada abierta desde ${fechaHora(data.jornada.opened_at)} · ${data.jornada.total_envios} envío(s)`
           : 'Sin jornada abierta: se abre sola al generar el primer lote'}

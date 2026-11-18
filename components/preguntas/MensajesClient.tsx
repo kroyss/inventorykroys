@@ -15,7 +15,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePrimera } from '@/lib/primera'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import type { PreguntaPrevia } from '@/lib/preguntasComprador'
-import { PageHeader, Tabs, EmptyState, Cargando, Pagination } from '@/components/ui'
+import { Tabs, EmptyState, Cargando, Pagination } from '@/components/ui'
+import { EncabezadoInfo } from '@/components/ui/Info'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
@@ -145,10 +146,14 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Mensajes" subtitle={<>
-        Mensajes de tus ventas en MercadoLibre, de todas tus cuentas, para que ninguno quede sin respuesta
-        <span className="block text-xs text-neutral-400 mt-0.5">Leer un mensaje aquí no lo marca como leído en MercadoLibre: se marca cuando respondes o tocas el sobre.</span>
-      </>}
+      {/* 18-11 (el dueño): la nota de «leído» y el resto de cómo funciona van en la ⓘ. */}
+      <EncabezadoInfo title="Mensajes" subtitle="Los mensajes de tus ventas en MercadoLibre, de todas tus cuentas"
+        info={<>
+          <li>Leer un mensaje aquí <b className="font-medium text-neutral-800">no lo marca como leído</b> en MercadoLibre: se marca cuando respondes o tocas el sobre.</li>
+          <li><b className="font-medium text-neutral-800">Por atender</b>: Responder (mensajes sin contestar), Pedir pago (ventas sin señal de pago dentro de tu plazo) y Escribirle (más de 12 h sin mensajes).</li>
+          <li><b className="font-medium text-neutral-800">Atendidas</b>: las conversaciones ya respondidas, con buscador.</li>
+          <li><b className="font-medium text-neutral-800">Al comprar</b>, Recordatorios y Pedir calificación: los mensajes de cada momento de la venta.</li>
+        </>}
         actions={<UsoIA />} />
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{error}</div>}
       {/* Cada conversación está en UNA: con mensajes sin responder → Por atender; si no → Atendidas. */}
