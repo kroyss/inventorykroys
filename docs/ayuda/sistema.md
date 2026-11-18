@@ -1091,13 +1091,12 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   poner stock en ML (aquí, en Automatizaciones → Stock y en la ventana de cambiar stock) avisa si pones más de lo que
   tienes y pide «Actualizar igual» (no bloquea). Apagada, el inventario se ve solo como dato y aquí sale una nota para
   revisar las sugerencias antes de aplicar. Arranca prendida si hubo entradas o ajustes de inventario en los últimos 60 días.
-  Prendida, **Automatizaciones → Stock** usa el mismo reparto: «inventario N · sugerido X» (al tocarlo) pone lo que sugiere Stock en ML (no
+  Prendida, **Automatizaciones → Stock** usa el mismo reparto: «Tienes N · [Poner X]» (al tocarlo) pone lo que sugiere Stock en ML (no
   todo el inventario; al pasar el cursor lo explica) y la que está en 0 porque lo que hay está en otra publicación dice
-  «inventario N · está en PIKEKE 1». Si comprando varias pierde el envío gratis, debajo dice «⚠ desde N u. sin envío
+  «Tienes N · en otra publicación» (al pasar el cursor dice en cuál); sin nada en el inventario, «Sin inventario». Si comprando varias pierde el envío gratis, debajo dice «⚠ desde N u. sin envío
   gratis · pack» (el enlace abre Stock vs inventario con esa publicación, para Crear pack). Si el producto está en varias
-  publicaciones y no hay reparto, dice «inventario N · en X publicaciones» sin sugerir (el número de cada una sale de
-  Stock vs inventario). La variante de una publicación **vinculada entera** dice «⚠ vinculada entera · dividir por
-  variantes» (no se sabe qué producto es: sin inventario ni sugerido). Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
+  publicaciones y no hay reparto, dice «Tienes N · [Repartir →]» sin sugerir (abre Stock vs inventario, que da el número de cada una). La variante de una publicación **vinculada entera** dice «[Vincular por color →]» (abre Dividir por
+  variantes; no se sabe qué producto es: sin inventario ni sugerido). Cada variante sale con su propia foto. Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
   (en «Para decidir» salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
   variantes, descripción) sin ir a MercadoLibre.
   **Compartida con COD-…**: la misma publicación vinculada a varios productos (modelos que elige el comprador, p. ej. un

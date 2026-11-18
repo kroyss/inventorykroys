@@ -32,7 +32,14 @@ const POR_MULTIGET = 20                    // máximo de ML en /items?ids=
 interface ItemML {
   id: string; title: string; status: string; sub_status?: string[]
   available_quantity: number; permalink?: string; thumbnail?: string
-  variations?: { id: number; available_quantity: number; attribute_combinations?: { name: string; value_name: string | null }[] }[]
+  pictures?: { id: string; url?: string; secure_url?: string }[]
+  variations?: { id: number; available_quantity: number; picture_ids?: string[]; attribute_combinations?: { name: string; value_name: string | null }[] }[]
+}
+/** 18-11 (el dueño: la variante Gris salía con la foto Blanca): foto chica (-I) de la PRIMERA foto de la variante. */
+const fotoVariante = (it: ItemML, ids?: string[]) => {
+  const p = (it.pictures ?? []).find(x => x.id === ids?.[0])
+  const u = p?.secure_url ?? p?.url
+  return u ? u.replace(/^http:/, 'https:').replace(/-[A-Z]\.(jpg|webp|png)$/i, '-I.$1') : null
 }
 
 export async function umbralStock(db: Pool) {
@@ -73,7 +80,7 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
   const sinLeer: string[] = []          // ML no dejó leerlas en esta pasada: se quedan como estaban (no se borran)
   for (let i = 0; i < ids.length; i += POR_MULTIGET) {
     const r = await leerItems<ItemML>(db, conexionId, ids.slice(i, i + POR_MULTIGET),
-      'id,title,status,sub_status,available_quantity,permalink,thumbnail,variations')
+      'id,title,status,sub_status,available_quantity,permalink,thumbnail,pictures,variations')
     sinLeer.push(...r.filter(x => x.code === -1).map(x => x.id))
     const filas: { item: string; var: number; titulo: string; variante: string | null; disp: number; estado: string; link: string | null; img: string | null; sub: string | null }[] = []
     for (const x of r) {
@@ -94,7 +101,7 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
       if (it.variations?.length) {
         for (const v of it.variations) {
           const nombre = (v.attribute_combinations ?? []).map(a => `${a.name}: ${a.value_name ?? '—'}`).join(' · ') || null
-          filas.push({ ...base, var: v.id, variante: nombre, disp: v.available_quantity ?? 0 })
+          filas.push({ ...base, var: v.id, variante: nombre, disp: v.available_quantity ?? 0, img: fotoVariante(it, v.picture_ids) ?? base.img })
         }
       } else {
         filas.push({ ...base, var: 0, variante: null, disp: it.available_quantity ?? 0 })

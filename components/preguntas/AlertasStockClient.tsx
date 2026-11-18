@@ -8,6 +8,9 @@ import Link from '@/components/ui/Link'
 import { BotonInfo, PanelInfo } from '@/components/ui/Info'
 import { useAvisos } from '@/components/layout/Avisos'
 
+/** Botón chico de la columna de la derecha (18-11): una sola acción por fila. */
+const CHIP = 'inline-flex items-center rounded-full px-2 py-0.5 font-medium ring-1 ring-inset transition'
+
 interface Fila {
   item_id: string; variante_id: string; titulo: string; variante: string | null; disponible: number; estado: string
   permalink: string | null; imagen: string | null; agotada_desde: string | null; bajo_desde: string | null
@@ -280,36 +283,40 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
         {/* 18-11 (el dueño: «una visión rápida, sin tanto texto»): UNA sola línea, siempre con lo que hay en el inventario;
             «poner X» solo si conviene subir el stock en ML (X = el sugerido de Stock vs inventario si reparte entre
             publicaciones; si no, lo del inventario). Si va en 0 a propósito, dice en qué otra publicación está. */}
-        {f.inventario != null && (() => {
+        {/* 18-11 (el dueño: «se ven forzados»): UNA línea que siempre empieza igual, «Tienes N», y como mucho UNA acción
+            (botón chico); el detalle va al pasar el cursor. Casos: Poner X (sugerido del reparto, o el inventario si está
+            en una sola publicación) · Repartir → (varias publicaciones y sin reparto) · en otra publicación · Sin
+            inventario · Vincular por color → (variante de una publicación vinculada entera: no se sabe qué producto es). */}
+        {f.entera_variantes ? (
+          <p className="text-[11px] whitespace-nowrap">
+            <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.item_id)}`}
+              title="La publicación está vinculada entera y tiene variantes: no se sabe qué producto es esta variante. Ábrela y usa «Dividir por variantes» para vincular cada color con su producto"
+              className={`${CHIP} bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100`}>Vincular por color →</Link>
+          </p>
+        ) : f.inventario != null && (() => {
           const conReparto = vista !== 'pausadas' && !!datos?.alDia && f.sugerido != null
-          if (conReparto && f.sugerido === 0 && f.en_otras) return (
-            <p className="max-w-[11rem] truncate text-[11px] text-neutral-600" title={`Va en 0 a propósito: lo que hay (${f.inventario} u.) está en ${f.en_otras}`}>
-              inventario {f.inventario} · está en {f.en_otras}</p>
-          )
-          // 18-11 (el dueño): sin reparto y con el producto en varias publicaciones NO se sugiere todo el inventario.
+          // Sin reparto y con el producto en varias publicaciones NO se sugiere todo el inventario.
           const varias = (f.n_pubs ?? 1) > 1
           const poner = vista === 'pausadas' ? null : conReparto ? f.sugerido! : varias ? null : f.inventario
           const puedePoner = poner != null && poner > f.disponible && !!datos?.puedeStock
+          if (f.inventario <= 0) return <p className="text-[11px] whitespace-nowrap text-neutral-400">Sin inventario</p>
           return (
-            // 18-11 (el dueño): «inventario N» en gris (dato); en verde solo «sugerido X» (la acción).
-            <p className="text-[11px] whitespace-nowrap text-neutral-500">
-              <span className="num">inventario {f.inventario}</span>
-              {!conReparto && varias && vista !== 'pausadas' && <span title="Ese inventario se reparte entre sus publicaciones: el número para cada una sale en Stock vs inventario"> · en {f.n_pubs} publicaciones</span>}
-              {puedePoner && <>
-                {' · '}
+            <p className="flex items-center justify-end gap-1.5 text-[11px] whitespace-nowrap text-neutral-500">
+              <span className="num">Tienes {f.inventario}</span>
+              {puedePoner ? (
                 <button type="button" onClick={() => escribir(f, String(poner))}
                   title={conReparto && poner! < f.inventario! ? `Lo que sugiere Stock vs inventario: reparte las ${f.inventario} u. entre tus publicaciones. Toca para ponerlo en MercadoLibre` : 'Toca para poner este número como stock en MercadoLibre'}
-                  className="font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-900">sugerido {poner}</button>
-              </>}
+                  className={`${CHIP} bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100`}>Poner {poner}</button>
+              ) : conReparto && f.sugerido === 0 && f.en_otras ? (
+                <span title={`Va en 0 a propósito: lo que hay está en ${f.en_otras}`} className="text-neutral-400">· en otra publicación</span>
+              ) : !conReparto && varias && vista !== 'pausadas' ? (
+                <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.item_id)}`}
+                  title={`Está en ${f.n_pubs} publicaciones: Stock vs inventario reparte lo que tienes entre todas`}
+                  className={`${CHIP} bg-sky-50 text-sky-700 ring-sky-200 hover:bg-sky-100`}>Repartir →</Link>
+              ) : null}
             </p>
           )
         })()}
-        {f.entera_variantes && (
-          <p className="text-[11px] text-amber-700 whitespace-nowrap" title="La publicación está vinculada entera y tiene variantes: no se sabe qué producto es esta variante. Vincula cada variante con su producto">
-            ⚠ vinculada entera ·{' '}
-            <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.item_id)}`} className="font-medium text-sky-700 underline hover:text-sky-900">dividir por variantes</Link>
-          </p>
-        )}
         {pasaInventario(f) && <p className="text-[11px] font-semibold text-amber-700 whitespace-nowrap">⚠ más de lo que tienes</p>}
         {/* 18-11 (el dueño: un cliente quería 10 bolsas): comprando varias pierde el envío gratis → aviso corto y el pack
             se arma en Stock vs inventario (con esa publicación ya buscada). No cambia lo sugerido. */}
