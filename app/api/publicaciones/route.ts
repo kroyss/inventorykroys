@@ -42,7 +42,10 @@ export async function GET(req: NextRequest) {
     if (ve.vincular) cond.vincular = SQL_SIN_VINCULAR
     if (ve.peso) cond.peso = SQL_SIN_PESO
     const extra = avisoPedido ? ` AND ${cond[avisoPedido]}` : ''
+    // 18-11 (caída de la lista en prod): Postgres exige que cada parámetro enviado aparezca en la consulta. Los arrays de
+    // stock/promo se mandan siempre que se ven, así que la lista también los nombra (como columnas), haya filtro o no.
     const cols = `${ve.vincular ? SQL_SIN_VINCULAR : 'FALSE'} AS sin_vincular, ${ve.peso ? SQL_SIN_PESO : 'FALSE'} AS sin_peso`
+      + (cond.stock ? `, ${cond.stock} AS _st` : '') + (cond.promo ? `, ${cond.promo} AS _pr` : '')
     const conteos = AVISOS.filter(a => cond[a]).map(a => `, COUNT(*) FILTER (WHERE ${cond[a]})::int AS ${a}`).join('')
     // Con un aviso pedido, la lista se filtra; los conteos de los filtros siguen siendo de toda la búsqueda.
     const [{ rows }, { rows: [t] }, { rows: cuentas }] = await Promise.all([
@@ -54,7 +57,8 @@ export async function GET(req: NextRequest) {
       s.db.query(`SELECT COUNT(*)::int AS todas, COUNT(*) FILTER (WHERE TRUE${extra})::int AS n${conteos} ${w.sql}`, args),
       s.db.query(`SELECT id, nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`),
     ])
-    const filas = rows.map(r => {
+    const filas = rows.map(({ _st, _pr, ...r }) => {
+      void _st; void _pr
       const st = stock.get(r.item_id)
       return { ...r, stock: st ? { nivel: st.nivel, code: st.code, disponible: st.disponible, pubs: st.pubs } : null, promo: promo.has(r.item_id) }
     })
