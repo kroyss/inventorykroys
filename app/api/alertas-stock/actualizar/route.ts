@@ -7,6 +7,7 @@ import { umbralStock } from '@/lib/alertasStock'
 import { esDemo } from '@/lib/demo'
 import { registrarUso } from '@/lib/usoAcciones'
 import { registrarCambioStock } from '@/lib/stockML'
+import { releerPublicacion } from '@/lib/catalogoML'
 
 const Body = z.object({
   cambios: z.array(z.object({
@@ -43,13 +44,17 @@ export async function POST(req: NextRequest) {
       try {
         const ruta = c.variante_id === '0' ? `/items/${c.item_id}` : `/items/${c.item_id}/variations/${c.variante_id}`
         if (!demo) await mlFetch(s.db, a.conexion_id, ruta, { method: 'PUT', body: { available_quantity: c.cantidad } })
+        // 18-11 (el dueño: la venta decía «Agotada» y ya tenía 41): la relectura de después (antes solo el estado) es la
+        // publicación entera y deja al día con UNA consulta el catálogo (Mis publicaciones, chips de Preguntas/Mensajes,
+        // Stock vs inventario) y la fila de Stock (estado incluido: ML la reactiva al ponerle stock).
         let estadoDespues: string | null = demo ? registro.estadoAntes : null
+        let releida = false
         if (!demo) {
-          try { estadoDespues = (await mlFetch<{ status: string }>(s.db, a.conexion_id, `/items/${c.item_id}?attributes=status`)).status }
-          catch { /* sin releer: queda sin estado */ }
+          try { estadoDespues = (await releerPublicacion(s.db, a.conexion_id, c.item_id)).status; releida = true }
+          catch { /* sin releer: queda sin estado; abajo se anota al menos la cantidad */ }
         }
         await registrarCambioStock(s.db, { ...registro, despues: c.cantidad, estadoDespues })
-        await s.db.query(
+        if (!releida) await s.db.query(
           `UPDATE ml_stock_alertas SET disponible = $3,
              agotada_desde = CASE WHEN $3 <= 0 THEN COALESCE(agotada_desde, NOW()) END,
              bajo_desde = CASE WHEN $3 > 0 AND $3 < $4 THEN COALESCE(bajo_desde, NOW()) END

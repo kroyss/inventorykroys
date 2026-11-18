@@ -58,6 +58,15 @@ export const fichaDeAtributos = (attrs: ItemCatalogo['attributes']) =>
 // 18-11: los mismos campos que la revisión de stock (lib/alertasStock.ts): con cada lectura se guardan las dos fotos.
 const CAMPOS = CAMPOS_ITEM
 
+/** 18-11: lee UNA publicación (GET individual: lo más fresco justo después de cambiarla; el multiget puede venir con
+ *  unos minutos de atraso) y la deja al día en el catálogo y en las alertas de stock. Devuelve lo leído. */
+export async function releerPublicacion(db: Pool, conexionId: number, itemId: string) {
+  const it = await mlFetch<ItemCatalogo>(db, conexionId, `/items/${itemId}?attributes=${CAMPOS}`)
+  if (it.status === 'active' || it.status === 'paused') await guardarItem(db, conexionId, it)
+  await guardarAlertas(db, conexionId, [it] as Parameters<typeof guardarAlertas>[2])
+  return it
+}
+
 /** Para la revisión de stock de cada hora (lib/alertasStock.ts), que ya leyó la publicación: la guarda en el catálogo. */
 export const guardarItemCatalogo = (db: Pool, conexionId: number, it: ItemCatalogo) => guardarItem(db, conexionId, it)
 
