@@ -10,7 +10,7 @@ import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, ML_API, tokenVigente, CuentaDemo } from '@/lib/ml'
 import { copiarNotas, leerNotas } from '@/lib/notasML'
-import { guardarOrden } from '@/lib/calificacionesML'
+import { guardarOrden, refrescarVendidas, itemsDeOrden } from '@/lib/calificacionesML'
 
 interface MensajeApi {
   id: string
@@ -77,9 +77,12 @@ async function ordenesDeVenta(db: Pool, conexionId: number, pack: string): Promi
     const p = await mlFetch<{ orders: { id: number }[] }>(db, conexionId, `/packs/${pack}`)
     ordenes = await Promise.all(p.orders.slice(0, 5).map(o => mlFetch<OrdenVenta>(db, conexionId, `/orders/${o.id}`)))
   }
+  const vendidas: string[] = []
   for (const o of ordenes) {
-    await guardarOrden(db, conexionId, o as unknown as Parameters<typeof guardarOrden>[2]).catch(e => console.error('[mensajes] guardar orden', e))
+    const nueva = await guardarOrden(db, conexionId, o as unknown as Parameters<typeof guardarOrden>[2]).catch(e => { console.error('[mensajes] guardar orden', e); return false })
+    if (nueva) vendidas.push(...itemsDeOrden(o as unknown as Parameters<typeof itemsDeOrden>[0]))
   }
+  await refrescarVendidas(db, conexionId, vendidas)   // 18-11: la publicación vendida queda al día
   return ordenes
 }
 

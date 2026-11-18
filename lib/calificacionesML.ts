@@ -82,8 +82,9 @@ export const detalleDeOrden = (o: Pick<OrdenBusqueda, 'order_items'>): DetalleOr
   }))
 
 /** Guarda (o actualiza) una venta de ML en ml_ordenes. */
-export async function guardarOrden(db: Pool, conexionId: number, o: OrdenBusqueda) {
-  await db.query(
+/** Guarda (o actualiza) una venta. Devuelve true si es NUEVA (no estaba guardada). */
+export async function guardarOrden(db: Pool, conexionId: number, o: OrdenBusqueda): Promise<boolean> {
+  const { rows: [g] } = await db.query(
     `INSERT INTO ml_ordenes (id, conexion_id, pack_id, fecha, comprador, productos, total, moneda,
                              cal_vendedor, cal_concretada, cal_comprador, items, detalle, estado, comprador_nombre, actualizada_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
@@ -96,7 +97,8 @@ export async function guardarOrden(db: Pool, conexionId: number, o: OrdenBusqued
                            THEN ml_ordenes.cal_vendedor
                            ELSE COALESCE(EXCLUDED.cal_vendedor, CASE WHEN ml_ordenes.cal_vendedor = 'cerrada_ml' THEN 'cerrada_ml' END) END,
        cal_concretada = COALESCE(EXCLUDED.cal_concretada, CASE WHEN EXCLUDED.cal_vendedor IS NOT NULL THEN ml_ordenes.cal_concretada END),
-       cal_comprador = EXCLUDED.cal_comprador, actualizada_at = NOW()`,
+       cal_comprador = EXCLUDED.cal_comprador, actualizada_at = NOW()
+     RETURNING (xmax = 0) AS nueva`,
     [o.id, conexionId, o.pack_id, o.date_created, o.buyer?.nickname ?? null,
      o.order_items.map(i => `${i.quantity} × ${i.item.title}`).join(' · '),
      o.total_amount, o.currency_id,
@@ -110,13 +112,28 @@ export async function guardarOrden(db: Pool, conexionId: number, o: OrdenBusqued
      JSON.stringify(detalleDeOrden(o)), o.status ?? null,
      // Nombre real (la venta suelta lo trae; la búsqueda a veces no): migración 080.
      [o.buyer?.first_name, o.buyer?.last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || null])
+  return !!g?.nueva
 }
+
+/** 18-11 (el dueño: «ir viendo lo que se va moviendo»): al llegar una venta NUEVA se relee de ML SOLO la publicación
+ *  (o las publicaciones) de esa venta, así Mis publicaciones, Stock vs inventario y Automatizaciones → Stock muestran el
+ *  stock y el estado reales (ML la pausa sola al quedar en 0) sin esperar la relectura general de cada 6 h. Una sola
+ *  consulta a ML por tanda (lee hasta 20 juntas). Si falla no corta nada: la relectura general lo corrige. */
+export async function refrescarVendidas(db: Pool, conexionId: number, items: Iterable<string>) {
+  const ids = [...new Set(items)].filter(x => /^[A-Z]{3}\d+$/.test(x))
+  if (!ids.length || await esDemo(db)) return
+  try {
+    const { refrescarItems } = await import('@/lib/catalogoML')
+    await refrescarItems(db, conexionId, ids)
+  } catch (e) { console.error('[ventas] releer publicaciones vendidas', e) }
+}
+export const itemsDeOrden = (o: { order_items?: { item: { id: string } }[] }) => (o.order_items ?? []).map(i => i.item.id)
 
 /** Trae una venta puntual de ML (por número) y la guarda. null = no es de esta cuenta. */
 export async function traerOrden(db: Pool, conexionId: number, id: string) {
   try {
     const o = await mlFetch<OrdenBusqueda>(db, conexionId, `/orders/${id}`)
-    await guardarOrden(db, conexionId, o)
+    if (await guardarOrden(db, conexionId, o)) await refrescarVendidas(db, conexionId, itemsDeOrden(o))
     return o
   } catch (e) {
     if (e instanceof ErrorML && [403, 404].includes(e.status)) return null
@@ -143,6 +160,7 @@ export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = 
   const ventana = dias ?? (completa ? DIAS_VENTANA : DIAS_RECIENTES)
   const desde = Date.now() - ventana * 86_400_000
   let n = 0
+  const vendidas = new Set<string>()    // publicaciones de las ventas NUEVAS de esta tanda (se releen al final)
   for (let offset = 0; offset < 5000; offset += 50) {
     const r = await mlFetch<{ results: OrdenBusqueda[] }>(db, conexionId,
       `/orders/search?seller=${c.ml_user_id}&sort=date_desc&limit=50&offset=${offset}`)
@@ -150,11 +168,12 @@ export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = 
     let viejas = false
     for (const o of lote) {
       if (new Date(o.date_created).getTime() < desde) { viejas = true; break }
-      await guardarOrden(db, conexionId, o)
+      if (await guardarOrden(db, conexionId, o)) for (const it of itemsDeOrden(o)) vendidas.add(it)
       n++
     }
     if (viejas || lote.length < 50) break
   }
+  await refrescarVendidas(db, conexionId, vendidas)
   if (dias !== undefined && !completa) return n     // "Traer nuevas": no cambia el ritmo del cron
   await db.query(`UPDATE ml_conexiones SET ordenes_sync_at = NOW() WHERE id = $1`, [conexionId])
   if (completa) {
