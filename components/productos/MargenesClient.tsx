@@ -23,7 +23,7 @@ import {
 // un % menor, y perseguir el % pediría subir más de lo necesario.
 // Aplicar deja la categoría y los precios guardados al día en un solo paso.
 
-const LIMITE = 5    // precio final por debajo del cual el cambio de envío pesa
+const LIMITE = 3    // precio final por debajo del cual el cambio de envío pesa (18-11, el dueño: antes 5)
 const SANO   = 25   // rentabilidad sobre costo sana (14-11: mismo corte por defecto que la ficha de producto)
 
 const fmt = (n: number) => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -207,7 +207,7 @@ export default function MargenesClient({ initialProducts, categories }: {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-lg font-semibold">Revisión de rentabilidad · productos de menos de $5</h1>
+          <h1 className="text-lg font-semibold">Revisión de rentabilidad · productos de menos de ${LIMITE}</h1>
           <p className="text-xs text-neutral-500">
             Compara la rentabilidad (sobre costo) con la regla de envío anterior (gratis desde $5 fijo) contra la tabla de
             MercadoEnvíos vigente, por peso. Sugiere el menor escalón de categoría que devuelve la ganancia por
@@ -218,7 +218,7 @@ export default function MargenesClient({ initialProducts, categories }: {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPICard compact label="Productos < $5" value={kpi.total} />
+        <KPICard compact label={`Productos < $${LIMITE}`} value={kpi.total} />
         <KPICard compact label="Perdieron ganancia" value={kpi.perdieron} accent={kpi.perdieron ? 'text-amber-600' : undefined} />
         <KPICard compact label="Rentabilidad < 10%" value={kpi.rojo} accent={kpi.rojo ? 'text-red-600' : undefined} />
         <KPICard compact label="Con sugerencia de subir" value={kpi.sugeridos} />

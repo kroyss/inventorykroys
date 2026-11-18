@@ -538,7 +538,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const sortArrow = (k: SortKey) =>
     sortKey === k ? <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span> : null
 
-  // Fase 3 (18-11, el dueño: simplificar): lo que antes eran pantallas o avisos aparte (Completar costos, Márgenes < $5)
+  // Fase 3 (18-11, el dueño: simplificar): lo que antes eran pantallas o avisos aparte (Completar costos, Márgenes < $3)
   // son FILTROS de esta misma lista; cada uno con su herramienta en lote a un clic.
   const finalDe = (p: Product) => simple ? p.sale_price : liveFinalVE(p, veRate?.excess ?? 0, effDiscountFor(p))
   const cumple = (p: Product, f: FiltroProd): boolean => {
@@ -547,7 +547,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     if (f === 'estimado') return !!p.costo_estimado
     if (f === 'sin_costo') return !(p.total_cost > 0)
     if (f === 'baja') { const n = p.total_cost > 0 ? netDe(p, effDiscountFor(p)) : null; return !!n && nivelDe(n.rentabilidad, umbr) !== 'sano' }
-    if (f === 'menos5') { const fin = finalDe(p); return fin > 0 && fin < 5 }
+    if (f === 'menos5') { const fin = finalDe(p); return fin > 0 && fin < 3 }   // 18-11 (el dueño): menos de $3
     return true
   }
   const cuentas = useMemo(() => {
@@ -603,7 +603,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   return (
     <div className="space-y-4">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      <EncabezadoInfo info={<><li>Cada producto con su costo, precio y rentabilidad. Tócalo para ver su ficha; Editar va en el pie.</li><li><b className="font-medium text-neutral-800">+ Producto</b> o <b className="font-medium text-neutral-800">Importar desde ML</b>: crea los productos a partir de tus publicaciones de MercadoLibre.</li><li><b className="font-medium text-neutral-800">Recargo sobre costo</b>: lo que le sumas al costo para el precio. <b className="font-medium text-neutral-800">Rentabilidad</b>: lo que te queda después de MercadoLibre, sobre el costo.</li><li><b className="font-medium text-neutral-800">Costos ML</b>: la comisión y el envío que se usan en ese cálculo.</li><li><b className="font-medium text-neutral-800">Filtros</b> (debajo del buscador, solo si hay algo): Costo estimado, Sin costo, Rentabilidad baja y Menos de $5. El que eliges trae su arreglo en lote (Completar costos, Revisar márgenes).</li></>} title="Productos" subtitle="Catálogo, precios y rentabilidad de cada producto" actions={<>
+      <EncabezadoInfo info={<><li>Cada producto con su costo, precio y rentabilidad. Tócalo para ver su ficha; Editar va en el pie.</li><li><b className="font-medium text-neutral-800">+ Producto</b> o <b className="font-medium text-neutral-800">Importar desde ML</b>: crea los productos a partir de tus publicaciones de MercadoLibre.</li><li><b className="font-medium text-neutral-800">Recargo sobre costo</b>: lo que le sumas al costo para el precio. <b className="font-medium text-neutral-800">Rentabilidad</b>: lo que te queda después de MercadoLibre, sobre el costo.</li><li><b className="font-medium text-neutral-800">Costos ML</b>: la comisión y el envío que se usan en ese cálculo.</li><li><b className="font-medium text-neutral-800">Filtros</b> (debajo del buscador, solo si hay algo): Costo estimado, Sin costo, Rentabilidad baja y Menos de $3. El que eliges trae su arreglo en lote (Completar costos, Revisar márgenes).</li></>} title="Productos" subtitle="Catálogo, precios y rentabilidad de cada producto" actions={<>
         {/* 14-11 (el dueño): Importar desde ML vive en Productos (es donde se crean); MercadoEnvíos sigue en Publicaciones. */}
         {importarML && products.length > 0 && (
           <Link href="/productos/importar-ml" className="btn-secondary text-sm whitespace-nowrap"
@@ -677,7 +677,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             ...(completarCostos && cuentas.estimado ? [{ value: 'estimado' as const, label: 'Costo estimado', count: cuentas.estimado }] : []),
             ...(cuentas.sin_costo ? [{ value: 'sin_costo' as const, label: 'Sin costo', count: cuentas.sin_costo }] : []),
             ...(cuentas.baja ? [{ value: 'baja' as const, label: 'Rentabilidad baja', count: cuentas.baja }] : []),
-            ...(country === 'VE' && descuento && cuentas.menos5 ? [{ value: 'menos5' as const, label: 'Menos de $5', count: cuentas.menos5 }] : []),
+            ...(country === 'VE' && descuento && cuentas.menos5 ? [{ value: 'menos5' as const, label: 'Menos de $3', count: cuentas.menos5 }] : []),
           ]} />
           {filtroP === 'estimado' && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
@@ -690,7 +690,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           )}
           {filtroP === 'menos5' && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-600">
-              <span className="flex-1">Precio final menor a $5: ahí el envío pesa más. La revisión compara la ganancia por unidad y sugiere el recargo.</span>
+              <span className="flex-1">Precio final menor a $3: ahí el envío pesa más. La revisión compara la ganancia por unidad y sugiere el recargo.</span>
               <Link href="/productos/margenes" className="btn-secondary text-xs whitespace-nowrap">Revisar márgenes →</Link>
             </div>
           )}

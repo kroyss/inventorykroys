@@ -968,7 +968,7 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
   distinto en el portal: revisar en Publicaciones → Preparar → Pesos y envío gratis) o **Sin peso**. Se puede ordenar por peso.
 - **Filtros de Productos (18-11):** debajo del buscador, solo los que tienen algo y con su número: **Costo estimado**
   (importados con un % del precio; trae **Completar en lote →**), **Sin costo**, **Rentabilidad baja** (por debajo de
-  «sana», los cortes de Costos ML) y **Menos de $5** (Venezuela; trae **Revisar márgenes →**, antes un botón aparte).
+  «sana», los cortes de Costos ML) y **Menos de $3** (Venezuela; trae **Revisar márgenes →**, antes un botón aparte).
 - **Stock bajo (18-11, una sola regla):** el mínimo de cada producto sale de las reglas de Inventario → Reponer: venta
   por mes × lo que tarda en llegar la mercancía (si vende al menos el mínimo por mes). El máximo, × lo que compras al
   pedir. Si le escribiste un mínimo a mano a un producto, manda ese. «Bajo» = con stock y por debajo de ese mínimo; lo
@@ -1008,7 +1008,7 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
     sobre el costo, con su color; antes «Ganancia» y «Margen neto»). Con varios seleccionados: **Recargo** + Aplicar
     se lo pone a todos (y recalcula sus precios). La tarjeta de arriba cuenta los **Sin recargo**.
   - Reportes (Por producto, Stock) muestran «Recargo 60%» en vez del nombre de la categoría.
-  - **Revisión de rentabilidad** (Productos, Venezuela; antes «Revisión de márgenes»): productos de menos de $5, su
+  - **Revisión de rentabilidad** (Productos, Venezuela; antes «Revisión de márgenes»): productos de menos de $3 (precio final; antes $5), su
     ganancia por unidad y rentabilidad con la regla de envío anterior contra la tabla de MercadoEnvíos vigente, y el
     recargo sugerido para recuperar los dólares por unidad.
 - **Costos ML** (botón en Productos; admin o quien tenga el permiso **Configurar costos ML**): la **comisión de
