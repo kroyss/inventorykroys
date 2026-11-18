@@ -12,7 +12,7 @@
 import { pasarPesos } from '@/lib/pesosML'
 import type { Pool } from 'pg'
 import { mlFetch, leerItems } from '@/lib/ml'
-import { idsDe } from '@/lib/alertasStock'
+import { idsDe, CAMPOS_ITEM, guardarAlertas } from '@/lib/alertasStock'
 import { guardarPregunta, type PreguntaML } from '@/lib/preguntas'
 
 export const HORAS_CATALOGO = 6
@@ -21,7 +21,7 @@ const POR_MULTIGET = 20
 const HISTORIAL_POR_PASADA = 4             // publicaciones por pasada del cron (cada minuto)
 
 interface ItemCatalogo {
-  id: string; title: string; status: string; price: number | null; currency_id: string | null
+  id: string; title: string; status: string; sub_status?: string[]; price: number | null; currency_id: string | null
   category_id: string | null; available_quantity: number; permalink?: string
   attributes?: { id?: string; name: string; value_name: string | null }[]
   thumbnail?: string; seller_custom_field?: string | null
@@ -55,7 +55,11 @@ export const fichaDeAtributos = (attrs: ItemCatalogo['attributes']) =>
   (attrs ?? []).filter(a => a.value_name && !ATRIBUTO_INUTIL.test(a.name))
     .slice(0, 18).map(a => `${a.name}: ${a.value_name}`).join(' · ') || null
 
-const CAMPOS = 'id,title,status,price,currency_id,category_id,available_quantity,permalink,attributes,thumbnail,seller_custom_field,variations,pictures'
+// 18-11: los mismos campos que la revisión de stock (lib/alertasStock.ts): con cada lectura se guardan las dos fotos.
+const CAMPOS = CAMPOS_ITEM
+
+/** Para la revisión de stock de cada hora (lib/alertasStock.ts), que ya leyó la publicación: la guarda en el catálogo. */
+export const guardarItemCatalogo = (db: Pool, conexionId: number, it: ItemCatalogo) => guardarItem(db, conexionId, it)
 
 async function guardarItem(db: Pool, conexionId: number, it: ItemCatalogo) {
   const vars = variantesDe(it)
@@ -80,11 +84,15 @@ export async function refrescarItems(db: Pool, conexionId: number, ids: string[]
   let n = 0
   for (let i = 0; i < ids.length; i += POR_MULTIGET) {
     const r = await leerItems<ItemCatalogo>(db, conexionId, ids.slice(i, i + POR_MULTIGET), CAMPOS)
+    const items: ItemCatalogo[] = []
     for (const x of r) {
       if (x.code !== 200 || !x.body) continue
       await guardarItem(db, conexionId, x.body)
+      items.push(x.body)
       n++
     }
+    // 18-11: la misma lectura deja al día Automatizaciones → Stock (venta nueva, Vende de más, pack…), sin otra consulta.
+    await guardarAlertas(db, conexionId, items as Parameters<typeof guardarAlertas>[2]).catch(e => console.error('[catalogo] alertas', e))
   }
   return n
 }
@@ -138,13 +146,23 @@ export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = 
     const r = await leerItems<ItemCatalogo>(db, conexionId, ids.slice(i, i + POR_MULTIGET),
       CAMPOS)
     sinLeer.push(...r.filter(x => x.code === -1).map(x => x.id))
+    const leidas: ItemCatalogo[] = []
     for (const x of r) {
       const it = x.code === 200 ? x.body : null
       if (!it || (it.status !== 'active' && it.status !== 'paused')) continue
       await guardarItem(db, conexionId, it)
+      leidas.push(it)
       n++
     }
+    // 18-11: con la misma lectura, las alertas de stock (Automatizaciones → Stock).
+    await guardarAlertas(db, conexionId, leidas as Parameters<typeof guardarAlertas>[2]).catch(e => console.error('[catalogo] alertas', e))
   }
+  await cerrarPasadaCatalogo(db, conexionId, inicio, sinLeer)
+  return n
+}
+
+/** Cierre de una pasada COMPLETA del catálogo (la de 6 h o la revisión de stock de cada hora, que lee lo mismo). */
+export async function cerrarPasadaCatalogo(db: Pool, conexionId: number, inicio: Date, sinLeer: string[]) {
   // Sale del catálogo lo que ya no está activo ni pausado (finalizado, borrado). Lo pausado sin movimiento
   // (ni ventas ni preguntas en DIAS_MOVIMIENTO días) se queda, marcado.
   await db.query(`DELETE FROM ml_catalogo WHERE conexion_id = $1 AND actualizado_at < $2 AND NOT (item_id = ANY($3::text[]))`,
@@ -157,7 +175,6 @@ export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = 
      WHERE c.conexion_id = $1`, [conexionId, DIAS_MOVIMIENTO])
   // 14-11: los productos sin peso toman el «Peso del paquete» de su publicación (borrador para revisar, lib/pesosML.ts).
   await pasarPesos(db)
-  return n
 }
 
 /** Trae TODAS las preguntas respondidas de unas pocas publicaciones que todavía no tienen su

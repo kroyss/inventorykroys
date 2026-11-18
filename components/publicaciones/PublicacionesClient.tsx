@@ -84,7 +84,7 @@ export default function PublicacionesClient() {
       {/* 08-11 (el dueño): acciones como botones, no como links sueltos. */}
       <div className="flex flex-wrap justify-end items-center gap-2">
         <button type="button" onClick={actualizar} disabled={actualizando} className="btn-secondary !px-3 !py-1.5"
-          title="Trae de MercadoLibre las publicaciones nuevas y los cambios (sola se refresca cada 6 horas)">
+          title="Trae de MercadoLibre las publicaciones nuevas y los cambios (sola se refresca cada hora)">
           <svg viewBox="0 0 20 20" className={`h-4 w-4 ${actualizando ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.7}><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           {actualizando ? 'Actualizando…' : 'Actualizar desde ML'}
         </button>

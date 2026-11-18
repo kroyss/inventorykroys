@@ -64,7 +64,68 @@ export async function idsDe(db: Pool, conexionId: number, sellerId: number, esta
   return ids
 }
 
-/** Revisa TODO el stock publicado de una cuenta y actualiza ml_stock_alertas. */
+// 18-11 (el dueño: «los datos que llegan de una consulta hay que usarlos todos»): UNA lectura de ML (multiget) deja al día
+// las DOS fotos de cada publicación: el catálogo (ml_catalogo: Mis publicaciones, Stock vs inventario, IA) y las alertas
+// de stock (ml_stock_alertas: Automatizaciones → Stock). Los mismos campos sirven para las dos.
+export const CAMPOS_ITEM = 'id,title,status,sub_status,price,currency_id,category_id,available_quantity,permalink,attributes,thumbnail,seller_custom_field,variations,pictures'
+
+/** Guarda en ml_stock_alertas lo que dice ML de estas publicaciones (por publicación y por variante). Sirve para la pasada
+ *  completa y para unas pocas (venta nueva, Vende de más…): NO borra las demás. Devuelve cuántas eran activas/pausadas. */
+export async function guardarAlertas(db: Pool, conexionId: number, items: ItemML[], umbralDado?: number) {
+  if (!items.length || await esDemo(db)) return 0
+  const umbral = umbralDado ?? await umbralStock(db)
+  let publicaciones = 0
+  const filas: { item: string; var: number; titulo: string; variante: string | null; disp: number; estado: string; link: string | null; img: string | null; sub: string | null }[] = []
+  for (const it of items) {
+    if (it.status !== 'active' && it.status !== 'paused') continue
+    publicaciones++
+    // Pausada a mano (con stock): no es alerta de stock; va a la pestaña "Pausadas" (migración 101), una fila
+    // por publicación. Pausada por falta de stock sí es alerta (agotada).
+    if (it.status === 'paused' && !(it.sub_status ?? []).includes('out_of_stock') && it.available_quantity > 0) {
+      filas.push({ item: it.id, titulo: it.title, estado: 'pausada', link: it.permalink ?? null, img: it.thumbnail ?? null,
+        var: 0, variante: null, disp: it.available_quantity,
+        // El motivo de ML (migración 111): vacío = la pausó el vendedor; under_review/forbidden… = la frenó ML.
+        sub: (it.sub_status ?? []).join(',') || null })
+      continue
+    }
+    const base = { item: it.id, titulo: it.title, estado: it.status, link: it.permalink ?? null, img: it.thumbnail ?? null, sub: null }
+    if (it.variations?.length) {
+      for (const v of it.variations) {
+        const nombre = (v.attribute_combinations ?? []).map(a => `${a.name}: ${a.value_name ?? '—'}`).join(' · ') || null
+        filas.push({ ...base, var: v.id, variante: nombre, disp: v.available_quantity ?? 0, img: fotoVariante(it, v.picture_ids) ?? base.img })
+      }
+    } else {
+      filas.push({ ...base, var: 0, variante: null, disp: it.available_quantity ?? 0 })
+    }
+  }
+  if (!filas.length) return publicaciones
+  await db.query(
+    `INSERT INTO ml_stock_alertas AS a (item_id, variante_id, conexion_id, titulo, variante, disponible, estado, permalink, imagen,
+                                        agotada_desde, bajo_desde, ultima_agotada_at, pausada_desde, actualizado_at, sub_status)
+     SELECT f.item, f.var, $1, f.titulo, f.variante, f.disp, f.estado, f.link, f.img,
+            CASE WHEN f.estado <> 'pausada' AND f.disp <= 0 THEN NOW() END,
+            CASE WHEN f.estado <> 'pausada' AND f.disp > 0 AND f.disp < $2 THEN NOW() END,
+            CASE WHEN f.estado <> 'pausada' AND f.disp <= 0 THEN NOW() END,
+            CASE WHEN f.estado = 'pausada' THEN NOW() END,
+            NOW(), f.sub
+     FROM unnest($3::text[], $4::bigint[], $5::text[], $6::text[], $7::int[], $8::text[], $9::text[], $10::text[], $11::text[])
+          AS f(item, var, titulo, variante, disp, estado, link, img, sub)
+     ON CONFLICT (empresa_id, item_id, variante_id) DO UPDATE SET
+       conexion_id = EXCLUDED.conexion_id, titulo = EXCLUDED.titulo, variante = EXCLUDED.variante,
+       disponible = EXCLUDED.disponible, estado = EXCLUDED.estado, permalink = EXCLUDED.permalink, imagen = EXCLUDED.imagen,
+       agotada_desde = CASE WHEN EXCLUDED.estado <> 'pausada' AND EXCLUDED.disponible <= 0 THEN COALESCE(a.agotada_desde, NOW()) END,
+       bajo_desde = CASE WHEN EXCLUDED.estado <> 'pausada' AND EXCLUDED.disponible > 0 AND EXCLUDED.disponible < $2 THEN COALESCE(a.bajo_desde, NOW()) END,
+       ultima_agotada_at = CASE WHEN EXCLUDED.estado <> 'pausada' AND EXCLUDED.disponible <= 0 THEN NOW() ELSE a.ultima_agotada_at END,
+       pausada_desde = CASE WHEN EXCLUDED.estado = 'pausada' THEN COALESCE(a.pausada_desde, NOW()) END,
+       actualizado_at = NOW(), sub_status = EXCLUDED.sub_status`,
+    [conexionId, umbral,
+     filas.map(f => f.item), filas.map(f => f.var), filas.map(f => f.titulo), filas.map(f => f.variante),
+     filas.map(f => f.disp), filas.map(f => f.estado), filas.map(f => f.link), filas.map(f => f.img), filas.map(f => f.sub)])
+  return publicaciones
+}
+
+/** Revisa TODO el stock publicado de una cuenta y actualiza ml_stock_alertas. 18-11: con la MISMA lectura deja también
+ *  el catálogo al día (y cuenta como su pasada de 6 h: catalogo_at), sin otra vuelta por todas las publicaciones. */
 export async function revisarStockCuenta(db: Pool, conexionId: number) {
   const { rows: [c] } = await db.query(`SELECT ml_user_id FROM ml_conexiones WHERE id = $1`, [conexionId])
   if (!c) return { publicaciones: 0 }
@@ -75,66 +136,24 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
   const inicio = new Date()
   const seller = Number(c.ml_user_id)
   const ids = [...new Set([...await idsDe(db, conexionId, seller, 'active'), ...await idsDe(db, conexionId, seller, 'paused')])]
+  const { guardarItemCatalogo, cerrarPasadaCatalogo } = await import('@/lib/catalogoML')
 
   let publicaciones = 0
   const sinLeer: string[] = []          // ML no dejó leerlas en esta pasada: se quedan como estaban (no se borran)
   for (let i = 0; i < ids.length; i += POR_MULTIGET) {
-    const r = await leerItems<ItemML>(db, conexionId, ids.slice(i, i + POR_MULTIGET),
-      'id,title,status,sub_status,available_quantity,permalink,thumbnail,pictures,variations')
+    const r = await leerItems<ItemML>(db, conexionId, ids.slice(i, i + POR_MULTIGET), CAMPOS_ITEM)
     sinLeer.push(...r.filter(x => x.code === -1).map(x => x.id))
-    const filas: { item: string; var: number; titulo: string; variante: string | null; disp: number; estado: string; link: string | null; img: string | null; sub: string | null }[] = []
-    for (const x of r) {
-      const it = x.code === 200 ? x.body : null
-      if (!it) continue
-      if (it.status !== 'active' && it.status !== 'paused') continue
-      publicaciones++
-      // Pausada a mano (con stock): no es alerta de stock; va a la pestaña "Pausadas" (migración 101), una fila
-      // por publicación. Pausada por falta de stock sí es alerta (agotada).
-      if (it.status === 'paused' && !(it.sub_status ?? []).includes('out_of_stock') && it.available_quantity > 0) {
-        filas.push({ item: it.id, titulo: it.title, estado: 'pausada', link: it.permalink ?? null, img: it.thumbnail ?? null,
-          var: 0, variante: null, disp: it.available_quantity,
-          // El motivo de ML (migración 111): vacío = la pausó el vendedor; under_review/forbidden… = la frenó ML.
-          sub: (it.sub_status ?? []).join(',') || null })
-        continue
-      }
-      const base = { item: it.id, titulo: it.title, estado: it.status, link: it.permalink ?? null, img: it.thumbnail ?? null, sub: null }
-      if (it.variations?.length) {
-        for (const v of it.variations) {
-          const nombre = (v.attribute_combinations ?? []).map(a => `${a.name}: ${a.value_name ?? '—'}`).join(' · ') || null
-          filas.push({ ...base, var: v.id, variante: nombre, disp: v.available_quantity ?? 0, img: fotoVariante(it, v.picture_ids) ?? base.img })
-        }
-      } else {
-        filas.push({ ...base, var: 0, variante: null, disp: it.available_quantity ?? 0 })
-      }
-    }
-    if (!filas.length) continue
-    await db.query(
-      `INSERT INTO ml_stock_alertas AS a (item_id, variante_id, conexion_id, titulo, variante, disponible, estado, permalink, imagen,
-                                          agotada_desde, bajo_desde, ultima_agotada_at, pausada_desde, actualizado_at, sub_status)
-       SELECT f.item, f.var, $1, f.titulo, f.variante, f.disp, f.estado, f.link, f.img,
-              CASE WHEN f.estado <> 'pausada' AND f.disp <= 0 THEN NOW() END,
-              CASE WHEN f.estado <> 'pausada' AND f.disp > 0 AND f.disp < $2 THEN NOW() END,
-              CASE WHEN f.estado <> 'pausada' AND f.disp <= 0 THEN NOW() END,
-              CASE WHEN f.estado = 'pausada' THEN NOW() END,
-              NOW(), f.sub
-       FROM unnest($3::text[], $4::bigint[], $5::text[], $6::text[], $7::int[], $8::text[], $9::text[], $10::text[], $11::text[])
-            AS f(item, var, titulo, variante, disp, estado, link, img, sub)
-       ON CONFLICT (empresa_id, item_id, variante_id) DO UPDATE SET
-         conexion_id = EXCLUDED.conexion_id, titulo = EXCLUDED.titulo, variante = EXCLUDED.variante,
-         disponible = EXCLUDED.disponible, estado = EXCLUDED.estado, permalink = EXCLUDED.permalink, imagen = EXCLUDED.imagen,
-         agotada_desde = CASE WHEN EXCLUDED.estado <> 'pausada' AND EXCLUDED.disponible <= 0 THEN COALESCE(a.agotada_desde, NOW()) END,
-         bajo_desde = CASE WHEN EXCLUDED.estado <> 'pausada' AND EXCLUDED.disponible > 0 AND EXCLUDED.disponible < $2 THEN COALESCE(a.bajo_desde, NOW()) END,
-         ultima_agotada_at = CASE WHEN EXCLUDED.estado <> 'pausada' AND EXCLUDED.disponible <= 0 THEN NOW() ELSE a.ultima_agotada_at END,
-         pausada_desde = CASE WHEN EXCLUDED.estado = 'pausada' THEN COALESCE(a.pausada_desde, NOW()) END,
-         actualizado_at = NOW(), sub_status = EXCLUDED.sub_status`,
-      [conexionId, umbral,
-       filas.map(f => f.item), filas.map(f => f.var), filas.map(f => f.titulo), filas.map(f => f.variante),
-       filas.map(f => f.disp), filas.map(f => f.estado), filas.map(f => f.link), filas.map(f => f.img), filas.map(f => f.sub)])
+    const items = r.filter(x => x.code === 200 && x.body).map(x => x.body!)
+    publicaciones += await guardarAlertas(db, conexionId, items, umbral)
+    for (const it of items) if (it.status === 'active' || it.status === 'paused') await guardarItemCatalogo(db, conexionId, it as unknown as Parameters<typeof guardarItemCatalogo>[2])   // leída con CAMPOS_ITEM: trae todo
   }
   // Lo que ya no está publicado (cerrado, borrado): fuera. Las pausadas a mano se quedan (estado 'pausada').
   await db.query(`DELETE FROM ml_stock_alertas WHERE conexion_id = $1 AND actualizado_at < $2 AND NOT (item_id = ANY($3::text[]))`,
     [conexionId, inicio, sinLeer])
   if (sinLeer.length) console.error('[alertas stock] sin leer', conexionId, sinLeer.length)
+  // El catálogo quedó leído entero con esta misma pasada: se cierra igual que la de 6 h y se anota como hecha.
+  await cerrarPasadaCatalogo(db, conexionId, inicio, sinLeer)
+  await db.query(`UPDATE ml_conexiones SET catalogo_at = NOW() WHERE id = $1`, [conexionId])
   return { publicaciones }
 }
 

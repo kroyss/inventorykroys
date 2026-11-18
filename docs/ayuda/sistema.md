@@ -502,9 +502,11 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   - **Sin peso** (Venezuela): su producto no tiene peso. Lleva a **Pesos y envío gratis**.
   - **En promo** (Venezuela): está en una promoción (según la última lectura de Promociones). Al pasar el cursor dice
     en qué campañas; al tocarla abre **Promociones** buscando esa publicación.
-  **Al día:** la lista es una copia del catálogo de ML (se relee sola cada 6 h, o con **Actualizar desde ML**). Cuando
-  llega una venta nueva, se relee al momento **solo la publicación vendida** (su stock y si ML la pausó al quedar en 0);
-  lo que cambies directo en ML sin vender aparece en la próxima relectura. Al abrir una publicación, el editor la lee en vivo.
+  **Al día:** la lista es una copia del catálogo de ML (se relee sola **cada hora**, junto con la revisión de stock, o con
+  **Actualizar desde ML**). Cuando llega una venta nueva, se relee al momento **solo la publicación vendida** (su stock y
+  si ML la pausó al quedar en 0) y con esa misma lectura quedan al día Mis publicaciones, Stock vs inventario y
+  **Automatizaciones → Stock** (cada lectura de ML se aprovecha para todas). Lo que cambies directo en ML sin vender
+  aparece en la próxima relectura. Al abrir una publicación, el editor la lee en vivo.
   Arriba, los filtros con su número (**Stock distinto · Sin vincular · Sin peso · En promo**) muestran solo lo que hay
   que arreglar. Cada etiqueta sale solo si tienes permiso para esa pantalla. Arriba a la derecha: **Vincular** y
   **Pesos y envío gratis** (con lo que falta: publicaciones activas con stock sin producto, el mismo número que el filtro «Sin vincular»; al pasar el cursor, cuántos colores/modelos), **Textos de descripción** y **Actualizar desde ML**. Tocar la fila abre
@@ -530,7 +532,7 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
 
 - **Buscar:** por título, SKU o número (MLV…), por cuenta y activas/pausadas. Toca una para abrirla.
 - **↻ Actualizar desde ML** (arriba a la derecha): trae ya las publicaciones nuevas o recién reactivadas. Sin tocarlo,
-  la lista se refresca sola cada 6 horas, por eso una recién publicada puede no aparecer al momento.
+  la lista se refresca sola cada hora, por eso una recién publicada puede tardar un poco en aparecer.
 - La pantalla trae lo que hay **ahora mismo** en MercadoLibre:
   - **Título:** solo se puede cambiar si la publicación **no tiene ventas** (regla de MercadoLibre).
   - **Precio, stock y estado** (activa / pausada). Debajo del precio ves la comisión de ML estimada (la de Ajustes) y
