@@ -28,14 +28,14 @@ export default function VinculosML({ codes, productCode, creando = false }: {
       ) : (
         <p className="text-xs text-neutral-500">
           {creando
-            ? 'Después de crearlo, si lo publicas en MercadoLibre, lo vinculas en Publicaciones → Vincular: el peso y la foto llegan solos.'
+            ? 'Después de crearlo, si lo publicas en MercadoLibre, lo vinculas en Publicaciones → Mis publicaciones → Vincular: el peso y la foto llegan solos.'
             : 'Sin publicaciones de MercadoLibre vinculadas.'}
         </p>
       )}
       {!creando && productCode && (
         <Link href={`/vincular-ml?buscar=${encodeURIComponent(productCode)}`}
           className="btn-secondary inline-block text-xs">
-          {codes.length > 0 ? 'Revisar vínculos con ML' : 'Vincular con ML'}
+          {codes.length > 0 ? 'Ver o vincular publicaciones →' : 'Vincular publicaciones →'}
         </Link>
       )}
     </div>

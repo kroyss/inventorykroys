@@ -490,7 +490,7 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
     en qué campañas; al tocarla abre **Promociones** buscando esa publicación.
   Arriba, los filtros con su número (**Stock distinto · Sin vincular · Sin peso · En promo**) muestran solo lo que hay
   que arreglar. Cada etiqueta sale solo si tienes permiso para esa pantalla. Arriba a la derecha: **Vincular** y
-  **Pesos y envío gratis** (con lo que falta), **Textos de descripción** y **Actualizar desde ML**. Tocar la fila abre
+  **Pesos y envío gratis** (con lo que falta: publicaciones activas con stock sin producto, el mismo número que el filtro «Sin vincular»; al pasar el cursor, cuántos colores/modelos), **Textos de descripción** y **Actualizar desde ML**. Tocar la fila abre
   el editor (ver abajo).
 - **Promociones** (ver abajo).
 - **Stock vs inventario:** el stock que muestra cada cuenta de ML contra tu inventario, con sus grupos y arreglos en lote.
@@ -929,7 +929,7 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   hecho; se revisa en Vincular o Stock, o se **elige con un clic** uno de los pesos que trae ML (en MercadoEnvíos o en la
   ficha del producto). Precios, rentabilidad, Promociones y Costos ML usan ese mismo peso.
 - **Publicaciones de MercadoLibre en la ficha del producto:** se ven los códigos MLV vinculados (cuenta, variante,
-  «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
+  «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular publicaciones →** / **Ver o vincular publicaciones →** (abre Vincular con ese producto: las que ya tiene y las que el sistema cree que son suyas)
   (abre Publicaciones → Mis publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
 - **Stock en ML: cómo está ordenada (17-11).** Arriba, **3 tarjetas** con lo que hay que hacer; cada producto cae en UN
   solo grupo (por prioridad), así los números suman lo que falta sin repetir:

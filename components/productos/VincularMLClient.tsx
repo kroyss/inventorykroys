@@ -122,7 +122,8 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     fotos: new Set(encontradas.filter(f => f.estado === 'vinculada').map(f => f.producto!.id)).size,
     dudas: encontradas.filter(f => f.duda).length,
     pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda && !f.no_usa && (!quieta(f) || palabras.length > 0)).length,
-    activas: encontradas.filter(activaSinVincular).length,
+    // 18-11: por PUBLICACIÓN (igual que el botón de Mis publicaciones y su filtro), no por color/modelo.
+    activas: new Set(encontradas.filter(activaSinVincular).map(f => `${f.cuenta}|${f.item_id}`)).size,
     nuevas: encontradas.filter(nuevaSinVincular).length,
     toda: encontradas.filter(porToda).length,
     no_usa: encontradas.filter(f => f.estado !== 'vinculada' && f.no_usa).length,

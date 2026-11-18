@@ -228,6 +228,12 @@ export async function crearProductos(db: PoolClient, lista: NuevoProducto[], use
  *  aviso de Stock en ML). Mismo criterio que filasImportar (código exacto o el de toda la publicación) pero contado en
  *  la base: antes se traía el catálogo entero (~900 kB) para contar. */
 export async function contarSinVincular(db: Pool): Promise<number> {
+  return (await contarSinVincularDetalle(db)).publicaciones
+}
+
+/** 18-11 (el dueño vio «Vincular 19» y «Sin vincular 7»): en todas las pantallas se cuenta por PUBLICACIÓN (como el
+ *  filtro de Mis publicaciones); las variantes (colores/modelos) sin producto van aparte, para el detalle. */
+export async function contarSinVincularDetalle(db: Pool): Promise<{ publicaciones: number; variantes: number }> {
   const { rows: [r] } = await db.query(
     `WITH filas AS (
        SELECT substring(c.item_id FROM 4) AS pub, v->>'id' AS var,
@@ -236,9 +242,9 @@ export async function contarSinVincular(db: Pool): Promise<number> {
        LEFT JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(c.variantes) = 'array' THEN c.variantes ELSE '[]'::jsonb END) v ON TRUE
        WHERE c.estado = 'active'),
      vinc AS (SELECT DISTINCT m.ml_code FROM product_ml_codes m JOIN products p ON p.id = m.product_id WHERE m.is_active AND p.is_active)
-     SELECT COUNT(*)::int AS n FROM filas f
+     SELECT COUNT(DISTINCT f.pub)::int AS publicaciones, COUNT(*)::int AS variantes FROM filas f
      LEFT JOIN vinc v1 ON v1.ml_code = f.pub || COALESCE(':' || f.var, '')
      LEFT JOIN vinc v2 ON v2.ml_code = f.pub
      WHERE f.disp > 0 AND v1.ml_code IS NULL AND v2.ml_code IS NULL`)
-  return r?.n ?? 0
+  return { publicaciones: r?.publicaciones ?? 0, variantes: r?.variantes ?? 0 }
 }

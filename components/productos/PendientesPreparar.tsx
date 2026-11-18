@@ -4,8 +4,8 @@
 // del navegador. Si falla, no se muestra nada.
 import { useSyncExternalStore } from 'react'
 
-type Pend = { sinVincular: number; sinPeso: number }
-const LLAVE = 'pendientes-preparar'
+type Pend = { sinVincular: number; sinPeso: number; sinVincularVariantes?: number }
+const LLAVE = 'pendientes-preparar-2'   // -2 (18-11): sinVincular pasó a contar publicaciones
 let datos: Pend | null = null
 let pedido: Promise<void> | null = null
 const avisar = new Set<() => void>()
@@ -26,13 +26,14 @@ function cargar() {
 const suscribir = (f: () => void) => { avisar.add(f); cargar(); return () => { avisar.delete(f) } }
 
 /** resumen: la suma (en la pestaña Preparar). de: un número (en Vincular o Pesos). */
-export default function PendientesPreparar({ resumen = false, de, activo = false }: { resumen?: boolean; de?: keyof Pend; activo?: boolean }) {
+export default function PendientesPreparar({ resumen = false, de, activo = false }: { resumen?: boolean; de?: 'sinVincular' | 'sinPeso'; activo?: boolean }) {
   const d = useSyncExternalStore(suscribir, () => datos, () => null)
   if (!d) return null
   const n = resumen ? d.sinVincular + d.sinPeso : de ? d[de] : 0
   if (!n) return null
   return (
-    <span title={resumen ? `${d.sinVincular ? `${d.sinVincular} publicaciones sin vincular` : ''}${d.sinVincular && d.sinPeso ? ' · ' : ''}${d.sinPeso ? `${d.sinPeso} productos sin peso` : ''}` : undefined}
+    <span title={de === 'sinVincular' ? `${d.sinVincular} publicaci${d.sinVincular === 1 ? 'ón activa' : 'ones activas'} con stock sin producto${(d.sinVincularVariantes ?? 0) > d.sinVincular ? ` (${d.sinVincularVariantes} colores/modelos)` : ''}`
+      : de === 'sinPeso' ? `${d.sinPeso} producto${d.sinPeso === 1 ? '' : 's'} sin peso` : resumen ? `${d.sinVincular ? `${d.sinVincular} publicaciones sin vincular` : ''}${d.sinVincular && d.sinPeso ? ' · ' : ''}${d.sinPeso ? `${d.sinPeso} productos sin peso` : ''}` : undefined}
       className={`ml-1.5 inline-flex min-w-[1.25rem] justify-center rounded-full px-1.5 text-[11px] font-medium tabular-nums leading-5 ${activo ? 'bg-white/20 text-white' : 'bg-neutral-100 text-neutral-600'}`}>
       {n > 999 ? '999+' : n}</span>
   )
