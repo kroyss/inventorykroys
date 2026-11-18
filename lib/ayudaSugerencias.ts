@@ -61,7 +61,7 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cómo actualizo el stock en ML?', video: 'Calificaciones y Stock',
       respuesta: 'Escribe el stock nuevo en cada fila (✎) y toca **Actualizar en MercadoLibre**. Solo cambia la cantidad disponible, nada más. Si tu inventario está marcado como al día y pones más de lo que tienes, la casilla se pone ámbar y te pide «Actualizar igual».' },
     { pregunta: '¿Qué significa «en 0 a propósito»?',
-      respuesta: 'Con el inventario al día, esta pantalla usa el mismo reparto que Stock en ML: esa publicación está en 0 porque lo que tienes ya está publicado en otra (te dice cuál). «sugerido: N · usar» pone lo que sugiere Stock en ML, no todo el inventario.' },
+      respuesta: 'Con el inventario al día, esta pantalla usa el mismo reparto que Stock en ML: esa publicación está en 0 porque lo que tienes ya está publicado en otra (te dice cuál). «inventario N · poner X» pone lo que sugiere Stock en ML (X), no todo el inventario.' },
     { pregunta: '¿Cada cuánto se revisa?', respuesta: 'Sola cada hora. Con **Revisar ahora** buscas en el momento (cada 10 minutos como máximo).' },
   ],
   '/pagos-me': [

@@ -30,7 +30,7 @@ type Vista = 'agotadas' | 'bajas' | 'pausadas'
 const hace = (s: string | null) => {
   if (!s) return '—'
   const h = (Date.now() - new Date(s).getTime()) / 3_600_000
-  if (h < 1) return 'hace menos de 1 h'
+  if (h < 1) return `hace ${Math.max(1, Math.round(h * 60))} min`   // 18-11 (el dueño): corto, sin «menos de»
   if (h < 24) return `hace ${Math.floor(h)} h`
   const d = Math.floor(h / 24)
   return `hace ${d} día${d === 1 ? '' : 's'}`
@@ -271,26 +271,32 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
         <p className={`text-sm font-semibold num ${vista === 'pausadas' ? 'text-amber-700' : f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
           {vista === 'pausadas' ? `⏸ Pausada · ${f.disponible} u.` : f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
         </p>
-        {sinStockML(f) && f.inventario != null && <p className="text-[11px] font-medium text-emerald-700 whitespace-nowrap">en inventario: {f.inventario} u.</p>}
-        {/* 28-10, empresas con inventario: lo que hay en el depósito; con un clic queda escrito como stock nuevo. */}
-        {vista !== 'pausadas' && f.inventario != null && datos?.alDia && f.sugerido === 0 && f.en_otras ? (
-          <p className="max-w-[11rem] text-[11px] leading-tight text-neutral-600" title="Stock en ML reparte lo que hay entre tus publicaciones">
-            en 0 a propósito: lo que hay está en {f.en_otras}</p>
-        ) : vista !== 'pausadas' && f.inventario != null && datos?.alDia && f.sugerido != null ? (
-          f.sugerido > f.disponible && datos?.puedeStock
-            ? <button type="button" onClick={() => escribir(f, String(f.sugerido))} title="Lo que sugiere Stock en ML (reparte lo que hay entre tus publicaciones)"
-                className="text-[11px] font-medium text-emerald-700 whitespace-nowrap hover:underline underline-offset-2">sugerido: {f.sugerido} u. · usar</button>
-            : <p className="text-[11px] whitespace-nowrap text-neutral-500">en inventario: {f.inventario} u. · sugerido {f.sugerido}</p>
-        ) : vista !== 'pausadas' && f.inventario != null && (
-          f.inventario > f.disponible && datos?.puedeStock
-            ? <button type="button" onClick={() => escribir(f, String(f.inventario))} title="Usar lo del inventario como stock nuevo"
-                className="text-[11px] font-medium text-emerald-700 whitespace-nowrap hover:underline underline-offset-2">en inventario: {f.inventario} u. · usar</button>
-            : <p className={`text-[11px] whitespace-nowrap ${f.inventario > 0 ? 'font-medium text-emerald-700' : 'text-neutral-500'}`}>
-                {f.inventario > 0 ? `en inventario: ${f.inventario} u.` : 'sin stock en inventario'}</p>
-        )}
+        {/* 18-11 (el dueño: «una visión rápida, sin tanto texto»): UNA sola línea, siempre con lo que hay en el inventario;
+            «poner X» solo si conviene subir el stock en ML (X = el sugerido de Stock vs inventario si reparte entre
+            publicaciones; si no, lo del inventario). Si va en 0 a propósito, dice en qué otra publicación está. */}
+        {f.inventario != null && (() => {
+          const conReparto = vista !== 'pausadas' && !!datos?.alDia && f.sugerido != null
+          if (conReparto && f.sugerido === 0 && f.en_otras) return (
+            <p className="max-w-[11rem] truncate text-[11px] text-neutral-600" title={`Va en 0 a propósito: lo que hay (${f.inventario} u.) está en ${f.en_otras}`}>
+              inventario {f.inventario} · está en {f.en_otras}</p>
+          )
+          const poner = vista === 'pausadas' ? null : conReparto ? f.sugerido! : f.inventario
+          const puedePoner = poner != null && poner > f.disponible && !!datos?.puedeStock
+          return (
+            <p className={`text-[11px] whitespace-nowrap ${f.inventario > 0 ? 'font-medium text-emerald-700' : 'text-neutral-500'}`}>
+              <span className="num">inventario {f.inventario}</span>
+              {puedePoner && <>
+                {' · '}
+                <button type="button" onClick={() => escribir(f, String(poner))}
+                  title={conReparto && poner! < f.inventario! ? `Lo que sugiere Stock vs inventario: reparte las ${f.inventario} u. entre tus publicaciones` : 'Poner este número como stock en MercadoLibre'}
+                  className="underline underline-offset-2 hover:text-emerald-900">poner {poner}</button>
+              </>}
+            </p>
+          )
+        })()}
         {pasaInventario(f) && <p className="text-[11px] font-semibold text-amber-700 whitespace-nowrap">⚠ más de lo que tienes</p>}
         <p className="text-[11px] text-neutral-400 whitespace-nowrap">
-          {vista === 'pausadas' ? `pausada ${hace(f.pausada_desde ?? f.agotada_desde ?? null)}` : vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
+          {hace(vista === 'pausadas' ? f.pausada_desde ?? f.agotada_desde ?? null : vista === 'agotadas' ? f.agotada_desde : f.bajo_desde)}
         </p>
       </div>
       {/* Corte de línea solo en celular (con algo abajo que mostrar). */}
