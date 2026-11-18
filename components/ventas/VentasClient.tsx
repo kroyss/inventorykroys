@@ -12,12 +12,13 @@ import SalioMal from '@/components/facturas/SalioMal'
 import MoverFactura from '@/components/facturas/MoverFactura'
 import { useImprimirFactura } from '@/components/facturas/ImprimirAqui'
 import { bs, type Invoice } from '@/lib/invoices'
-import { Pagination, PageHeader, StatusBadge, chipCls, ESTADOS_VENTA_VE } from '@/components/ui'
+import { Pagination, StatusBadge, chipCls, ESTADOS_VENTA_VE } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import { itemsTooltip } from '@/lib/itemsTooltip'
 import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
 import { DateField } from '@/components/ui/DateField'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 const PAGE_SIZE = 15
 
@@ -414,7 +415,8 @@ export default function VentasClient({ products: initialProducts, userRole, coun
 
   return (
     <div>
-      <PageHeader title="Ventas" subtitle="Órdenes de MercadoLibre y ventas locales" actions={
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li><b className="font-medium text-neutral-800">Por confirmar</b>: las ventas de MercadoLibre que faltan registrar. Verifica el pago y toca «Registrar venta»: se descuenta del inventario.</li><li><b className="font-medium text-neutral-800">Traer pagos y ventas</b>: trae al instante las ventas nuevas de MercadoLibre (y, con Pagos ME, los pagos y guías de MercadoEnvíos en 1 a 3 min). También llegan solas cada hora.</li><li><b className="font-medium text-neutral-800">Comprobar con el banco</b> (con Pagos ME): subes el estado de cuenta y dice qué pagos llegaron de verdad. <b className="font-medium text-neutral-800">Ir a Despachos</b> salta a imprimir las guías.</li><li>Estados: <b className="font-medium text-neutral-800">Borrador</b> (falta registrar) · <b className="font-medium text-neutral-800">Por despachar</b> (registrada, falta la guía) · <b className="font-medium text-neutral-800">Despachada</b> · <b className="font-medium text-neutral-800">Local</b> (venta en tienda entregada).</li><li><b className="font-medium text-neutral-800">Nueva venta</b>: para una venta local (LOCAL-…) o una de MercadoLibre que no llegó sola.</li></>} title="Ventas" subtitle="Órdenes de MercadoLibre y ventas locales" actions={
         <>
           {/* Con ML conectado lo normal es confirmar las ventas que ya llegaron; "Nueva venta" queda para lo suelto (LOCAL…). */}
           {porConfirmar && (

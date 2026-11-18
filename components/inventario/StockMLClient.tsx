@@ -4,13 +4,13 @@
 // «Poner en ML lo que hay» (antes «Igualar y reactivar») los deja todos al día de una vez (antes: de a una publicación, cuenta por cuenta).
 import { useEffect, useMemo, useState } from 'react'
 import Link from '@/components/ui/Link'
-import { PageHeader } from '@/components/ui'
 import { FotoProducto } from '@/components/ui/FotoProducto'
 import { Ventana } from '@/components/ui/Ventana'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { DesactivadoPublicado, FilaStockML, PubStockML } from '@/lib/stockConML'
 import { AbrirFicha } from '@/components/preguntas/FichaPublicacion'
 import { cambioML, grupoDe, motivosDecidir, urgencia, type GrupoStock } from '@/lib/stockGrupos'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 // 17-11 (el dueño: «nos llenamos de opciones»): la pantalla se ordena por QUÉ HAY QUE HACER. Cada producto cae en UN
 // solo grupo, por prioridad (los números suman lo que falta, sin repetir): Vende de más → Tienes y no vendes → Para
@@ -220,7 +220,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
 
   return (
     <div className="space-y-4 pb-20">
-      <PageHeader title="Stock en MercadoLibre"
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li>Cada producto con todas sus publicaciones: lo que MercadoLibre ofrece contra lo que tienes en inventario.</li><li>Arriba, lo que hay que hacer: <b className="font-medium text-neutral-800">Vende de más</b> (ML ofrece más de lo que tienes: urgente), <b className="font-medium text-neutral-800">Tienes y no vendes</b> y <b className="font-medium text-neutral-800">Por ajustar</b>.</li><li>Poner en ML cambia tus publicaciones; <b className="font-medium text-neutral-800">Corregir stock</b> cambia tu inventario (queda como ajuste).</li><li>Más de 10 publicaciones a la vez van por la cola: el avance sale abajo a la derecha y queda en <b className="font-medium text-neutral-800">Historial de tareas</b>.</li></>} title="Stock en MercadoLibre"
         subtitle="Cada producto con todas sus publicaciones: pon en ML lo que hay y reactiva las pausadas en todas tus cuentas de una vez"
         actions={<>
           <Link href="/inventario" className="btn-secondary text-sm whitespace-nowrap">← Inventario</Link>

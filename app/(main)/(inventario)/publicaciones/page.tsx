@@ -4,10 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { tieneModulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 import { sinCuentasML } from '@/lib/preguntasSesion'
-import { PageHeader } from '@/components/ui'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import PublicacionesClient from '@/components/publicaciones/PublicacionesClient'
 import PublicacionesMLTabs, { pestanasML } from '@/components/productos/PublicacionesMLTabs'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 export const metadata = { title: 'Publicaciones' }
 
@@ -28,7 +28,8 @@ export default async function PublicacionesPage() {
   return (
     <div>
       <PublicacionesMLTabs user={u} actual="editar" />
-      <PageHeader title="Editar publicaciones" subtitle="Precio, stock, fotos, características, variantes y descripción de tus publicaciones de MercadoLibre" />
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li>Busca una publicación y cambia precio, stock, fotos, características, variantes o descripción.</li><li>Lo que guardas va directo a MercadoLibre. Los cambios en lote van por la cola: el avance sale abajo a la derecha.</li></>} title="Editar publicaciones" subtitle="Precio, stock, fotos, características, variantes y descripción de tus publicaciones de MercadoLibre" />
       <PublicacionesClient />
     </div>
   )

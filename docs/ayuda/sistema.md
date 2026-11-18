@@ -551,7 +551,8 @@ para que verifiques los pagos de corrido y despaches.
 
 **Dónde se verifica (18-11):** **sin inventario**, en Pagos ME (pestaña Ventas). **Con inventario** (y acceso a Ventas),
 en **Ventas → Por confirmar**: es la misma lista, así que no se repite; Pagos ME pasa a ser **«Conexión Pagos ME»** (menú
-de tu cuenta, o **⚙ Conexión** en Por confirmar): la PC, las cuentas, el programa y el **Historial de pagos**. Si entras a
+de tu cuenta): la PC, las cuentas, el programa y el **Historial de pagos**. En Por confirmar, **⚙ Conexión** se
+despliega ahí mismo (agregar cuenta, programa, extensión, conectar la PC) sin salir de la lista. Si entras a
 /pagos-me por un enlace viejo, te lleva a Por confirmar. Si apagas o prendes el inventario no se pierde nada: los pagos y lo
 ya verificado son los mismos, solo cambia dónde se ven.
 
@@ -850,6 +851,9 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 ## 15. Inventario (solo con el módulo Inventario)
 
 *Cómo lo pregunta la gente:* productos, catálogo, inventario, ventas, compras, entró mercancía, vincular publicaciones, combos, packs, promociones, reportes, tasa, ajustes.
+
+**La ⓘ junto al título** (Ventas, Compras, Inventario, Facturas, Productos, Publicaciones, Reportes, Finanzas, y también
+en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócala para abrirla o cerrarla.
 
 > Este espacio se prende por empresa (plan Completo). Si no lo ves, tu empresa trabaja «todo desde MercadoLibre».
 

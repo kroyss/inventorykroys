@@ -23,7 +23,8 @@ import Link from '@/components/ui/Link'
 import { rutaHabilitada } from '@/lib/modulos'
 import { rutaPermitida } from '@/lib/permisos'
 import { NumeritoAviso } from '@/components/layout/Avisos'
-import EstadoVigilante, { CONEXION_HREF, type DatosVigilante } from '@/components/pagosme/EstadoVigilante'
+import { type DatosVigilante } from '@/components/pagosme/EstadoVigilante'
+import VigilanteConConexion from '@/components/pagosme/ConexionME'
 import { puede } from '@/lib/permisos'
 
 const chipCls = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset transition-colors'
@@ -882,11 +883,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
                 : <>última vez <b className="text-neutral-700">{datos.ultimaBusqueda ? hora(datos.ultimaBusqueda) : '—'}</b></>}
             </p>
           ) : <>
-          {/* 17-11 (el dueño): un solo botón, como en Pagos ME: las ventas al instante y los pagos/guías cuando llegan. */}
-          <p>
-            <b className="text-neutral-700">{datos.pagosME ? '«Traer pagos y ventas»' : '«Traer ventas»'}</b>: ventas nuevas de MercadoLibre
-            {datos.pagosME ? ' al instante y pagos y guías de MercadoEnvíos (1 a 3 min)' : ' (solas cada hora)'}
-          </p>
+          {/* 17-11 (el dueño): un solo botón, como en Pagos ME: las ventas al instante y los pagos/guías cuando llegan.
+              18-11: lo que hace cada botón va en la ⓘ del título de Ventas. */}
           <p>
             Ventas: {revisado
               ? <>recién {hora(revisado.at)}, <b className={revisado.nuevas ? 'text-emerald-700' : 'text-neutral-700'}>
@@ -1096,14 +1094,16 @@ function IrADespachos() {
 function EstadoPagosME({ vuelta }: { vuelta: string }) {
   const u = useSession().data?.user as { role?: 'admin' | 'user'; permisos?: string[] } | undefined
   const ve = !!u && puede(u, 'ver_pagos_me')
-  const [d, setD] = useState<DatosVigilante | null>(null)
+  const [d, setD] = useState<(DatosVigilante & { desdeML?: boolean }) | null>(null)
+  const [otra, setOtra] = useState(0)
   useEffect(() => {
     if (!ve) return
     let vivo = true
     fetch('/api/pagos-me?solo=estado', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))
       .then(x => { if (vivo && x?.vigilante) setD(x) }).catch(() => {})
     return () => { vivo = false }
-  }, [ve, vuelta])
+  }, [ve, vuelta, otra])
   if (!ve || !d) return null
-  return <EstadoVigilante d={d} conexion={{ href: CONEXION_HREF }} />
+  // ⚙ Conexión se despliega aquí mismo (18-11, el dueño: antes llevaba a otra página y sacaba de Por confirmar).
+  return <VigilanteConConexion d={d} isAdmin={puede(u, 'pagos_me_config')} desdeML={!!d.desdeML} onCambio={() => setOtra(n => n + 1)} />
 }

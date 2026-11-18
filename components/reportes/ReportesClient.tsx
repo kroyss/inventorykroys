@@ -5,12 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import {
   DateRangeBar, presetRange, type DatePreset,
-  KPICard, DataTable, exportRows, money, type Column,
-  PageHeader, Tabs, StatusBadge, Cargando, ESTADOS_VENTA_VE,
+  KPICard, DataTable, exportRows, money, type Column, Tabs, StatusBadge, Cargando, ESTADOS_VENTA_VE,
 } from '@/components/ui'
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import { matchFuzzy } from '@/lib/search'
 import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 type Tab = 'resumen' | 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito' | 'conteos' | 'atencion'
 
@@ -110,7 +110,8 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Reportes" subtitle="El detalle con Excel: ventas y compras por fechas, y cómo está tu inventario hoy. El resumen del negocio está en el Inicio." />
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li>El detalle con Excel. <b className="font-medium text-neutral-800">Por fechas</b>: Ventas y Compras. <b className="font-medium text-neutral-800">Cómo estás hoy</b>: Inventario, En tránsito y Conteos.</li><li><b className="font-medium text-neutral-800">Ventas → Por producto</b>: el top de lo vendido y cuánto subió o bajó cada uno contra los días anteriores.</li><li>La ganancia se ve solo con permiso de costos.</li><li>El resumen del negocio está en el <b className="font-medium text-neutral-800">Inicio</b>; qué comprar, en <b className="font-medium text-neutral-800">Inventario → Reponer</b>.</li></>} title="Reportes" subtitle="El detalle con Excel: ventas y compras por fechas, y cómo está tu inventario hoy. El resumen del negocio está en el Inicio." />
       {/* pestañas en dos grupos: por período | estado actual */}
       <Tabs value={tab} onChange={t => { setData(null); setTab(t) }} items={[
         ...PERIOD_TABS.map(t => ({ value: t.key, label: t.label, group: 'periodo' })),

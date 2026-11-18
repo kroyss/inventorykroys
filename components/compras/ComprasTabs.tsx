@@ -6,8 +6,9 @@ import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import type { PurchaseOrder, ImportOrder, Supplier, UserRole } from '@/lib/types'
 import ComprasClient from './ComprasClient'
 import ImportsClient from './ImportsClient'
-import { PageHeader, Tabs, chipCls } from '@/components/ui'
+import { Tabs, chipCls } from '@/components/ui'
 import type { AccesoCompras } from '@/lib/permisos'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 interface Props {
   initialOrders: PurchaseOrder[]
@@ -100,7 +101,8 @@ export default function ComprasTabs({
 
   return (
     <div>
-      <PageHeader title={isAdmin ? 'Compras' : 'Recepciones'}
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li><b className="font-medium text-neutral-800">+ Compra</b>: lo que le compraste a un proveedor, con su costo. El stock entra cuando la recibes.</li><li>Si la llevas por etapas: Pendiente → Pagada → En camino → Recibida → Finalizada. Una entrega a medias queda Parcial.</li><li><b className="font-medium text-neutral-800">Importaciones</b> (si las usas): pagos del 50 % y 100 %, fotos, datos de envío y costos de traerla.</li><li>La lista va ordenada por el último movimiento; toca una para ver su detalle.</li></>} title={isAdmin ? 'Compras' : 'Recepciones'}
         subtitle={isAdmin ? (importaciones ? 'Importaciones y compras locales, del pago a la recepción'
           : etapas ? 'Compras a tus proveedores, del pago a la recepción' : 'La mercancía que entra: suma al stock y registra lo que pagaste')
           : 'Mercancía que llega y hay que recibir'}

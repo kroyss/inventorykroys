@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Ventana } from '@/components/ui/Ventana'
 import Link from '@/components/ui/Link'
 import { useRouter } from 'next/navigation'
-import { PageHeader, EmptyState, FilterPills, Pagination } from '@/components/ui'
+import { EmptyState, FilterPills, Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useTraidaME } from '@/components/pagosme/useTraidaME'
 import {
@@ -12,6 +12,7 @@ import {
 import { mlNetFor, type VeRate } from '@/lib/pricingVE'
 import { ventaACosto } from '@/lib/salud'
 import type { CampanaML, PromoDeItem } from '@/lib/promocionesML'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 // Promociones de MercadoLibre (migraciones 094 y 097).
 //  Fase 1: ver campañas, envío gratis por transportista, descuento máximo y unidades para el envío gratis.
@@ -444,7 +445,8 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Promociones" subtitle="Campañas de MercadoLibre, envío gratis por transportista y rentabilidad al precio de la promo"
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li>Las campañas de MercadoLibre: qué publicaciones pueden entrar y hasta dónde bajar el precio.</li><li>Antes de entrar ves la rentabilidad al precio de la promo y si mantiene el envío gratis por transportista.</li><li><b className="font-medium text-neutral-800">+ Campaña propia</b>: tu propia promoción, con las publicaciones que elijas.</li></>} title="Promociones" subtitle="Campañas de MercadoLibre, envío gratis por transportista y rentabilidad al precio de la promo"
         actions={<>
           <Link href="/productos" className="btn-secondary text-sm whitespace-nowrap">← Productos</Link>
           <button onClick={() => setModal({ tipo: 'nueva' })} disabled={!!busy || sinFoto} className="btn-secondary text-sm whitespace-nowrap">+ Campaña propia</button>

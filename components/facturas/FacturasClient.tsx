@@ -8,9 +8,10 @@ import FacturaForm from './FacturaForm'
 import { useImprimirFactura } from './ImprimirAqui'
 import SalioMal from './SalioMal'
 import MoverFactura from './MoverFactura'
-import { PageHeader, chipCls } from '@/components/ui'
+import { chipCls } from '@/components/ui'
 import { DateField } from '@/components/ui/DateField'
 import { usePrimera } from '@/lib/primera'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 type Filter = 'all' | 'EMITIDA' | 'ANULADA' | 'RET_PENDIENTE'
 const FILTERS: { key: Filter; label: string }[] = [
@@ -100,7 +101,8 @@ export default function FacturasClient({ inicial = null }: { userRole: UserRole
 
   return (
     <div>
-      <PageHeader title="Facturas" subtitle="Facturas fiscales emitidas desde las ventas" actions={<>
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li>Las facturas fiscales emitidas desde las ventas.</li><li><b className="font-medium text-neutral-800">Retención pendiente</b>: facturas que esperan el comprobante de retención del cliente.</li><li><b className="font-medium text-neutral-800">Hoja de prueba</b>: imprime una de prueba para cuadrar el papel. <b className="font-medium text-neutral-800">Configuración</b>: el número siguiente y el corrimiento al imprimir.</li></>} title="Facturas" subtitle="Facturas fiscales emitidas desde las ventas" actions={<>
         <a href="/factura/prueba" target="_blank" rel="noreferrer" className="btn-secondary text-sm whitespace-nowrap">Hoja de prueba</a>
         {/* Configuración: también los usuarios, por si hay que corregir el número o el corrimiento al imprimir. */}
         <button onClick={() => setShowConfig(true)} className="btn-secondary text-sm whitespace-nowrap">Configuración</button>

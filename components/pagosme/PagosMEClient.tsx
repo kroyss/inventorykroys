@@ -4,7 +4,8 @@ import { usePrimera } from '@/lib/primera'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { EncabezadoInfo } from '@/components/ui/Info'
 import Link from '@/components/ui/Link'
-import EstadoVigilante, { traidaCompleta } from './EstadoVigilante'
+import { traidaCompleta } from './EstadoVigilante'
+import VigilanteConConexion, { CodigoConexion, DESCARGA_PROGRAMA } from './ConexionME'
 import { type PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from './PagoME'
 import PorConfirmar, { usePorConfirmar } from '@/components/ventas/PorConfirmar'
@@ -26,9 +27,6 @@ interface Datos {
   cuentasML?: { nickname: string; estado: string; con_navegador: boolean }[]
 }
 
-/** Programa para la PC (tools/vigilante-pagos-me/instalador → public/descargas). */
-// Con la versión en el enlace (23-10): Cloudflare guarda los .exe hasta 4 h; así cada versión nueva se baja al momento.
-const DESCARGA_PROGRAMA = '/descargas/InstalarPagosME.exe?v=1.3.7'
 
 const hora = (s: string | null) => s ? new Date(s).toLocaleString('es-VE', {
   timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -45,8 +43,6 @@ const ERROR_PERFIL: Record<string, string> = {
 /** `conexion` (18-11): con inventario y Ventas, la lista de pagos por confirmar vive en Ventas → Por confirmar; aquí queda
  *  la conexión (PC, cuentas, programa) y el historial de pagos. Sin inventario, esta pantalla ES la lista. */
 export default function PagosMEClient({ isAdmin, inicial = null, conexion = false }: { isAdmin: boolean; inicial?: unknown; conexion?: boolean }) {
-  // ⚙ Conexión: en la página de conexión abierta; en la lista, cerrada (se despliega).
-  const [verConexion, setVerConexion] = useState(conexion)
   const [filtro, setFiltro] = useState<Filtro>('pendiente')
   const [datos, setDatos] = useState<Datos | null>(null)
   const [marcados, setMarcados] = useState<Set<number>>(new Set())
@@ -55,10 +51,7 @@ export default function PagosMEClient({ isAdmin, inicial = null, conexion = fals
   const [error, setError] = useState<string | null>(null)
   const [ver, setVer] = useState<PagoME | null>(null)
   const [buscar, setBuscar] = useState('')
-  const [clave, setClave] = useState<string | null>(null)
   const [codigo, setCodigo] = useState<{ codigo: string; vence_at: string } | null>(null)
-  // "+ Agregar otra cuenta de MercadoEnvíos" (29-10): '' = sin cuenta elegida; el nombre = la que falta.
-  const [agregar, setAgregar] = useState<string | null>(null)
   // Sin inventario (Fundadores, 19-10): la lista por VENTA, como "Por confirmar"; la tabla queda como Historial.
   const [vista, setVista] = useState<'ventas' | 'historial'>('ventas')
   const pc = usePorConfirmar(!conexion && !!datos?.desdeML)
@@ -145,23 +138,11 @@ export default function PagosMEClient({ isAdmin, inicial = null, conexion = fals
     cargar()
   }
 
-  const generarClave = async () => {
-    if (datos?.vigilante.clave && !confirm('Se genera una clave nueva y la anterior deja de funcionar. ¿Seguir?')) return
-    const r = await fetch('/api/pagos-me/clave', { method: 'POST' })
-    const d = await r.json().catch(() => ({}))
-    if (r.ok) { setClave(d.clave); cargar() } else setError(d.error ?? 'Error')
-  }
-
   const conectar = async () => {
     setError(null)
     const r = await fetch('/api/pagos-me/conexion', { method: 'POST' })
     const d = await r.json().catch(() => ({}))
     if (r.ok) setCodigo(d); else setError(d.error ?? 'Error')
-  }
-  const desconectar = async () => {
-    if (!confirm('Se desconectan TODAS las PCs: dejan de traer pagos hasta que las conectes de nuevo con un código. ¿Seguir?')) return
-    const r = await fetch('/api/pagos-me/conexion', { method: 'DELETE' })
-    if (r.ok) { setAviso('PCs desconectadas.'); setCodigo(null); cargar() } else setError('No se pudo desconectar')
   }
   // Nombre a mostrar de cada perfil: la cuenta de MercadoEnvíos (si ya la dijo) o el nombre técnico.
   const nombre = (perfil: string) => datos?.vigilante.latidos.find(l => l.perfil === perfil)?.cuenta ?? perfil
@@ -194,25 +175,6 @@ export default function PagosMEClient({ isAdmin, inicial = null, conexion = fals
   // Con inventario la lista trae su propio «Traer pagos y ventas»: arriba no se repite (18-11).
   const botonArriba = !(conLista && datos?.conInventario)
   const B = 'font-medium text-neutral-800'
-  const panelConexion = isAdmin && verConexion && (
-    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-neutral-100 pt-2">
-      {perfiles.length > 0 && (
-        <button onClick={() => { setAgregar(''); conectar() }} className="font-medium text-emerald-700 underline">+ Agregar otra cuenta de MercadoEnvíos</button>
-      )}
-      <a href={DESCARGA_PROGRAMA} className="underline text-neutral-500 hover:text-neutral-800">Descargar programa</a>
-      <a href="/extension" target="_blank" className="underline text-neutral-500 hover:text-neutral-800">Extensión de Chrome</a>
-      <button onClick={conectar} className="underline text-neutral-500 hover:text-neutral-800">Conectar una PC</button>
-      {!datos?.desdeML && (
-        <button onClick={generarClave} className="underline text-neutral-400 hover:text-neutral-800" title="Para la instalación a mano (avanzado)">
-          {datos?.vigilante.clave ? 'Clave larga' : 'Generar clave'}
-        </button>
-      )}
-      {datos?.vigilante.clave && (
-        <button onClick={desconectar} className="underline text-neutral-400 hover:text-red-700">Desconectar PCs</button>
-      )}
-    </div>
-  )
-
   return (
     <div className="space-y-4">
       {/* 18-11 (el dueño: «mucho ruido antes de los productos»): ⓘ, una línea de estado y ⚙ Conexión desplegable. */}
@@ -236,26 +198,10 @@ export default function PagosMEClient({ isAdmin, inicial = null, conexion = fals
 
       {sinConectar && <PrimerosPasos isAdmin={isAdmin} onConectar={conectar} programaListo={!!despertador} />}
 
-      {datos && (
-        <EstadoVigilante d={datos} conexion={isAdmin ? { abierto: verConexion, onToggle: () => setVerConexion(v => !v) } : null}
-          onAgregar={isAdmin ? n => { setAgregar(n); conectar() } : undefined}
-          extra={<>
-            {panelConexion}
-            {agregar !== null && (
-              <AgregarCuenta cuenta={agregar} codigo={codigo} onOtroCodigo={conectar}
-                desconectada={!!agregar && (datos?.cuentasML ?? []).some(c => c.nickname === agregar && c.estado !== 'activa')}
-                onCerrar={() => { setAgregar(null); setCodigo(null) }} />
-            )}
-            {codigo && agregar === null && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
-            {clave && (
-              <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900">
-                Clave del vigilante (se muestra solo esta vez; cópiala en la extensión de cada perfil):
-                <code className="ml-2 select-all font-mono bg-white px-1.5 py-0.5 rounded border">{clave}</code>
-                <button onClick={() => navigator.clipboard.writeText(clave)} className="ml-2 underline">Copiar</button>
-              </div>
-            )}
-          </>} />
-      )}
+      {/* Primeros pasos: el código que pidió «Genera tu código» va justo debajo. */}
+      {sinConectar && codigo && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
+
+      {datos && <VigilanteConConexion d={datos} isAdmin={isAdmin} desdeML={!!datos.desdeML} onCambio={cargar} abiertoInicial={conexion} />}
 
       {/* La caja grande de la traída solo cuando hay que mirarla (trayendo, falla, incompleta); si salió bien va en la línea. */}
       {pedido && datos && (despertador || perfiles.length > 0) && !traidaCompleta(datos) && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML}
@@ -524,87 +470,6 @@ function PrimerosPasos({ isAdmin, onConectar, programaListo }: { isAdmin: boolea
       </>) : (
         <p className="text-xs">Pídele a un administrador de tu empresa que conecte la PC.</p>
       )}
-    </div>
-  )
-}
-
-/** Segunda (o tercera…) cuenta de MercadoEnvíos (29-10): cada cuenta va en su propio perfil de Chrome con el Asistente.
- *  El programa de la PC encuentra solo el perfil nuevo: no se reinstala nada. El código ya viene generado. */
-function AgregarCuenta({ cuenta, codigo, desconectada, onOtroCodigo, onCerrar }: {
-  cuenta: string; codigo: { codigo: string; vence_at: string } | null; desconectada: boolean
-  onOtroCodigo: () => void; onCerrar: () => void
-}) {
-  const nombre = cuenta || 'la otra cuenta'
-  const paso = 'flex gap-3 items-start'
-  const num = 'shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-semibold flex items-center justify-center'
-  const sub = 'block text-xs text-neutral-500 mt-0.5'
-  return (
-    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 space-y-3 text-sm text-neutral-700">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold text-neutral-900">Agregar {cuenta ? <b>{cuenta}</b> : 'otra cuenta de MercadoEnvíos'}</p>
-          <p className="text-xs text-neutral-500 mt-0.5">
-            Cada cuenta va en <b>su propio perfil de Chrome</b>, con su sesión de MercadoEnvíos. El programa de la PC encuentra solo el
-            perfil nuevo: no hay que reinstalar nada.
-          </p>
-        </div>
-        <button onClick={onCerrar} className="text-emerald-700 text-xs shrink-0">Cerrar ✕</button>
-      </div>
-      <ol className="space-y-2.5">
-        <li className={paso}><span className={num}>1</span>
-          <span>La cuenta tiene que estar conectada en <a href="/cuentas-ml" className="font-medium text-emerald-700 underline">Cuentas ML</a>.
-            {desconectada
-              ? <span className="block text-xs font-medium text-red-700 mt-0.5">⚠ {cuenta} está desconectada: conéctala primero, si no sus guías no entran.</span>
-              : <span className={sub}>Si no aparece ahí, conéctala primero.</span>}</span></li>
-        <li className={paso}><span className={num}>2</span>
-          <span>En la PC de las guías, abre Chrome y crea <b>otro perfil</b>: toca tu foto (arriba a la derecha) → <b>Agregar</b> →{' '}
-            <b>Continuar sin cuenta</b> → ponle de nombre {cuenta ? <b>{cuenta}</b> : 'el de la cuenta'}.
-            <span className={sub}>Se abre una ventana nueva: ese es el perfil de {nombre}. Los pasos 3 y 4 van en esa ventana.</span></span></li>
-        <li className={paso}><span className={num}>3</span>
-          <span>En esa ventana, entra a <b>MercadoEnvíos con la cuenta de {nombre}</b> y deja la sesión iniciada. Después agrega el
-            Asistente desde <a href="/extension" target="_blank" className="font-medium text-emerald-700 underline">app.elcomerciantedigital.com/extension</a>{' '}
-            → <b>Añadir a Chrome</b>.</span></li>
-        <li className={paso}><span className={num}>4</span>
-          <span>Toca la <b>pieza de rompecabezas</b> (arriba a la derecha) → abre <b>Asistente de envíos</b> → pega este código → <b>Conectar</b>.
-            Debe decir <b>«Conectado al sistema»</b>.
-            {codigo ? (
-              <span className="mt-1.5 flex flex-wrap items-center gap-3">
-                <code className="select-all rounded bg-white px-2 py-1 font-mono text-xl font-semibold tracking-widest ring-1 ring-emerald-200">{codigo.codigo}</code>
-                <button onClick={() => navigator.clipboard.writeText(codigo.codigo)} className="btn-secondary text-xs">Copiar</button>
-                <span className="text-xs text-neutral-500">
-                  Vale hasta las {new Date(codigo.vence_at).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })}.{' '}
-                  <button onClick={onOtroCodigo} className="underline">Otro código</button>
-                </span>
-              </span>
-            ) : <span className={sub}>Generando el código…</span>}</span></li>
-        <li className={paso}><span className={num}>5</span>
-          <span>Listo: toca <b>Traer pagos y guías</b>. Se abre un Chrome por cuenta, trae lo suyo y se cierra. Arriba, {nombre} pasa a
-            «conectado».
-            <span className={sub}>No cierres sesión de MercadoEnvíos en ningún perfil. Si se vence, al traer queda abierta esa ventana para
-              que vuelvas a entrar.</span></span></li>
-      </ol>
-    </div>
-  )
-}
-
-/** El código para conectar la PC: grande, para copiarlo o dictarlo. */
-function CodigoConexion({ codigo, vence, onCerrar }: { codigo: string; vence: string; onCerrar: () => void }) {
-  const [copiado, setCopiado] = useState(false)
-  const hasta = new Date(vence).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })
-  return (
-    <div className="mt-2 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-emerald-900 flex flex-wrap items-center gap-3">
-      <div>
-        <div className="text-[11px] uppercase tracking-wide text-emerald-700">Código de conexión</div>
-        <code className="select-all font-mono text-2xl font-semibold tracking-widest">{codigo}</code>
-      </div>
-      <button onClick={() => { navigator.clipboard.writeText(codigo); setCopiado(true) }} className="btn-secondary text-xs">
-        {copiado ? 'Copiado ✓' : 'Copiar'}
-      </button>
-      <p className="text-xs text-emerald-800 flex-1 min-w-[200px]">
-        Escríbelo en el programa al instalarlo y en el Asistente de envíos de cada cuenta de Chrome. Vale hasta las {hasta}{hasta.endsWith('.') ? '' : '.'}
-        Las PCs que ya estaban conectadas siguen funcionando.
-      </p>
-      <button onClick={onCerrar} className="text-emerald-700 text-xs">Cerrar ✕</button>
     </div>
   )
 }

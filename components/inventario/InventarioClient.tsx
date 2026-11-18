@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { FotoProducto } from '@/components/ui/FotoProducto'
 import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
-import { Pagination, PageHeader, KPICard, StatusBadge } from '@/components/ui'
+import { Pagination, KPICard, StatusBadge } from '@/components/ui'
 import Link from '@/components/ui/Link'
 import EtiquetasModal from './EtiquetasModal'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -11,6 +11,7 @@ import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
 import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -407,7 +408,8 @@ export default function InventarioClient({ initialItems, acceso, country, etique
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" actions={<>
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li>El stock de cada producto con su mínimo y máximo; el color avisa lo que está bajo o agotado.</li><li>Cada venta registrada resta y cada compra recibida suma. En el detalle de un producto ves todos sus movimientos.</li><li><b className="font-medium text-neutral-800">Ajuste de stock</b>: si contaste y no cuadra, guarda el número real; queda como un ajuste en sus movimientos.</li><li><b className="font-medium text-neutral-800">Reponer</b>: qué comprar según lo que vendes. <b className="font-medium text-neutral-800">Stock en ML</b>: compara tu stock con tus publicaciones.</li></>} title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" actions={<>
         {stockML && (
           <Link href="/inventario/stock-ml" className="btn-secondary text-sm whitespace-nowrap"
             title="Cada producto con todas sus publicaciones de MercadoLibre: iguala el stock y reactiva en todas tus cuentas de una vez">

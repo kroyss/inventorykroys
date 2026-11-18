@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { FotoProducto, FotoEditable } from '@/components/ui/FotoProducto'
 import type { Product, ProfitCategory, Country, MLCode } from '@/lib/types'
-import { int, PageHeader, KPICard, StatusBadge, RowMenu } from '@/components/ui'
+import { int, KPICard, StatusBadge, RowMenu } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
@@ -17,6 +17,7 @@ import ElegirPesoML from './ElegirPesoML'
 import MedidorGanancia from './MedidorGanancia'
 import CostosMLModal from './CostosMLModal'
 import { umbralesDe, nivelDe, colorRentab, AYUDA_RENTABILIDAD, type Umbrales } from '@/lib/salud'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 // ─── helpers ────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -581,7 +582,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Productos" subtitle="Catálogo, precios y rentabilidad de cada producto" actions={<>
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li>Cada producto con su costo, precio y rentabilidad. Tócalo para ver su ficha; Editar va en el pie.</li><li><b className="font-medium text-neutral-800">+ Producto</b> o <b className="font-medium text-neutral-800">Importar desde ML</b>: crea los productos a partir de tus publicaciones de MercadoLibre.</li><li><b className="font-medium text-neutral-800">Recargo sobre costo</b>: lo que le sumas al costo para el precio. <b className="font-medium text-neutral-800">Rentabilidad</b>: lo que te queda después de MercadoLibre, sobre el costo.</li><li><b className="font-medium text-neutral-800">Costos ML</b>: la comisión y el envío que se usan en ese cálculo.</li></>} title="Productos" subtitle="Catálogo, precios y rentabilidad de cada producto" actions={<>
         {/* 14-11 (el dueño): Importar desde ML vive en Productos (es donde se crean); MercadoEnvíos sigue en Publicaciones. */}
         {importarML && products.length > 0 && (
           <Link href="/productos/importar-ml" className="btn-secondary text-sm whitespace-nowrap"

@@ -2,13 +2,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { usePrimera } from '@/lib/primera'
 import type { FinanceAccount, FinanceCategory, FinanceLedgerRow, FinanceKind } from '@/lib/types'
-import { money, PageHeader, Tabs, KPICard } from '@/components/ui'
+import { money, Tabs, KPICard } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Combobox } from '@/components/ui/Combobox'
 import { parseLocalDate } from '@/lib/tz'
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import { DateField, MonthField } from '@/components/ui/DateField'
 import CostosML from '@/components/finanzas/CostosML'
+import { EncabezadoInfo } from '@/components/ui/Info'
 
 const CURRENCIES = ['USD', 'COP', 'VES'] as const
 
@@ -136,7 +137,8 @@ export default function FinanzasClient({ inicial = null }: { inicial?: FinanzasI
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Finanzas" subtitle="De toda la organización: Venezuela y Colombia juntas, en USD" />
+      {/* 18-11 (el dueño): ⓘ en cada sección. */}
+      <EncabezadoInfo info={<><li>De toda la organización: Venezuela y Colombia juntas, en dólares.</li><li><b className="font-medium text-neutral-800">Movimientos</b>: ingresos y gastos del mes, por país. <b className="font-medium text-neutral-800">Cierre mensual</b>: cómo terminó cada mes.</li><li><b className="font-medium text-neutral-800">Capital / Liquidez</b>: cuánto hay en las cuentas, aparte las reservas. <b className="font-medium text-neutral-800">Costos ML</b>: los envíos de ML contra lo facturado.</li></>} title="Finanzas" subtitle="De toda la organización: Venezuela y Colombia juntas, en USD" />
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
 
