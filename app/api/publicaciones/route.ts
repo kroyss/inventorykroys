@@ -3,27 +3,64 @@ import { sesionPublicaciones } from '@/lib/preguntasSesion'
 import { apiError } from '@/lib/apiError'
 import { whereFiltro } from '@/lib/publicacionesLista'
 import { actualizarCatalogo } from '@/lib/catalogoML'
+import { puede } from '@/lib/permisos'
+import { tieneModulo } from '@/lib/modulos'
+import { avisosStock, itemsEnPromo, SQL_SIN_PESO, SQL_SIN_VINCULAR, type AvisoStock } from '@/lib/avisosPublicaciones'
 
 const POR_PAGINA = 40
 
-// GET /api/publicaciones?q=&cuenta=&estado=&pagina= → las publicaciones de las cuentas conectadas (ml_catalogo).
+// GET /api/publicaciones?q=&cuenta=&estado=&pagina=&aviso= → las publicaciones de las cuentas conectadas (ml_catalogo).
+// Fase 4 (18-11): cada fila trae sus avisos (stock, vincular, peso, promo; lib/avisosPublicaciones.ts) y arriba el
+// conteo de cada uno para los filtros. Cada aviso solo si el usuario ve esa pantalla. &fresco=1 recalcula el stock.
+const AVISOS = ['stock', 'vincular', 'peso', 'promo'] as const
+type Aviso = typeof AVISOS[number]
+
 export async function GET(req: NextRequest) {
   const s = await sesionPublicaciones()
   if ('error' in s) return s.error
   const p = req.nextUrl.searchParams
   const pagina = Math.max(1, Number(p.get('pagina')) || 1)
+  const u = s.session.user
+  const ve: Record<Aviso, boolean> = {
+    stock: tieneModulo(u, 'inventario') && puede(u, 'ver_inventario'),
+    vincular: puede(u, 'vincular_ml') || (puede(u, 'ver_productos') && puede(u, 'importar_ml')),
+    peso: u.country === 'VE' && tieneModulo(u, 'inventario') && puede(u, 'ver_productos'),
+    promo: u.country === 'VE' && tieneModulo(u, 'promociones') && puede(u, 'promociones') && puede(u, 'ver_productos'),
+  }
+  const avisoPedido = AVISOS.find(a => a === p.get('aviso') && ve[a]) ?? null
   try {
+    const [stock, promo] = await Promise.all([
+      ve.stock ? avisosStock(s.db, u.empresaId, u.country, p.get('fresco') === '1').catch(() => new Map<string, AvisoStock>()) : Promise.resolve(new Map<string, AvisoStock>()),
+      ve.promo ? itemsEnPromo(s.db).catch(() => new Set<string>()) : Promise.resolve(new Set<string>()),
+    ])
     const w = whereFiltro({ q: p.get('q') ?? '', cuenta: Number(p.get('cuenta')) || null, estado: p.get('estado') })
+    // Los arrays de ids (stock, promo) van como parámetro solo si se ven: cada $n debe usarse en la consulta.
+    const args = [...w.args]
+    const cond: Partial<Record<Aviso, string>> = {}
+    if (ve.stock) { args.push([...stock.keys()]); cond.stock = `m.item_id = ANY($${args.length}::text[])` }
+    if (ve.promo) { args.push([...promo]); cond.promo = `m.item_id = ANY($${args.length}::text[])` }
+    if (ve.vincular) cond.vincular = SQL_SIN_VINCULAR
+    if (ve.peso) cond.peso = SQL_SIN_PESO
+    const extra = avisoPedido ? ` AND ${cond[avisoPedido]}` : ''
+    const cols = `${ve.vincular ? SQL_SIN_VINCULAR : 'FALSE'} AS sin_vincular, ${ve.peso ? SQL_SIN_PESO : 'FALSE'} AS sin_peso`
+    const conteos = AVISOS.filter(a => cond[a]).map(a => `, COUNT(*) FILTER (WHERE ${cond[a]})::int AS ${a}`).join('')
+    // Con un aviso pedido, la lista se filtra; los conteos de los filtros siguen siendo de toda la búsqueda.
     const [{ rows }, { rows: [t] }, { rows: cuentas }] = await Promise.all([
       s.db.query(
         `SELECT m.item_id, m.titulo, m.precio::float AS precio, m.moneda, m.disponible, m.estado, m.thumbnail, m.permalink, m.sku,
                 k.nickname AS cuenta, COALESCE(jsonb_array_length(m.variantes), 0) AS variantes,
-                (SELECT MAX(c.creado_at) FROM ml_publicacion_cambios c WHERE c.item_id = m.item_id AND c.ok) AS editada_at
-         ${w.sql} ORDER BY m.sin_movimiento, m.estado, m.titulo LIMIT ${POR_PAGINA} OFFSET ${(pagina - 1) * POR_PAGINA}`, w.args),
-      s.db.query(`SELECT COUNT(*)::int AS n ${w.sql}`, w.args),
+                (SELECT MAX(c.creado_at) FROM ml_publicacion_cambios c WHERE c.item_id = m.item_id AND c.ok) AS editada_at, ${cols}
+         ${w.sql}${extra} ORDER BY m.sin_movimiento, m.estado, m.titulo LIMIT ${POR_PAGINA} OFFSET ${(pagina - 1) * POR_PAGINA}`, args),
+      s.db.query(`SELECT COUNT(*)::int AS todas, COUNT(*) FILTER (WHERE TRUE${extra})::int AS n${conteos} ${w.sql}`, args),
       s.db.query(`SELECT id, nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`),
     ])
-    return NextResponse.json({ filas: rows, total: t.n, porPagina: POR_PAGINA, cuentas })
+    const filas = rows.map(r => {
+      const st = stock.get(r.item_id)
+      return { ...r, stock: st ? { nivel: st.nivel, code: st.code, disponible: st.disponible, pubs: st.pubs } : null, promo: promo.has(r.item_id) }
+    })
+    const { n, todas, ...avisos } = t
+    return NextResponse.json({ filas, total: n, todas, porPagina: POR_PAGINA, cuentas, avisos, aviso: avisoPedido,
+                               puedeIgualar: ve.stock && puede(u, 'reponer_stock') })
   } catch (err) {
     return apiError(err)
   }

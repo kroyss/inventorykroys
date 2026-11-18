@@ -1,12 +1,26 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from '@/components/ui/Link'
+import { FilterPills } from '@/components/ui'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { VistoNuevo } from '@/components/ui/Nuevo'
+import PendientesPreparar from '@/components/productos/PendientesPreparar'
+import { pestanasML } from '@/components/productos/PublicacionesMLTabs'
 
 interface Fila {
   item_id: string; titulo: string; precio: number | null; moneda: string | null; disponible: number; estado: string
   thumbnail: string | null; sku: string | null; cuenta: string; variantes: number; editada_at: string | null
+  // Fase 4 (18-11): avisos de la fila (lib/avisosPublicaciones.ts); solo vienen los que el usuario puede ver.
+  sin_vincular: boolean; sin_peso: boolean; promo: boolean
+  stock: null | { nivel: 'vende' | 'stock'; code: string; disponible: number
+                  pubs: { item_id: string; variante_id: string | null; variante: string | null; ml: number | null; queda: number; reactivar: boolean }[] }
 }
-interface Respuesta { filas: Fila[]; total: number; porPagina: number; cuentas: { id: number; nickname: string }[] }
+type Aviso = 'stock' | 'vincular' | 'peso' | 'promo'
+interface Respuesta {
+  filas: Fila[]; total: number; todas: number; porPagina: number; cuentas: { id: number; nickname: string }[]
+  avisos: Partial<Record<Aviso, number>>; puedeIgualar: boolean
+}
 
 const precio = (n: number | null, m: string | null) => n == null ? '—'
   : `${m === 'COP' ? '$' : 'US$'} ${n.toLocaleString('de-DE', { maximumFractionDigits: m === 'COP' ? 0 : 2, minimumFractionDigits: m === 'COP' ? 0 : 2 })}`
@@ -22,7 +36,12 @@ export default function PublicacionesClient() {
   const [cuenta, setCuenta] = useState('')
   const [estado, setEstado] = useState('')
   const [pagina, setPagina] = useState(1)
+  const [aviso, setAviso] = useState<'' | Aviso>('')
+  const fresco = useRef(false)
   const [r, setR] = useState<Respuesta | null>(null)
+  const { data: sesion } = useSession()
+  const pest = sesion?.user ? pestanasML(sesion.user) : []
+  const vinc = pest.find(x => x.k === 'vincular'), envios = pest.find(x => x.k === 'envios')
   const [error, setError] = useState(false)
   const [elegidas, setElegidas] = useState<Set<string>>(new Set())
   const [todasBusqueda, setTodasBusqueda] = useState(false)
@@ -39,17 +58,20 @@ export default function PublicacionesClient() {
   useEffect(() => { const t = setTimeout(() => { setBuscar(q); setPagina(1) }, 300); return () => clearTimeout(t) }, [q])
   useEffect(() => {
     let vivo = true
-    const p = new URLSearchParams({ q: buscar, cuenta, estado, pagina: String(pagina) })
+    const p = new URLSearchParams({ q: buscar, cuenta, estado, pagina: String(pagina), aviso })
+    if (fresco.current) { p.set('fresco', '1'); fresco.current = false }
     fetch(`/api/publicaciones?${p}`).then(x => x.ok ? x.json() : Promise.reject())
       .then(d => { if (vivo) { setR(d); setError(false) } }).catch(() => { if (vivo) setError(true) })
     return () => { vivo = false }
-  }, [buscar, cuenta, estado, pagina, recarga])
+  }, [buscar, cuenta, estado, pagina, recarga, aviso])
+  // Después de igualar: relee con el stock recién calculado (el servidor lo guarda 1 min).
+  const releer = () => { fresco.current = true; setRecarga(n => n + 1) }
 
   const paginas = r ? Math.max(1, Math.ceil(r.total / r.porPagina)) : 1
   const limpiar = () => { setElegidas(new Set()); setTodasBusqueda(false) }
   const cuantas = todasBusqueda ? Math.min(r?.total ?? 0, 3000) : elegidas.size
   const sel: Seleccion = todasBusqueda
-    ? { filtro: { q: buscar, cuenta: Number(cuenta) || null, estado: estado || null } }
+    ? { filtro: { q: buscar, cuenta: Number(cuenta) || null, estado: estado || null } }   // (sin el filtro de aviso: «Elegir las de esta búsqueda» se apaga con aviso)
     : { items: [...elegidas] }
   const marcar = (id: string) => { setTodasBusqueda(false); setElegidas(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const paginaMarcada = !!r?.filas.length && r.filas.every(f => elegidas.has(f.item_id))
@@ -63,6 +85,10 @@ export default function PublicacionesClient() {
           <svg viewBox="0 0 20 20" className={`h-4 w-4 ${actualizando ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.7}><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           {actualizando ? 'Actualizando…' : 'Actualizar desde ML'}
         </button>
+        <VistoNuevo clave="mis_publicaciones" />
+        {/* 18-11 Fase 4: Vincular y Pesos (antes el submenú «Preparar») se abren desde aquí, con lo que falta. */}
+        {vinc && <Link href={vinc.href} className="btn-secondary !px-3 !py-1.5" title="Unir cada publicación o variante con su producto">Vincular<PendientesPreparar de="sinVincular" /></Link>}
+        {envios && <Link href={envios.href} className="btn-secondary !px-3 !py-1.5" title="Pesos de los productos y el envío gratis de MercadoEnvíos">Pesos y envío gratis<PendientesPreparar de="sinPeso" /></Link>}
         <Link href="/publicaciones/textos" className="btn-secondary !px-3 !py-1.5"><svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.7}><path d="M5 3h7l3 3v11H5z M8 9h5 M8 12h5" strokeLinecap="round" strokeLinejoin="round" /></svg>Textos de descripción</Link>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -78,24 +104,31 @@ export default function PublicacionesClient() {
           <option value="">Activas y pausadas</option><option value="active">Activas</option><option value="paused">Pausadas</option>
         </select>
       </div>
+      {r && Object.values(r.avisos ?? {}).some(n => (n ?? 0) > 0) && (
+        <FilterPills value={aviso} onChange={v => { setAviso(v); setPagina(1); limpiar() }} options={[
+          { value: '' as const, label: 'Todas', count: r.todas },
+          ...(AVISOS_UI.filter(a => (r.avisos[a.k] ?? 0) > 0 || aviso === a.k).map(a => ({ value: a.k, label: a.t, count: r.avisos[a.k] ?? 0 }))),
+        ]} />
+      )}
       {error ? <p className="text-sm text-neutral-500">No se pudo cargar la lista. Prueba de nuevo.</p> : !r ? (
         <div className="space-y-2">{[0, 1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl border border-neutral-200 bg-neutral-50 animate-pulse" />)}</div>
       ) : !r.filas.length ? (
         <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 px-4 py-6 text-center">
-          {buscar ? 'No hay publicaciones con esa búsqueda.' : 'Todavía no se leyeron las publicaciones de tus cuentas (se leen solas cada pocas horas).'}
+          {aviso ? 'Nada pendiente aquí. ✓' : buscar ? 'No hay publicaciones con esa búsqueda.' : 'Todavía no se leyeron las publicaciones de tus cuentas (se leen solas cada pocas horas).'}
         </p>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={paginaMarcada} onChange={marcarPagina} /> Elegir esta página</label>
             <span>{r.total.toLocaleString('es-VE')} publicaciones</span>
-            {(elegidas.size > 0 || todasBusqueda) && r.total > r.filas.length && !todasBusqueda && (
+            {(elegidas.size > 0 || todasBusqueda) && r.total > r.filas.length && !todasBusqueda && !aviso && (
               <button type="button" onClick={() => setTodasBusqueda(true)} className="text-sky-700 hover:underline">Elegir las {Math.min(r.total, 3000).toLocaleString('es-VE')} de esta búsqueda</button>
             )}
           </div>
           <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
             {r.filas.map(f => (
-              <li key={f.item_id} className="flex items-center">
+              <li key={f.item_id}>
+                <div className="flex items-center">
                 <input type="checkbox" className="ml-3" aria-label="Elegir" checked={todasBusqueda || elegidas.has(f.item_id)} onChange={() => marcar(f.item_id)} />
                 <Link href={`/publicaciones/${f.item_id}`} className="flex flex-1 min-w-0 items-center gap-3 px-3 py-2.5 hover:bg-neutral-50">
                   <span className="w-12 h-12 shrink-0 rounded-md bg-neutral-50 border border-neutral-200 overflow-hidden">
@@ -115,6 +148,8 @@ export default function PublicacionesClient() {
                   </span>
                   <span className="text-neutral-300">→</span>
                 </Link>
+                </div>
+                <AvisosFila f={f} puedeIgualar={!!r.puedeIgualar} vincular={!!vinc} envios={envios?.href ?? null} onIgualado={releer} />
               </li>
             ))}
           </ul>
@@ -139,6 +174,64 @@ export default function PublicacionesClient() {
       )}
       {accion === 'descripcion' && <LoteDescripcion sel={sel} cuantas={cuantas} onCerrar={() => setAccion(null)} onHecho={limpiar} />}
       {accion === 'precio' && <LotePrecio sel={sel} onCerrar={() => setAccion(null)} onHecho={limpiar} />}
+    </div>
+  )
+}
+
+const AVISOS_UI: { k: Aviso; t: string }[] = [
+  { k: 'stock', t: 'Stock distinto' }, { k: 'vincular', t: 'Sin vincular' }, { k: 'peso', t: 'Sin peso' }, { k: 'promo', t: 'En promo' },
+]
+const ETQ = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-4 whitespace-nowrap'
+
+/** Fase 4 (18-11, el dueño: «al estilo ML»): etiquetas cortas SOLO cuando algo pide atención; cada una lleva a lo que
+ *  lo resuelve. «Igualar» pone en ML lo que hay con la misma acción de Stock vs inventario (el servidor recalcula ahora). */
+function AvisosFila({ f, puedeIgualar, vincular, envios, onIgualado }: {
+  f: Fila; puedeIgualar: boolean; vincular: boolean; envios: string | null; onIgualado: () => void
+}) {
+  const confirmar = useConfirm()
+  const [trabajando, setTrabajando] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const st = f.stock
+  if (!st && !f.sin_vincular && !f.sin_peso && !f.promo && !msg) return null
+  const una = st?.pubs.length === 1 ? st.pubs[0] : null
+  const detalle = st ? (una ? `ML ${una.ml ?? 0} → ${una.queda}${una.reactivar ? ' y activar' : ''}` : st.pubs.length ? `${st.pubs.length} variantes` : '') : ''
+  const igualar = async () => {
+    if (!st?.pubs.length) return
+    const lineas = st.pubs.map(p => `${p.variante ? `${p.variante}: ` : ''}ML ${p.ml ?? 0} → ${p.queda}${p.reactivar ? ' (y se activa)' : ''}`)
+    if (!await confirmar({ title: 'Poner en ML lo que hay', message: `${st.code} · tienes ${st.disponible}\n${lineas.join('\n')}`, confirmText: 'Sí, igualar' })) return
+    setTrabajando(true); setMsg(null)
+    try {
+      const res = await fetch('/api/stock-en-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'igualar', pubs: st.pubs.slice(0, 20).map(p => ({ item_id: p.item_id, variante_id: p.variante_id })) }) })
+      const d = await res.json().catch(() => null)
+      const malas = ((d?.resultados ?? []) as { ok: boolean; error?: string }[]).filter(x => !x.ok)
+      if (!res.ok) setMsg(d?.error ?? 'No se pudo igualar')
+      else if (malas.length) setMsg(malas[0].error ?? 'ML no aceptó el cambio')
+      else { setMsg('✓ Igualado'); onIgualado() }
+    } catch { setMsg('No se pudo igualar') }
+    setTrabajando(false)
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 pb-2.5 pl-[6.25rem] pr-3 -mt-1">
+      {st && (
+        <span className={`${ETQ} ${st.nivel === 'vende' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}
+          title={st.nivel === 'vende' ? 'MercadoLibre ofrece más de lo que tienes en el inventario' : 'El stock en ML no coincide con tu inventario'}>
+          {st.nivel === 'vende' ? 'Vende de más' : 'Stock distinto'}{detalle && <span className="num">· {detalle}</span>}
+          {puedeIgualar && st.pubs.length > 0 && (
+            <button type="button" onClick={igualar} disabled={trabajando} className="ml-0.5 font-medium underline underline-offset-2 disabled:opacity-50">
+              {trabajando ? 'Igualando…' : 'Igualar'}</button>
+          )}
+          <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(st.code)}`} className="ml-0.5 underline underline-offset-2">Ver</Link>
+        </span>
+      )}
+      {f.sin_vincular && (vincular
+        ? <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.item_id)}`} className={`${ETQ} border-sky-200 bg-sky-50 text-sky-800 hover:border-sky-300`}>Sin vincular · Vincular →</Link>
+        : <span className={`${ETQ} border-sky-200 bg-sky-50 text-sky-800`}>Sin vincular</span>)}
+      {f.sin_peso && (envios
+        ? <Link href={envios} className={`${ETQ} border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-300`}>Sin peso · Cargar →</Link>
+        : <span className={`${ETQ} border-neutral-200 bg-neutral-50 text-neutral-600`}>Sin peso</span>)}
+      {f.promo && <Link href="/productos/promociones" className={`${ETQ} border-lime-200 bg-lime-50 text-lime-800 hover:border-lime-300`}>En promo</Link>}
+      {msg && <span className={`text-[11px] ${msg.startsWith('✓') ? 'text-emerald-700' : 'text-red-600'}`}>{msg}</span>}
     </div>
   )
 }

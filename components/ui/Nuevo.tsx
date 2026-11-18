@@ -11,6 +11,8 @@ export const NUEVOS = {
   // 18-11 (Fase 1, orden de Publicaciones e Inventario).
   preparar: '2026-12-18',
   reponer: '2026-12-18',
+  // 18-11 Fase 4: Mis publicaciones (lista con avisos por fila).
+  mis_publicaciones: '2026-12-18',
 } as const
 export type ClaveNuevo = keyof typeof NUEVOS
 

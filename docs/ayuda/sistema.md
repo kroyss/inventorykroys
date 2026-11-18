@@ -473,13 +473,24 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 
 *Cómo lo pregunta la gente:* editar publicación, cambiar precio en ML, cambiar fotos, características, ficha técnica, descripción, variantes, pausar publicación, cambiar precios a muchas, subir precios en lote, pie de descripción, encabezado, condiciones de compra, plantilla de descripción, cambiar la info de abajo de la descripción en todas.
 
-Todo lo de tus publicaciones de MercadoLibre en un solo menú, con pestañas ordenadas por trabajo (18-11; cada una
-aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones** en el menú se abre la primera:
-- **Stock vs inventario:** el stock que muestra cada cuenta de ML contra tu inventario (lo de todos los días).
-- **Editar** (viene con el Inventario; permiso **Publicaciones (editar en MercadoLibre)**): ver abajo.
-- **Preparar:** lo que se hace al empezar y de vez en cuando: **Vincular** (unir cada publicación o variante con su
-  producto) y **Pesos y envío gratis** (Venezuela; antes la pestaña MercadoEnvíos). El numerito gris dice cuánto falta:
-  publicaciones activas sin vincular y productos sin peso.
+Todo lo de tus publicaciones de MercadoLibre en un solo menú, con pestañas ordenadas por trabajo (18-11;
+cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones** en el menú se abre la primera:
+- **Mis publicaciones** (antes «Editar»; viene con el Inventario; permiso **Publicaciones (editar en MercadoLibre)**):
+  la lista de todas tus publicaciones, como en ML. Cada fila lleva una **etiqueta corta solo si algo pide atención**:
+  - **Stock distinto** (ámbar) o **Vende de más** (rojo): el stock de ML no coincide con tu inventario (la misma cuenta
+    de Stock vs inventario). **Igualar** pone en ML lo que hay (pide confirmar y muestra ML X → Y); **Ver** abre
+    Stock vs inventario con ese producto.
+  - **Sin vincular**: activa con stock y sin producto. Lleva a **Vincular** con esa publicación.
+  - **Sin peso** (Venezuela): su producto no tiene peso. Lleva a **Pesos y envío gratis**.
+  - **En promo** (Venezuela): está en una promoción (según la última lectura de Promociones).
+  Arriba, los filtros con su número (**Stock distinto · Sin vincular · Sin peso · En promo**) muestran solo lo que hay
+  que arreglar. Cada etiqueta sale solo si tienes permiso para esa pantalla. Arriba a la derecha: **Vincular** y
+  **Pesos y envío gratis** (con lo que falta), **Textos de descripción** y **Actualizar desde ML**. Tocar la fila abre
+  el editor (ver abajo).
+- **Promociones** (ver abajo).
+- **Stock vs inventario:** el stock que muestra cada cuenta de ML contra tu inventario, con sus grupos y arreglos en lote.
+- **Vincular** y **Pesos y envío gratis** (antes en «Preparar»): se abren desde los botones de Mis publicaciones o
+  desde sus etiquetas; estando ahí, «← Mis publicaciones» vuelve. Quien no tiene Mis publicaciones los ve como pestañas.
 - **Historial de tareas** (enlace a la derecha): lo que se mandó a MercadoLibre en segundo plano. Mientras algo se
   está enviando, el avance sale abajo a la derecha de cualquier pantalla (también lo de Stock vs inventario cuando
   son más de 10 publicaciones).
@@ -900,7 +911,7 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
   modelo; si está en varias publicaciones, la activa con más stock). En la ficha del producto: **Cambiar foto** (o
   **Subir foto**) pone una tuya, y **Usar la de MercadoLibre** vuelve a la de ML. Sin foto: cuadro gris «Sin foto».
   Las hojas impresas (recepción y conteo) no llevan fotos.
-- **Pesos (Publicaciones → Preparar → Pesos y envío gratis, Venezuela):** el peso de cada producto sale **solo** del portal de
+- **Pesos (Publicaciones → Mis publicaciones → Pesos y envío gratis, Venezuela):** el peso de cada producto sale **solo** del portal de
   MercadoEnvíos (el que usa ML para el envío gratis), por medio de sus vínculos: Pagos ME lo trae en la primera traída
   del día. En la ficha y en MercadoEnvíos se ve con la marca **ME** y no se edita a mano. El peso es **solo** el del portal (nunca el que declara la
   publicación). Pasa al producto al crear, importar o vincular, y si a alguna publicación vinculada le falta, el sistema
@@ -913,7 +924,7 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
   ficha del producto). Precios, rentabilidad, Promociones y Costos ML usan ese mismo peso.
 - **Publicaciones de MercadoLibre en la ficha del producto:** se ven los códigos MLV vinculados (cuenta, variante,
   «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
-  (abre Publicaciones → Preparar → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
+  (abre Publicaciones → Mis publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
 - **Stock en ML: cómo está ordenada (17-11).** Arriba, **3 tarjetas** con lo que hay que hacer; cada producto cae en UN
   solo grupo (por prioridad), así los números suman lo que falta sin repetir:
   🔴 **Vende de más** (ML ofrece lo que no tienes: riesgo de reclamo) · 🔵 **Tienes y no vendes** (hay unidades y ninguna
@@ -965,7 +976,7 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
   se crea otro). Si ninguno coincide lo dice, y se crea como nueva. Clic en una fila abre la ficha; Editar en el pie.
   En Venezuela, la columna **Peso ME** muestra el peso de cada producto y de dónde sale: solo el número = del portal de
   MercadoEnvíos (al pasar el mouse, la fecha en que se leyó), **a mano**, **⚠ distintos** (sus publicaciones pesan
-  distinto en el portal: revisar en Publicaciones → Preparar → Pesos y envío gratis) o **Sin peso**. Se puede ordenar por peso.
+  distinto en el portal: revisar en Publicaciones → Mis publicaciones → Pesos y envío gratis) o **Sin peso**. Se puede ordenar por peso.
 - **Filtros de Productos (18-11):** debajo del buscador, solo los que tienen algo y con su número: **Costo estimado**
   (importados con un % del precio; trae **Completar en lote →**), **Sin costo**, **Rentabilidad baja** (por debajo de
   «sana», los cortes de Costos ML) y **Menos de $3** (Venezuela; trae **Revisar márgenes →**, antes un botón aparte).
@@ -1027,7 +1038,7 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
   como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos
   datos» los deja para la próxima vez.
 - **Publicaciones** (menú propio, con pestañas Editar · Vincular · Stock · Promociones · MercadoEnvíos (Venezuela) · Tareas; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
-- **Vincular** (Publicaciones → Preparar → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
+- **Vincular** (Publicaciones → Mis publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.
   **Publicaciones nuevas:** al abrir Vincular, el sistema busca solo las publicaciones que creaste en ML (como mucho
   cada 5 minutos por cuenta). Las de los últimos 15 días sin producto salen en un aviso azul **«N publicaciones nuevas

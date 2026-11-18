@@ -5,7 +5,7 @@ import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
 import { contarSinVincular } from '@/lib/importarML'
 
-// GET /api/publicaciones/pendientes (18-11): lo que falta en Publicaciones → Preparar, para el numerito gris de la
+// GET /api/publicaciones/pendientes (18-11): lo que falta en Vincular y Pesos (botones de Mis publicaciones, antes Preparar), para el numerito gris de la
 // pestaña. Publicaciones activas con stock sin vincular (lo mismo que avisa Stock vs inventario) y productos activos sin
 // peso (Venezuela con Inventario). Solo lectura; cada número solo si el usuario ve esa pantalla.
 export async function GET() {
