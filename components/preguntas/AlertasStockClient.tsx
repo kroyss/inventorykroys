@@ -288,8 +288,8 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
               {puedePoner && <>
                 {' · '}
                 <button type="button" onClick={() => escribir(f, String(poner))}
-                  title={conReparto && poner! < f.inventario! ? `Lo que sugiere Stock vs inventario: reparte las ${f.inventario} u. entre tus publicaciones` : 'Poner este número como stock en MercadoLibre'}
-                  className="underline underline-offset-2 hover:text-emerald-900">poner {poner}</button>
+                  title={conReparto && poner! < f.inventario! ? `Lo que sugiere Stock vs inventario: reparte las ${f.inventario} u. entre tus publicaciones. Toca para ponerlo en MercadoLibre` : 'Toca para poner este número como stock en MercadoLibre'}
+                  className="underline underline-offset-2 hover:text-emerald-900">sugerido {poner}</button>
               </>}
             </p>
           )

@@ -459,7 +459,7 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 - **Pausadas:** publicaciones pausadas a mano (o por ML al quedar en 0). Márcalas y toca **Reactivar en
   MercadoLibre** (o ▶ en cada una).
 - **Cada fila (con Inventario):** a la derecha, siempre **inventario N** (lo que hay en tu inventario) y, si conviene
-  subir el stock en ML, **poner X** (lo escribe como stock nuevo). Debajo, **hace 17 h / hace 2 días / hace 40 min**:
+  subir el stock en ML, **sugerido X** (al tocarlo lo escribe como stock nuevo). Debajo, **hace 17 h / hace 2 días / hace 40 min**:
   desde cuándo está agotada, por agotarse o pausada.
 - **No hay para reponer:** deja de avisar de ese producto hasta que lo repongas y vuelva a agotarse.
 - **Revisar ahora:** busca en ML en el momento (se puede cada 10 minutos). Además se revisa sola cada hora.
@@ -1067,7 +1067,7 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   poner stock en ML (aquí, en Automatizaciones → Stock y en la ventana de cambiar stock) avisa si pones más de lo que
   tienes y pide «Actualizar igual» (no bloquea). Apagada, el inventario se ve solo como dato y aquí sale una nota para
   revisar las sugerencias antes de aplicar. Arranca prendida si hubo entradas o ajustes de inventario en los últimos 60 días.
-  Prendida, **Automatizaciones → Stock** usa el mismo reparto: «inventario N · poner X» pone lo que sugiere Stock en ML (no
+  Prendida, **Automatizaciones → Stock** usa el mismo reparto: «inventario N · sugerido X» (al tocarlo) pone lo que sugiere Stock en ML (no
   todo el inventario; al pasar el cursor lo explica) y la que está en 0 porque lo que hay está en otra publicación dice
   «inventario N · está en PIKEKE 1». Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
   (en «Para decidir» salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
