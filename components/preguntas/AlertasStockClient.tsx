@@ -18,6 +18,10 @@ interface Fila {
   inventario?: number | null      // lo que hay en el inventario del producto vinculado (solo empresas con inventario; 28-10 en las 3 vistas)
   sugerido?: number | null        // 17-11, inventario al día: lo que sugiere Stock en ML para esta publicación (mismo reparto)
   en_otras?: string | null        // 17-11: está en 0 a propósito, lo que hay está en estas publicaciones
+  /** 18-11: variante de una publicación vinculada ENTERA (no se sabe qué producto es): sin inventario ni sugerido. */
+  entera_variantes?: boolean
+  /** 18-11: en cuántas publicaciones (o variantes) está el producto; con más de una, «sugerido» solo del reparto. */
+  n_pubs?: number | null
   /** 18-11: qué cantidades quedan sin envío gratis (hasta lo que mostrará ML, máx. 20). Solo con el inventario al día. */
   envio_cantidad?: { pierde: number[]; hasta: number; promo: boolean } | null
 }
@@ -282,12 +286,15 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
             <p className="max-w-[11rem] truncate text-[11px] text-neutral-600" title={`Va en 0 a propósito: lo que hay (${f.inventario} u.) está en ${f.en_otras}`}>
               inventario {f.inventario} · está en {f.en_otras}</p>
           )
-          const poner = vista === 'pausadas' ? null : conReparto ? f.sugerido! : f.inventario
+          // 18-11 (el dueño): sin reparto y con el producto en varias publicaciones NO se sugiere todo el inventario.
+          const varias = (f.n_pubs ?? 1) > 1
+          const poner = vista === 'pausadas' ? null : conReparto ? f.sugerido! : varias ? null : f.inventario
           const puedePoner = poner != null && poner > f.disponible && !!datos?.puedeStock
           return (
             // 18-11 (el dueño): «inventario N» en gris (dato); en verde solo «sugerido X» (la acción).
             <p className="text-[11px] whitespace-nowrap text-neutral-500">
               <span className="num">inventario {f.inventario}</span>
+              {!conReparto && varias && vista !== 'pausadas' && <span title="Ese inventario se reparte entre sus publicaciones: el número para cada una sale en Stock vs inventario"> · en {f.n_pubs} publicaciones</span>}
               {puedePoner && <>
                 {' · '}
                 <button type="button" onClick={() => escribir(f, String(poner))}
@@ -297,6 +304,12 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
             </p>
           )
         })()}
+        {f.entera_variantes && (
+          <p className="text-[11px] text-amber-700 whitespace-nowrap" title="La publicación está vinculada entera y tiene variantes: no se sabe qué producto es esta variante. Vincula cada variante con su producto">
+            ⚠ vinculada entera ·{' '}
+            <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.item_id)}`} className="font-medium text-sky-700 underline hover:text-sky-900">dividir por variantes</Link>
+          </p>
+        )}
         {pasaInventario(f) && <p className="text-[11px] font-semibold text-amber-700 whitespace-nowrap">⚠ más de lo que tienes</p>}
         {/* 18-11 (el dueño: un cliente quería 10 bolsas): comprando varias pierde el envío gratis → aviso corto y el pack
             se arma en Stock vs inventario (con esa publicación ya buscada). No cambia lo sugerido. */}

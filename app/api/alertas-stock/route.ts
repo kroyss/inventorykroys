@@ -26,12 +26,20 @@ const PAUSADA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND (a.estado = 'pa
 // módulo inventario (sin él la columna ni se calcula). La variante busca su vínculo propio ("item:variante") y, si no
 // tiene, el de la publicación; combos ("trae N u."): alcanza para inventario ÷ N publicaciones.
 // 17-11: publicación compartida por varios productos (modelos) → la SUMA de lo que hay de cada uno (antes el mayor).
+const VINCULO_VARIANTE = `EXISTS (SELECT 1 FROM product_ml_codes v WHERE v.is_active
+            AND v.ml_code = substring(a.item_id FROM 4) || ':' || a.variante_id)`
+const CODIGO_FILA = `CASE WHEN a.variante_id <> 0 AND ${VINCULO_VARIANTE}
+     THEN substring(a.item_id FROM 4) || ':' || a.variante_id ELSE substring(a.item_id FROM 4) END`
 const SQL_INVENTARIO_FILA = `(SELECT SUM(FLOOR(GREATEST(i.quantity, 0) / GREATEST(COALESCE(m.unidades, 1), 1)))::int FROM product_ml_codes m
     JOIN products p ON p.id = m.product_id AND p.is_active JOIN inventory i ON i.product_id = p.id
-   WHERE m.is_active AND m.ml_code = CASE
-     WHEN a.variante_id <> 0 AND EXISTS (SELECT 1 FROM product_ml_codes v WHERE v.is_active
-            AND v.ml_code = substring(a.item_id FROM 4) || ':' || a.variante_id)
-     THEN substring(a.item_id FROM 4) || ':' || a.variante_id ELSE substring(a.item_id FROM 4) END)`
+   WHERE m.is_active AND m.ml_code = ${CODIGO_FILA})`
+// 18-11 (el dueño: «sugerido 57» en la variante Gris de una publicación vinculada ENTERA a la bolsa Blanca): la variante
+// sin vínculo propio en una publicación vinculada entera NO es ese producto → no se muestra su inventario ni se sugiere.
+const SQL_ENTERA_VARIANTES = `(a.variante_id <> 0 AND NOT ${VINCULO_VARIANTE} AND EXISTS (SELECT 1 FROM product_ml_codes w
+    WHERE w.is_active AND w.ml_code = substring(a.item_id FROM 4)))`
+// 18-11: en cuántas publicaciones (o variantes) está el producto: con más de una, «sugerido» solo sale del reparto.
+const SQL_N_PUBS = `(SELECT COUNT(DISTINCT m2.ml_code)::int FROM product_ml_codes m2
+   WHERE m2.is_active AND m2.product_id IN (SELECT m.product_id FROM product_ml_codes m WHERE m.is_active AND m.ml_code = ${CODIGO_FILA}))`
 const PAUSADA_EN_LISTA = `(a.descartada_at IS NULL OR a.descartada_at < COALESCE(a.pausada_desde, a.agotada_desde))`
 
 export async function GET(req: NextRequest) {
@@ -49,7 +57,7 @@ export async function GET(req: NextRequest) {
       s.db.query(
         `SELECT a.item_id, a.variante_id::text, a.titulo, a.variante, a.disponible, a.estado, a.permalink, a.imagen,
                 a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, a.pausada_desde, a.sub_status, c.nickname AS cuenta,
-                ${caliente} AS caliente, a.descartada_at${conInventario ? `, ${SQL_INVENTARIO_FILA} AS inventario` : ''}
+                ${caliente} AS caliente, a.descartada_at${conInventario ? `, ${SQL_INVENTARIO_FILA} AS inventario, ${SQL_ENTERA_VARIANTES} AS entera_variantes, ${SQL_N_PUBS} AS n_pubs` : ''}
          FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
          WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
       s.db.query(
@@ -61,6 +69,7 @@ export async function GET(req: NextRequest) {
                   FROM ml_conexiones WHERE estado = 'activa'`),
       conInventario ? leerInventarioAlDia(s.db) : Promise.resolve(false),
     ])
+    for (const r of rows) if (r.entera_variantes) r.inventario = null   // ese número es de OTRO producto (ver arriba)
     // 17-11 (el dueño: «las dos pantallas chocan»): con el inventario al día, cada fila trae lo que sugiere Stock en ML
     // (el mismo reparto entre cuentas): «usar» pone eso y no todo el inventario, y la que está en 0 a propósito lo dice.
     if (alDia && rows.length) {
@@ -70,6 +79,7 @@ export async function GET(req: NextRequest) {
         if (!pubs.has(k)) pubs.set(k, { f, p })
       }
       for (const r of rows) {
+        if (r.entera_variantes) continue
         const x = pubs.get(`${r.item_id}:${r.variante_id === '0' ? '' : r.variante_id}`) ?? pubs.get(`${r.item_id}:`)
         if (!x) continue
         r.sugerido = x.p.objetivo

@@ -1094,7 +1094,10 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   Prendida, **Automatizaciones → Stock** usa el mismo reparto: «inventario N · sugerido X» (al tocarlo) pone lo que sugiere Stock en ML (no
   todo el inventario; al pasar el cursor lo explica) y la que está en 0 porque lo que hay está en otra publicación dice
   «inventario N · está en PIKEKE 1». Si comprando varias pierde el envío gratis, debajo dice «⚠ desde N u. sin envío
-  gratis · pack» (el enlace abre Stock vs inventario con esa publicación, para Crear pack). Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
+  gratis · pack» (el enlace abre Stock vs inventario con esa publicación, para Crear pack). Si el producto está en varias
+  publicaciones y no hay reparto, dice «inventario N · en X publicaciones» sin sugerir (el número de cada una sale de
+  Stock vs inventario). La variante de una publicación **vinculada entera** dice «⚠ vinculada entera · dividir por
+  variantes» (no se sabe qué producto es: sin inventario ni sugerido). Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
   (en «Para decidir» salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
   variantes, descripción) sin ir a MercadoLibre.
   **Compartida con COD-…**: la misma publicación vinculada a varios productos (modelos que elige el comprador, p. ej. un
