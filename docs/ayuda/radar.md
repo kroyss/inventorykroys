@@ -517,7 +517,7 @@ botón **Renovar mi plan**. Al activar o renovar el plan vuelve todo; si no se v
 entrar.
 
 > **Radar mensual (solo el Radar):** quien se registró en el Radar y no tiene plan del Sistema paga **$20 al mes**
-(en noviembre 2026, **$12**, −40%) y ese mes tiene el **Radar PRO todos los días**. Mientras no paga ve 5 productos de
+(en noviembre 2026, **$14**, −30%) y ese mes tiene el **Radar PRO todos los días**. Mientras no paga ve 5 productos de
 ejemplo y el botón **Pagar y activar**: lleva a **Mi plan** (app.elcomerciantedigital.com/renovar), donde entra con su
 mismo usuario y contraseña y paga por Pago Móvil o Binance. Cuando lo confirmamos se abre todo (salir y volver a
 entrar). Al vencer el mes vuelve la pantalla de pago. Los precios están en radar.elcomerciantedigital.com/precios.
