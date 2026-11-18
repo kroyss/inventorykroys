@@ -72,7 +72,7 @@ export default async function InicioPage() {
 
       {/* ── Barra ── */}
       <header className="absolute inset-x-0 top-0 z-10">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4 sm:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
           <span className="text-sm font-semibold tracking-tight text-white">El Comerciante <span className="text-lime-400">Digital</span></span>
           <span className="flex items-center gap-4">
             <a href={PRECIOS} className="text-sm font-medium text-neutral-300 transition hover:text-white">Precios</a>
@@ -86,7 +86,9 @@ export default async function InicioPage() {
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 h-[34rem] w-[34rem] rounded-full border border-lime-400/15" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-[24rem] w-[24rem] rounded-full border border-lime-400/20" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 h-[14rem] w-[14rem] rounded-full bg-lime-400/10 blur-2xl" />
-        <div className="relative mx-auto max-w-5xl px-5 pb-14 pt-24 sm:px-8 sm:pb-20 sm:pt-28">
+        {/* 18-11 (el dueño): en pantallas anchas, dos columnas (texto + tarjeta de lo que hay) para usar todo el ancho. */}
+        <div className="relative mx-auto max-w-6xl px-5 pb-14 pt-24 sm:px-8 sm:pb-20 sm:pt-28 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-center lg:gap-12">
+          <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">MercadoLibre Venezuela</p>
           <h1 className="mt-3 max-w-3xl text-[2.1rem] font-semibold leading-[1.1] tracking-tight sm:text-5xl">
             Automatizamos lo que <span className="text-lime-400">te quita el día</span> en MercadoLibre.
@@ -106,16 +108,45 @@ export default async function InicioPage() {
               className="inline-flex items-center gap-2 rounded-xl border border-lime-400/50 px-5 py-3 text-sm font-semibold text-lime-400 transition hover:border-lime-400 hover:bg-lime-400/10">
               <Icono d={I.enviar} className="h-4 w-4" /> Escríbenos por Telegram
             </a>
+            {/* 18-11 (el dueño): el Radar también en la portada; las cuentas nuevas lo prueban gratis (Radar mig 036). */}
+            <a href="https://radar.elcomerciantedigital.com/registro"
+              className="inline-flex items-center gap-2 rounded-xl border border-lime-400/50 px-5 py-3 text-sm font-semibold text-lime-400 transition hover:border-lime-400 hover:bg-lime-400/10">
+              <Icono d={I.radar} className="h-4 w-4" /> Prueba el Radar gratis
+            </a>
           </div>
           <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-neutral-400">
             <li className="flex items-center gap-2"><Icono d={I.grupo} className="h-4 w-4 text-lime-400" /><b className="text-white">+{vendedores ? vendedores.toLocaleString('de-DE') : 10}</b> vendedores activos</li>
             <li className="flex items-center gap-2"><Icono d={I.radar} className="h-4 w-4 text-lime-400" /><b className="text-white">{productosRadar}</b> productos en el Radar</li>
             <li className="flex items-center gap-2"><Icono d={I.check} className="h-4 w-4 text-lime-400" />Lo usamos en nuestras cuentas cada día</li>
           </ul>
+          </div>
+          {/* Tarjeta de la derecha (solo pantallas anchas): lo que hay, cada uno con su entrada. */}
+          <div className="relative mt-10 hidden rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-sm lg:mt-0 lg:block">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Todo en un solo lugar</p>
+            <ul className="mt-4 space-y-2.5">
+              {[
+                { t: 'Automatizaciones', d: 'Preguntas, mensajes, guías y avisos', i: I.rayo, href: REGISTRO, cta: '15 días gratis' },
+                { t: 'Pagos MercadoEnvíos', d: 'Pagos y guías del portal, solos', i: I.pago, href: REGISTRO, cta: 'Incluido en la prueba' },
+                { t: 'Radar de Oportunidades', d: 'Qué se vende y a qué precio real', i: I.radar, href: 'https://radar.elcomerciantedigital.com/registro', cta: '¡Pruébalo gratis!' },
+                { t: 'Inventario', d: 'Stock, ventas y rentabilidad', i: I.caja, href: PRECIOS, cta: 'Plan Completo' },
+              ].map(x => (
+                <li key={x.t}>
+                  <a href={x.href} className="group flex items-center gap-3 rounded-2xl border border-white/5 bg-neutral-900/60 px-3.5 py-3 transition hover:border-lime-400/40 hover:bg-neutral-900">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-lime-400/10 text-lime-400"><Icono d={x.i} className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-white">{x.t}</span>
+                      <span className="block truncate text-xs text-neutral-400">{x.d}</span>
+                    </span>
+                    <span className="shrink-0 text-[11px] font-semibold text-lime-400 group-hover:text-lime-300">{x.cta}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 
-      <main className="mx-auto max-w-5xl space-y-12 px-5 py-10 sm:space-y-14 sm:px-8 sm:py-14">
+      <main className="mx-auto max-w-6xl space-y-12 px-5 py-10 sm:space-y-14 sm:px-8 sm:py-14">
         {/* ── Lo que hacemos ── */}
         <section>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-700">Lo que hacemos</p>
