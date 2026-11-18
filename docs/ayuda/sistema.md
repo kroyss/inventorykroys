@@ -482,7 +482,7 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   la lista de todas tus publicaciones, como en ML. Cada fila lleva una **etiqueta corta solo si algo pide atención**:
   - **Activa · Pausar** / **Pausada · Activar** (siempre): el estado en ML; al tocarlo pide confirmar y la pausa o la
     activa. Pausada desde aquí queda «pausada a mano» (el stock automático no la reactiva). Para varias: elígelas y
-    abajo **Pausar** o **Activar** (más de 10 van por la cola; las que ya estaban así no se tocan; solo se activan las
+    abajo **Pausar** o **Activar** (van por la cola, con el avance abajo a la derecha y en Historial de tareas; las que ya estaban así no se tocan; solo se activan las
     que tienen stock en ML).
   - **Stock distinto** (ámbar) o **Vende de más** (rojo): el stock de ML no coincide con tu inventario (la misma cuenta
     de Stock vs inventario). Dice la diferencia (ML X · inventario Y, o cuántas variantes no cuadran; el detalle al

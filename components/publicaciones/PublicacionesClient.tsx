@@ -276,7 +276,7 @@ function LoteEstado({ sel, cuantas, estado, onCerrar, onHecho }: {
   const mandar = async () => {
     setEnviando(true); setError(null)
     try {
-      const r = await fetch('/api/publicaciones/estado', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado, ...sel }) })
+      const r = await fetch('/api/publicaciones/estado', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado, lote: true, ...sel }) })
       const d = await r.json().catch(() => null)
       if (!r.ok) setError(d?.error ?? 'No se pudo')
       else if (d?.lote) { setLote(d.lote.id); onHecho() }
@@ -303,7 +303,7 @@ function LoteEstado({ sel, cuantas, estado, onCerrar, onHecho }: {
           {pausar
             ? 'Quedan «pausadas a mano»: el stock automático no las reactiva solo. Las que ya estaban pausadas no se tocan.'
             : 'Solo se activan las que tienen stock en MercadoLibre; las demás te dirán por qué. Las que ya estaban activas no se tocan.'}
-          {cuantas > 10 && ' Son más de 10: van por la cola de MercadoLibre y puedes seguir trabajando.'}
+          {' Van por la cola de MercadoLibre: ves el avance abajo a la derecha y puedes seguir trabajando.'}
         </p>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-2">
