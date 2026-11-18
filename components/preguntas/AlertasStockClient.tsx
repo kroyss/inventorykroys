@@ -5,6 +5,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { AbrirFicha } from './FichaPublicacion'
 import CambiarStock from './CambiarStock'
 import Link from '@/components/ui/Link'
+import { BotonInfo, PanelInfo } from '@/components/ui/Info'
 import { useAvisos } from '@/components/layout/Avisos'
 
 interface Fila {
@@ -304,8 +305,7 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
           acción aparecen solo cuando hay algo que mandar. */}
       <PageHeader
         title={<span className="inline-flex items-center gap-2">Stock
-          <button type="button" onClick={() => setVerInfo(v => !v)} aria-expanded={verInfo} aria-label="Cómo funciona" title="Cómo funciona"
-            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-semibold ${verInfo ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 text-neutral-500 hover:border-neutral-500 hover:text-neutral-800'}`}>i</button>
+          <BotonInfo abierto={verInfo} onClick={() => setVerInfo(v => !v)} />
         </span>}
         subtitle="Lo vendido en 30 días que se agotó o se está agotando en MercadoLibre, por variante"
         actions={<>
@@ -317,15 +317,13 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
           </div>
         </>} />
       {verInfo && (
-        <div className="-mt-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-600 shadow-sm">
-          <ul className="list-disc space-y-1 pl-5">
+        <PanelInfo>
             <li>Solo lo que <b className="font-medium text-neutral-800">vendiste en los últimos 30 días</b>: lo que conviene reponer.</li>
             <li>El aviso (y el numerito del menú) cuenta lo de los <b className="font-medium text-neutral-800">últimos 7 días</b>; lo más viejo queda abajo, sin sumar.</li>
             <li>Se revisa sola cada hora; «Revisar ahora» busca en ML en el momento (como mucho cada 10 minutos).</li>
             <li>El tiempo de cada una cuenta desde que el sistema la vio así (lo que ya estaba agotado al empezar, el 02/10, cuenta desde ese día).</li>
             {conInventario && <li>Aquí ves <b className="font-medium text-neutral-800">lo que dice MercadoLibre</b>. Para compararlo con tu inventario: <Link href="/inventario/stock-ml" className="underline">Stock vs inventario</Link>.</li>}
-          </ul>
-        </div>
+        </PanelInfo>
       )}
 
       {vendeDeMas > 0 && (

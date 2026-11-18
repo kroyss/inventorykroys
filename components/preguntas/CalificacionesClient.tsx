@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePrimera } from '@/lib/primera'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS, ESTADOS_VENTA_VE } from '@/components/ui'
+import { BotonInfo, PanelInfo } from '@/components/ui/Info'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
 import { DIA_AUTO_NO_CONCRETADA, MAX_DIAS_NO_CONCRETADA, ML_CONCRETA_SOLA_DIAS, diasParaConcretarSola } from '@/lib/noConcretada'
@@ -88,6 +89,7 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
   inicial?: unknown }) {
   const confirm = useConfirm()
   const [vista, setVista] = useState<'listas' | 'proximas' | 'esperando' | 'config'>('listas')
+  const [verInfo, setVerInfo] = useState(false)
   const [datos, setDatos] = useState<Datos | null>(null)
   const [elegidas, setElegidas] = useState<Record<string, Tipo | null>>({})
   const [filtro, setFiltro] = useState<'todas' | Tipo | 'revisar' | 'calificaron'>('todas')
@@ -193,8 +195,25 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
   const sinc = datos?.cuentas.map(c => c.ordenes_sync_at).filter(Boolean).sort()[0]
   return (
     <div className="space-y-4">
-      <PageHeader title="Calificaciones" subtitle="Ventas de MercadoLibre sin calificar, cruzadas con el sistema: lo cargado se concretó, lo que nunca entró no"
-        actions={<button onClick={actualizar} disabled={actualizando || corriendo} className="btn-secondary text-sm">{actualizando ? 'Trayendo ventas…' : 'Actualizar ventas'}</button>} />
+      {/* 18-11 (el dueño, como en Stock): lo de cómo funciona va en la ⓘ; arriba solo lo que se usa. */}
+      <PageHeader title={<span className="inline-flex items-center gap-2">Calificaciones<BotonInfo abierto={verInfo} onClick={() => setVerInfo(v => !v)} /></span>}
+        subtitle="Ventas de MercadoLibre sin calificar, cruzadas con el sistema"
+        actions={<div className="flex flex-col items-end">
+          <button onClick={actualizar} disabled={actualizando || corriendo} className="btn-secondary text-sm">{actualizando ? 'Trayendo ventas…' : 'Actualizar ventas'}</button>
+          {sinc && <span className="mt-0.5 text-[11px] text-neutral-400">actualizadas {new Date(sinc).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>}
+        </div>} />
+      {verInfo && datos && (
+        <PanelInfo>
+          <li><b className="font-medium text-neutral-800">Concretada</b>: {datos.desdeML ? 'su guía salió en Despachos' : 'está en el sistema (procesada o facturada)'}
+            {datos.conReportador ? <>{datos.desdeML ? ' y ya la reportaste' : ' y, si lleva guía, ya la reportaste'} (Reportador); la espera cuenta desde el reporte</> : ''}.</li>
+          <li><b className="font-medium text-neutral-800">No concretada</b>: {datos.desdeML ? 'cancelada en MercadoLibre, o ' : ''}sin {datos.desdeML ? 'guía' : 'cargar'} después de {datos.plantillas.noConcretada.dias} días.</li>
+          <li><b className="font-medium text-neutral-800">Revisar</b>: el sistema no puede saberlo{datos.conReportador ? ` (la guía se imprimió pero a los ${datos.topeDias ?? 10} días no se reportó)` : ''}{datos.pagosME ? ', o no buscaste los pagos (Traer pagos y guías) después de la venta' : ''}: decides tú. Puedes cambiar cada una antes de calificar.</li>
+          {datos.plantillas.esperaDias ? <li><b className="font-medium text-neutral-800">Próximas</b>: ya se sabe cómo calificarlas, pero están en tu espera de {datos.plantillas.esperaDias} día{datos.plantillas.esperaDias === 1 ? '' : 's'}{datos.conReportador ? ' desde que se reportó la guía' : ' desde la compra'}. No tienes que hacer nada.</li> : null}
+          {(datos.plantillas.auto || datos.plantillas.autoNoConcretada) && <li><b className="font-medium text-neutral-800">Automática</b>:{' '}
+            {datos.plantillas.auto ? <>todos los días desde las {horaTxt(datos.plantillas.hora)} se califican solas las concretadas</> : <>las concretadas las calificas tú</>}
+            {datos.plantillas.autoNoConcretada ? <>, y el día {DIA_AUTO_NO_CONCRETADA} desde las {horaTxt(datos.plantillas.horaNc)} las no concretadas que se te pasaron.</> : <>; las no concretadas esperan que las revises.</>}</li>}
+        </PanelInfo>
+      )}
       {aviso && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{aviso}</div>}
 
       <Tabs value={vista} onChange={setVista} items={[
@@ -209,16 +228,15 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
       {!datos ? <Cargando /> : vista === 'config' ? <Configuracion plantillas={datos.plantillas} desdeML={!!datos.desdeML} onGuardado={cargar} /> : (
         <>
           {(datos.plantillas.auto || datos.plantillas.autoNoConcretada) && vista === 'listas' && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-              <b>Calificación automática activa:</b>{' '}
-              {datos.plantillas.auto ? <>todos los días desde las {horaTxt(datos.plantillas.hora)} se califican solas las <b>concretadas</b></> : <>las concretadas las calificas tú</>}
-              {datos.plantillas.autoNoConcretada
-                ? <>, y el <b>día {DIA_AUTO_NO_CONCRETADA}</b> desde las {horaTxt(datos.plantillas.horaNc)} las <b>no concretadas</b> que se te pasaron{datos.autoNcUltimo?.estado === 'listo' ? ` (última: ${datos.autoNcUltimo.calificadas ?? 0})` : ''}.</>
-                : <>; las no concretadas siguen esperando que las revises.</>}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900"
+              title="Cómo funciona: toca la ⓘ junto al título">
+              <b>✓ Calificación automática activa</b>
+              <span>· {datos.plantillas.auto ? `concretadas cada día ${horaTxt(datos.plantillas.hora)}` : 'concretadas: tú'}
+                {datos.plantillas.autoNoConcretada ? ` · no concretadas el día ${DIA_AUTO_NO_CONCRETADA}` : ''}</span>
               {datos.plantillas.auto && datos.autoUltimo?.estado === 'listo' && (
-                <> Última: {new Date(datos.autoUltimo.at ?? datos.autoUltimo.fecha).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {datos.autoUltimo.calificadas ?? 0} calificadas
+                <span className="text-emerald-800">· última {new Date(datos.autoUltimo.at ?? datos.autoUltimo.fecha).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}: {datos.autoUltimo.calificadas ?? 0} calificadas
                   {datos.autoUltimo.quitadas ? ` · ${datos.autoUltimo.quitadas} que ML ya no permitía` : ''}
-                  {datos.autoUltimo.errores ? <span className="text-amber-800"> · {datos.autoUltimo.errores} con error (quedan en la lista)</span> : ''}.</>
+                  {datos.autoUltimo.errores ? <span className="text-amber-800"> · {datos.autoUltimo.errores} con error (quedan en la lista)</span> : ''}</span>
               )}
             </div>
           )}
@@ -231,20 +249,6 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
               Mientras tanto, tus ventas quedan para <b>Revisar</b>: decide tú cada una (solo las canceladas en MercadoLibre salen como no concretadas).
             </div>
           )}
-          <p className="text-xs text-neutral-500">
-            {vista === 'proximas'
-              ? <>Ya se sabe cómo calificarlas, pero están en tu espera de <b>{datos.plantillas.esperaDias} día{datos.plantillas.esperaDias === 1 ? '' : 's'}</b>
-                  {datos.conReportador ? ' desde que se reportó la guía' : ' desde la compra'}.
-                  {datos.plantillas.auto ? ' Las concretadas se califican solas ese día; las demás pasan a Por calificar.' : ' Ese día pasan a Por calificar.'} No tienes que hacer nada.</>
-              : <>
-                <b>Concretada</b>: {datos.desdeML ? 'su guía salió en Despachos' : 'está en el sistema (procesada o facturada)'}
-                {datos.conReportador ? <>{datos.desdeML ? ' y ya la reportaste' : ' y, si lleva guía, ya la reportaste'} (Reportador); la espera cuenta desde el reporte</> : ''}.
-                {' '}<b>No concretada</b>: {datos.desdeML ? 'cancelada en MercadoLibre, o' : ''} sin {datos.desdeML ? 'guía' : 'cargar'} después de {datos.plantillas.noConcretada.dias} días.
-                {' '}<b>Revisar</b>: el sistema no puede saberlo{datos.conReportador ? ` (la guía se imprimió pero a los ${datos.topeDias ?? 10} días no se reportó)` : ''}{datos.pagosME ? ', o no buscaste los pagos (Traer pagos y guías) después de la venta' : ''}: decides tú.
-                {vista === 'listas' && ' Puedes cambiar cada una antes de calificar.'}
-              </>}
-            {sinc && <> · Ventas actualizadas {new Date(sinc).toLocaleString('es-VE')}</>}
-          </p>
 
           {vista === 'listas' && datos.ordenes.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3">
