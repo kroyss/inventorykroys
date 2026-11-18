@@ -1,15 +1,19 @@
 'use client'
-import { Fragment, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from '@/components/ui/Link'
 import { PageHeader } from '@/components/ui'
 import { Ventana } from '@/components/ui/Ventana'
 import { matchFuzzy } from '@/lib/search'
 import type { Capitulo } from '@/lib/manual'
+import { Reproductor, type Video } from '@/components/aprendizaje/AprendizajeClient'
 
-/** 18-11: video grabado que acompaña un capítulo (demostración de apoyo; el manual es lo que está al día). */
-export interface VideoApoyo { id: number; titulo: string; segundos: number | null; visto: boolean }
+/** 18-11: video grabado que acompaña un capítulo (demostración de apoyo; el manual es lo que está al día). Se ve AHÍ
+ *  MISMO, dentro del capítulo (el dueño: «que no salga del manual, parte íntegra y opcional»), con «Ampliar». Usa el
+ *  mismo reproductor de Aprendizaje: el avance cuenta igual. */
+export type VideoApoyo = Video
 const reloj = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+const duracion = (v: Video) => v.duracion_video ?? (v.duracion_seg > 0 ? v.duracion_seg : null)
 
 // Vista de un manual de Aprendizaje (14-11): índice fijo a la izquierda (chips arriba en el celular), buscador, cada
 // capítulo con su captura (se abre grande) y sus temas. El texto viene del manual del asistente (lib/manual.ts).
@@ -61,6 +65,22 @@ export default function ManualVista({ titulo, capitulos, capturas, base, reabrir
   const [buscar, setBuscar] = useState('')
   const [grande, setGrande] = useState<string | null>(null)
   const [abriendo, setAbriendo] = useState(false)
+  // Video abierto (uno a la vez) y si está ampliado. Ampliar solo cambia el marco: el reproductor sigue donde iba.
+  const [viendo, setViendo] = useState<{ cap: string; id: number } | null>(null)
+  const [ampliado, setAmpliado] = useState(false)
+  const [vistos, setVistos] = useState<Set<number>>(() => new Set(Object.values(videos ?? {}).flat().filter(v => v.completado).map(v => v.id)))
+  useEffect(() => {
+    if (!ampliado) return
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAmpliado(false) }
+    document.addEventListener('keydown', esc)
+    const antes = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', esc); document.body.style.overflow = antes }
+  }, [ampliado])
+  const abrirVideo = (cap: string, id: number) => {
+    setAmpliado(false)
+    setViendo(v => (v?.cap === cap && v.id === id ? null : { cap, id }))
+  }
 
   const filtrados = useMemo(() => {
     const q = buscar.trim()
@@ -105,27 +125,63 @@ export default function ManualVista({ titulo, capitulos, capturas, base, reabrir
             <p className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">
               <span aria-hidden>▶</span>
               <span>Este manual está siempre al día con las pantallas. Los <b className="font-semibold">videos de apoyo</b> de cada capítulo son una
-                demostración grabada: algún botón puede verse distinto, pero el funcionamiento es el mismo.</span>
+                demostración grabada (opcional, se ve aquí mismo): algún botón puede verse distinto, pero el funcionamiento es el mismo.</span>
             </p>
           )}
           {!filtrados.length && <p className="rounded-xl border border-neutral-200 bg-white px-4 py-8 text-center text-sm text-neutral-500">Nada coincide con «{buscar}». Prueba con otra palabra o pregunta en Ayuda.</p>}
           {filtrados.map(c => (
             <section key={c.id} id={c.id} className="scroll-mt-20 space-y-3">
               <h2 className="text-lg font-semibold text-neutral-900">{c.titulo}</h2>
-              {videos?.[c.id] && !buscar.trim() && (
-                <div className="flex flex-wrap gap-2">
-                  {videos[c.id].map(v => (
-                    <Link key={v.id} href={`/aprendizaje?video=${v.id}`}
-                      className="group inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white py-1 pl-1 pr-3 text-sm text-neutral-700 shadow-sm transition hover:border-neutral-300 hover:shadow">
-                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] ${v.visto ? 'bg-emerald-100 text-emerald-700' : 'bg-red-600 text-white'}`} aria-hidden>
-                        {v.visto ? '✓' : '▶'}
-                      </span>
-                      <span><span className="text-neutral-400">Video de apoyo · </span>{v.titulo}</span>
-                      {v.segundos ? <span className="text-xs text-neutral-400">{reloj(v.segundos)}</span> : null}
-                    </Link>
-                  ))}
-                </div>
-              )}
+              {videos?.[c.id] && !buscar.trim() && (() => {
+                const lista = videos[c.id]
+                const v = viendo?.cap === c.id ? lista.find(x => x.id === viendo.id) : undefined
+                return (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {lista.map(x => {
+                        const activo = v?.id === x.id
+                        const seg = duracion(x)
+                        return (
+                          <button key={x.id} type="button" onClick={() => abrirVideo(c.id, x.id)} aria-expanded={activo}
+                            className={`group inline-flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-sm shadow-sm transition ${activo
+                              ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:shadow'}`}>
+                            <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] ${activo ? 'bg-white text-neutral-900'
+                              : vistos.has(x.id) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-600 text-white'}`} aria-hidden>
+                              {activo ? '■' : vistos.has(x.id) ? '✓' : '▶'}
+                            </span>
+                            <span><span className={activo ? 'text-neutral-300' : 'text-neutral-400'}>{activo ? 'Viendo · ' : 'Video de apoyo · '}</span>{x.titulo}</span>
+                            {seg ? <span className={`text-xs ${activo ? 'text-neutral-300' : 'text-neutral-400'}`}>{reloj(seg)}</span> : null}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {v && (
+                      // Mismo árbol ampliado o no (solo cambian las clases): el video no se reinicia al ampliar.
+                      <div className={ampliado ? 'fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-6' : ''}
+                        onClick={e => { if (ampliado && e.target === e.currentTarget) setAmpliado(false) }}>
+                        <div className={ampliado ? 'w-full max-w-6xl space-y-2' : 'space-y-2 rounded-xl border border-neutral-200 bg-white p-3 shadow-sm'}>
+                          <div className="flex items-center gap-2">
+                            <p className={`min-w-0 flex-1 truncate text-sm font-medium ${ampliado ? 'text-white' : 'text-neutral-800'}`}>{v.titulo}</p>
+                            <button type="button" onClick={() => setAmpliado(a => !a)}
+                              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition ${ampliado
+                                ? 'bg-white/10 text-white hover:bg-white/20' : 'border border-neutral-300 text-neutral-700 hover:bg-neutral-50'}`}>
+                              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+                                {ampliado ? <path d="M8 3v5H3M12 17v-5h5M3 8l5-5M17 12l-5 5" /> : <path d="M3 8V3h5M17 12v5h-5M3 3l5 5M17 17l-5-5" />}
+                              </svg>
+                              {ampliado ? 'Achicar' : 'Ampliar'}
+                            </button>
+                            <button type="button" onClick={() => { setAmpliado(false); setViendo(null) }} aria-label="Cerrar el video"
+                              className={`rounded-lg px-2 py-1 text-sm transition ${ampliado ? 'text-white/80 hover:bg-white/10 hover:text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}>✕</button>
+                          </div>
+                          <Reproductor key={v.id} video={v} onAvance={(id, _visto, _dur, completo) => {
+                            if (completo) setVistos(s => (s.has(id) ? s : new Set(s).add(id)))
+                          }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
               {capturas[c.id] && !buscar.trim() && (
                 <button type="button" onClick={() => setGrande(c.id)} className="block w-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 shadow-sm transition hover:shadow-md" title="Ver grande">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

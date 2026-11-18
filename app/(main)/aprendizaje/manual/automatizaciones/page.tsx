@@ -30,7 +30,7 @@ export default async function ManualAutomatizacionesPage() {
     const f = path.join(process.cwd(), 'public', 'manual', 'automatizaciones', `${c.id}.png`)
     if (existsSync(f)) capturas[c.id] = Math.round(statSync(f).mtimeMs)
     const vs = videos.filter(v => v.serie !== 'inventario' && c.videos.some(k => plano(v.titulo).includes(k)))
-    if (vs.length) deCapitulo[c.id] = vs.map(v => ({ id: v.id, titulo: v.titulo, segundos: v.duracion_video ?? (v.duracion_seg || null), visto: v.completado }))
+    if (vs.length) deCapitulo[c.id] = vs as VideoApoyo[]
   }
   return <><VistoNuevo clave="manual_automatizaciones" /><ManualVista titulo="Manual de Automatizaciones" capitulos={capitulos} capturas={capturas} base="/manual/automatizaciones"
     reabrirGuia={false} videos={deCapitulo} /></>

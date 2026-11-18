@@ -1284,8 +1284,10 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   trae el botón **Ver la guía de Primeros pasos** para volver a mostrar la guía en el Inicio si la ocultaste.
   El **Manual de Automatizaciones** (con cualquiera de sus módulos) explica Cuentas de MercadoLibre, Preguntas, Mensajes,
   Calificaciones y reputación, Stock, Pagos ME, Despachos, Reportador y Mis avisos; cada cuenta ve solo los capítulos
-  de sus módulos. El manual es lo que está al día con las pantallas; cada capítulo enlaza su **video de apoyo** (la
-  demostración grabada, con ✓ si ya lo viste), que puede mostrar algún botón distinto.
+  de sus módulos. El manual es lo que está al día con las pantallas; cada capítulo trae su **video de apoyo** (la
+  demostración grabada, con ✓ si ya lo viste), que es opcional y se reproduce ahí mismo dentro del capítulo, sin salir
+  del manual; **Ampliar** lo agranda a pantalla (Esc o Achicar para volver) y el avance cuenta igual que en Videos.
+  Puede mostrar algún botón distinto.
   **Cuando un video explica lo que preguntan, recomiéndalo** (además de responder), con su título:
 
   | Video | Qué enseña | Secciones |
