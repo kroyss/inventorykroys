@@ -2,6 +2,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { usePrimera } from '@/lib/primera'
 import { PageHeader, EmptyState } from '@/components/ui'
+import { EncabezadoInfo } from '@/components/ui/Info'
+import Link from '@/components/ui/Link'
+import EstadoVigilante, { traidaCompleta } from './EstadoVigilante'
 import { type PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from './PagoME'
 import PorConfirmar, { usePorConfirmar } from '@/components/ventas/PorConfirmar'
@@ -39,7 +42,11 @@ const ERROR_PERFIL: Record<string, string> = {
   sin_sesion: 'no tiene la sesión de MercadoEnvíos iniciada: en la PC quedó abierta esa ventana; inicia sesión ahí y vuelve a traer',
 }
 
-export default function PagosMEClient({ isAdmin, inicial = null }: { isAdmin: boolean; inicial?: unknown }) {
+/** `conexion` (18-11): con inventario y Ventas, la lista de pagos por confirmar vive en Ventas → Por confirmar; aquí queda
+ *  la conexión (PC, cuentas, programa) y el historial de pagos. Sin inventario, esta pantalla ES la lista. */
+export default function PagosMEClient({ isAdmin, inicial = null, conexion = false }: { isAdmin: boolean; inicial?: unknown; conexion?: boolean }) {
+  // ⚙ Conexión: en la página de conexión abierta; en la lista, cerrada (se despliega).
+  const [verConexion, setVerConexion] = useState(conexion)
   const [filtro, setFiltro] = useState<Filtro>('pendiente')
   const [datos, setDatos] = useState<Datos | null>(null)
   const [marcados, setMarcados] = useState<Set<number>>(new Set())
@@ -54,7 +61,7 @@ export default function PagosMEClient({ isAdmin, inicial = null }: { isAdmin: bo
   const [agregar, setAgregar] = useState<string | null>(null)
   // Sin inventario (Fundadores, 19-10): la lista por VENTA, como "Por confirmar"; la tabla queda como Historial.
   const [vista, setVista] = useState<'ventas' | 'historial'>('ventas')
-  const pc = usePorConfirmar(!!datos?.desdeML)
+  const pc = usePorConfirmar(!conexion && !!datos?.desdeML)
 
   const cargar = useCallback(async () => {
     const r = await fetch(`/api/pagos-me?estado=${filtro}`)
@@ -177,113 +184,87 @@ export default function PagosMEClient({ isAdmin, inicial = null }: { isAdmin: bo
   // Mientras carga no se muestra nada a medias (23-10: sin datos se veía unos segundos la vista con inventario).
   if (!datos) return (
     <div className="space-y-4">
-      <PageHeader title="Pagos MercadoEnvíos" subtitle="Pagos y guías traídos del portal: verifícalos de corrido contra el banco" />
+      <PageHeader title="Pagos MercadoEnvíos" subtitle={conexion ? 'Conexión e historial de pagos' : 'Verifica los pagos de MercadoEnvíos contra el banco'} />
       <p className="text-sm text-neutral-400">Cargando…</p>
+    </div>
+  )
+
+  // La lista por VENTA (como Por confirmar) va en la pestaña Ventas: sin inventario, o con inventario sin acceso a Ventas.
+  const conLista = !conexion && !!datos?.desdeML
+  // Con inventario la lista trae su propio «Traer pagos y ventas»: arriba no se repite (18-11).
+  const botonArriba = !(conLista && datos?.conInventario)
+  const B = 'font-medium text-neutral-800'
+  const panelConexion = isAdmin && verConexion && (
+    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-neutral-100 pt-2">
+      {perfiles.length > 0 && (
+        <button onClick={() => { setAgregar(''); conectar() }} className="font-medium text-emerald-700 underline">+ Agregar otra cuenta de MercadoEnvíos</button>
+      )}
+      <a href={DESCARGA_PROGRAMA} className="underline text-neutral-500 hover:text-neutral-800">Descargar programa</a>
+      <a href="/extension" target="_blank" className="underline text-neutral-500 hover:text-neutral-800">Extensión de Chrome</a>
+      <button onClick={conectar} className="underline text-neutral-500 hover:text-neutral-800">Conectar una PC</button>
+      {!datos?.desdeML && (
+        <button onClick={generarClave} className="underline text-neutral-400 hover:text-neutral-800" title="Para la instalación a mano (avanzado)">
+          {datos?.vigilante.clave ? 'Clave larga' : 'Generar clave'}
+        </button>
+      )}
+      {datos?.vigilante.clave && (
+        <button onClick={desconectar} className="underline text-neutral-400 hover:text-red-700">Desconectar PCs</button>
+      )}
     </div>
   )
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Pagos MercadoEnvíos" subtitle="Pagos y guías traídos del portal: verifícalos de corrido contra el banco"
-        actions={
-          <button onClick={traer} disabled={busy === 'traer' || trabajando} className="btn-primary text-sm whitespace-nowrap">
-            {trabajando ? 'Trayendo…' : 'Traer pagos y guías'}
-          </button>
-        } />
+      {/* 18-11 (el dueño: «mucho ruido antes de los productos»): ⓘ, una línea de estado y ⚙ Conexión desplegable. */}
+      <EncabezadoInfo title="Pagos MercadoEnvíos"
+        subtitle={conexion ? 'Conexión de la PC y el historial de pagos' : 'Verifica los pagos de MercadoEnvíos contra el banco'}
+        info={<>
+          {conexion && <li>Los pagos se verifican en <Link href="/ventas?vista=confirmar" className="underline">Ventas → Por confirmar</Link>; aquí queda la conexión y el <b className={B}>historial de pagos</b>.</li>}
+          <li><b className={B}>Traer pagos y guías</b>: la PC abre Chrome y trae de MercadoEnvíos los pagos, las guías y las ventas nuevas (1 a 3 min). También se trae sola durante el día.</li>
+          {!conexion && <li>Verifica cada pago contra el banco, uno por uno o con <b className={B}>Comprobar con el banco</b> (subes el estado de cuenta).</li>}
+          <li>Las guías de las ventas pagadas pasan solas a <b className={B}>Despachos</b>.</li>
+          <li>La línea de arriba dice si la PC está lista y cómo salió la última traída. <b className={B}>⚙ Conexión</b>: agregar cuentas, el programa, la extensión y conectar la PC.</li>
+        </>}
+        actions={<>
+          {conexion && <Link href="/ventas?vista=confirmar" className="btn-secondary text-sm whitespace-nowrap">Ir a Por confirmar →</Link>}
+          {botonArriba && (
+            <button onClick={traer} disabled={busy === 'traer' || trabajando} className="btn-primary text-sm whitespace-nowrap">
+              {trabajando ? 'Trayendo…' : 'Traer pagos y guías'}
+            </button>
+          )}
+        </>} />
 
       {sinConectar && <PrimerosPasos isAdmin={isAdmin} onConectar={conectar} programaListo={!!despertador} />}
 
-      {/* Vigilante */}
-      <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 space-y-1">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span className="font-medium text-neutral-800">Vigilante:</span>
-          {despertador ? <>
-            <span className="flex items-center gap-1.5">
-              {/* 14-11 (el dueño): si el despertador no corre pero Chrome sí (la extensión tiene señal), igual trae: naranja.
-                  Rojo solo cuando no responde ninguno. */}
-              <span className={`w-2 h-2 rounded-full ${despertador.conectado ? 'bg-green-500' : perfiles.some(l => l.conectado) ? 'bg-orange-400' : 'bg-red-400'}`} />
-              {despertador.conectado ? 'PC en espera'
-                : perfiles.some(l => l.conectado)
-                  ? <span className="text-orange-700" title="Con Chrome abierto trae igual. Para que lo abra solo: reinicia la PC o abre instalar-despertador.cmd">Chrome conectado · el despertador no corre (reinicia la PC)</span>
-                  : `PC sin señal desde ${hora(despertador.visto_at)} (¿apagada?)`}
-            </span>
-            {perfiles.length > 0 && (
-              <span className="text-neutral-400">abre Chrome solo al traer: {perfiles.map(l => l.cuenta ?? l.perfil).join(' · ')}</span>
+      {datos && (
+        <EstadoVigilante d={datos} conexion={isAdmin ? { abierto: verConexion, onToggle: () => setVerConexion(v => !v) } : null}
+          onAgregar={isAdmin ? n => { setAgregar(n); conectar() } : undefined}
+          extra={<>
+            {panelConexion}
+            {agregar !== null && (
+              <AgregarCuenta cuenta={agregar} codigo={codigo} onOtroCodigo={conectar}
+                desconectada={!!agregar && (datos?.cuentasML ?? []).some(c => c.nickname === agregar && c.estado !== 'activa')}
+                onCerrar={() => { setAgregar(null); setCodigo(null) }} />
             )}
-          </> : <>
-          {perfiles.length === 0 && <span className="text-amber-700">ningún perfil se ha conectado todavía</span>}
-          {perfiles.map(l => (
-            <span key={l.perfil} className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${l.conectado ? 'bg-green-500' : 'bg-red-400'}`} />
-              {l.cuenta ?? l.perfil} <span className="text-neutral-400">{l.conectado ? 'conectado' : `sin señal desde ${hora(l.visto_at)}`}</span>
-            </span>
-          ))}
-          </>}
-          {isAdmin && (
-            <span className="ml-auto flex flex-wrap items-center gap-3">
-              {perfiles.length > 0 && (
-                <button onClick={() => { setAgregar(''); conectar() }} className="font-medium text-emerald-700 underline">+ Agregar otra cuenta de MercadoEnvíos</button>
-              )}
-              <a href={DESCARGA_PROGRAMA} className="underline text-neutral-500 hover:text-neutral-800">Descargar programa</a>
-              <a href="/extension" target="_blank" className="underline text-neutral-500 hover:text-neutral-800">Extensión de Chrome</a>
-              <button onClick={conectar} className="underline text-neutral-500 hover:text-neutral-800">Conectar una PC</button>
-              {!datos?.desdeML && (
-                <button onClick={generarClave} className="underline text-neutral-400 hover:text-neutral-800" title="Para la instalación a mano (avanzado)">
-                  {datos?.vigilante.clave ? 'Clave larga' : 'Generar clave'}
-                </button>
-              )}
-              {datos?.vigilante.clave && (
-                <button onClick={desconectar} className="underline text-neutral-400 hover:text-red-700">Desconectar PCs</button>
-              )}
-            </span>
-          )}
-        </div>
-        {datos?.vigilante.latidos.filter(l => l.verificacion === 'distinta').map(l => (
-          <div key={l.perfil} className="mt-2 rounded-lg bg-red-50 border border-red-200 p-2 text-red-800">
-            ⚠ Un Chrome de la PC tiene abierta la cuenta de MercadoEnvíos <b>{l.cuenta_portal ?? l.perfil}</b>, que no corresponde a ninguna
-            cuenta de MercadoLibre conectada. No se trae nada de ella: entra al portal con la cuenta correcta en ese Chrome.
-          </div>
-        ))}
-        {/* Cuentas de ML sin su Chrome (o desconectadas): no se traen sus pagos ni sus guías (29-10). */}
-        {!sinConectar && (datos?.cuentasML ?? []).some(c => c.estado !== 'activa' || !c.con_navegador) && (
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-            {(datos?.cuentasML ?? []).filter(c => c.estado !== 'activa' || !c.con_navegador).map(c => c.estado !== 'activa' ? (
-              <span key={c.nickname} className="text-red-700">
-                ⚠ <b>{c.nickname}</b> está desconectada de MercadoLibre: no se traen sus guías.{' '}
-                <a href="/cuentas-ml" className="font-medium underline">Conectarla</a>
-              </span>
-            ) : (
-              <span key={c.nickname} className="text-amber-700">
-                ○ <b>{c.nickname}</b> no tiene su Chrome conectado: no se traen sus pagos ni guías.{' '}
-                {isAdmin && <button onClick={() => { setAgregar(c.nickname); conectar() }} className="font-medium underline">Agregar</button>}
-              </span>
-            ))}
-          </div>
-        )}
-        {agregar !== null && (
-          <AgregarCuenta cuenta={agregar} codigo={codigo} onOtroCodigo={conectar}
-            desconectada={!!agregar && (datos?.cuentasML ?? []).some(c => c.nickname === agregar && c.estado !== 'activa')}
-            onCerrar={() => { setAgregar(null); setCodigo(null) }} />
-        )}
-        {codigo && agregar === null && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
-        {clave && (
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900">
-            Clave del vigilante (se muestra solo esta vez; cópiala en la extensión de cada perfil):
-            <code className="ml-2 select-all font-mono bg-white px-1.5 py-0.5 rounded border">{clave}</code>
-            <button onClick={() => navigator.clipboard.writeText(clave)} className="ml-2 underline">Copiar</button>
-          </div>
-        )}
-      </div>
+            {codigo && agregar === null && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
+            {clave && (
+              <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900">
+                Clave del vigilante (se muestra solo esta vez; cópiala en la extensión de cada perfil):
+                <code className="ml-2 select-all font-mono bg-white px-1.5 py-0.5 rounded border">{clave}</code>
+                <button onClick={() => navigator.clipboard.writeText(clave)} className="ml-2 underline">Copiar</button>
+              </div>
+            )}
+          </>} />
+      )}
 
-      {/* Sin nada conectado (recién instalado o todo desconectado) no hay traída que mostrar: se ven los pasos. */}
-      {pedido && (despertador || perfiles.length > 0) && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML}
+      {/* La caja grande de la traída solo cuando hay que mirarla (trayendo, falla, incompleta); si salió bien va en la línea. */}
+      {pedido && datos && (despertador || perfiles.length > 0) && !traidaCompleta(datos) && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML}
         pcPrendida={!!despertador?.conectado} />}
-
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
       {aviso && <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">{aviso}</div>}
 
-      {datos?.desdeML && (
+      {conLista && (
         <div className="flex gap-1 border-b border-neutral-200">
           {([['ventas', 'Ventas'], ['historial', 'Historial de pagos']] as const).map(([k, t]) => (
             <button key={k} onClick={() => setVista(k)}
@@ -293,8 +274,9 @@ export default function PagosMEClient({ isAdmin, inicial = null }: { isAdmin: bo
           ))}
         </div>
       )}
-      {datos?.desdeML && vista === 'ventas' && !datos.conInventario && (
-        <PorConfirmar datos={pc.datos} onRecargar={pc.cargar} onConfirmar={() => {}}
+      {conexion && <h2 className="pt-1 text-sm font-semibold text-neutral-800">Historial de pagos</h2>}
+      {conLista && vista === 'ventas' && !datos.conInventario && (
+        <PorConfirmar datos={pc.datos} onRecargar={pc.cargar} onConfirmar={() => {}} enPagosME
           onVerificar={async (id, v) => {
             const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ids: [id], verificacion: v }) }).catch(() => null)
@@ -302,14 +284,10 @@ export default function PagosMEClient({ isAdmin, inicial = null }: { isAdmin: bo
             await Promise.all([pc.cargar(), cargar()])
           }} />
       )}
-      {/* Con inventario (07-11): la MISMA lista y el mismo modo que Ventas → Por confirmar (registrar la venta descuenta
-          el stock; "Ya la despaché por fuera" no va: descuadra el inventario). Antes se veía en modo sin inventario. */}
-      {datos?.desdeML && vista === 'ventas' && datos.conInventario && <>
-        <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
-          Llevas inventario: esta es la misma lista de <a href="/ventas?vista=confirmar" className="font-medium underline">Ventas → Por confirmar</a>.
-          Verifica el pago aquí y toca «Registrar venta» para descontarla del stock.
-        </div>
-        <PorConfirmar datos={pc.datos} onRecargar={pc.cargar}
+      {/* Con inventario y SIN acceso a Ventas (18-11): la misma lista que Por confirmar, aquí. Con acceso a Ventas, la lista
+          vive allá (esta pantalla es la conexión). */}
+      {conLista && vista === 'ventas' && datos.conInventario && (
+        <PorConfirmar datos={pc.datos} onRecargar={pc.cargar} enPagosME
           onConfirmar={n => { window.location.href = `/ventas?vista=confirmar&registrar=${n}` }}
           onVerificarPago={async (id, v) => {
             const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -318,9 +296,9 @@ export default function PagosMEClient({ isAdmin, inicial = null }: { isAdmin: bo
             await Promise.all([pc.cargar(), cargar()])
           }}
           onVerificarCargada={() => { window.location.href = '/ventas?vista=confirmar' }} />
-      </>}
+      )}
 
-      {(!datos?.desdeML || vista === 'historial') && <>
+      {(!conLista || vista === 'historial') && <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
           {FILTROS.map(f => (
@@ -491,9 +469,8 @@ function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML, pcPrendid
   if (fallas.length || faltan.length) return caja('bg-red-50 border-red-200 text-red-900',
     <>❌ La traída de {cuando} quedó incompleta: revisa antes de despachar.</>,
     <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{nombre(p)}</b> no respondió</span>)}</>)
-  return caja('bg-green-50 border-green-200 text-green-900',
-    <>✅ Listo: traída {origen} de {cuando} completa · {nuevas === 0 ? 'no había pagos nuevos' : `${nuevas} pago${nuevas === 1 ? '' : 's'} nuevo${nuevas === 1 ? '' : 's'}`}.{desdeML ? ' Las guías ya están en Despachos: verifica los pagos y despacha.' : ' Ya está todo al día: puedes cargar las ventas y despachar.'}</>,
-    detalle)
+  // Completa y sin errores (18-11): va en la línea de estado, no en una caja.
+  return null
 }
 
 /** Primera vez: qué es y cómo se conecta. Es LA guía de los Fundadores (23-10): cada paso una sola acción, y los

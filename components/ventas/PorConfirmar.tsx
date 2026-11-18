@@ -23,6 +23,8 @@ import Link from '@/components/ui/Link'
 import { rutaHabilitada } from '@/lib/modulos'
 import { rutaPermitida } from '@/lib/permisos'
 import { NumeritoAviso } from '@/components/layout/Avisos'
+import EstadoVigilante, { CONEXION_HREF, type DatosVigilante } from '@/components/pagosme/EstadoVigilante'
+import { puede } from '@/lib/permisos'
 
 const chipCls = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset transition-colors'
 
@@ -722,7 +724,7 @@ function FilaCargada({ c, onVerificar }: { c: CargadaConPago; onVerificar: (sale
   )
 }
 
-export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar, onVerificarCargada, onVerificarPago, onPagoChip }: {
+export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar, onVerificarCargada, onVerificarPago, onPagoChip, enPagosME = false }: {
   datos: Datos | null
   onRecargar: () => Promise<void>
   onConfirmar: (numero: string) => void
@@ -734,6 +736,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   onVerificarPago?: Verificar
   /** 16-11: verificar el pago tocando su chip (Ventas → Por confirmar con Pagos ME). */
   onPagoChip?: Verificar
+  /** Dentro de Pagos ME (18-11): la línea de estado de la PC ya está arriba, no se repite. */
+  enPagosME?: boolean
 }) {
   const sinInventario = !!onVerificar
   const [actualizando, setActualizando] = useState(false)
@@ -866,6 +870,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   return (
     <Recargar.Provider value={onRecargar}>
     <div className="space-y-3">
+      {datos.pagosME && !enPagosME && <EstadoPagosME vuelta={tme.traida ? `${tme.traida.id}-${tme.ocupada}` : ''} />}
       <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Una línea por botón: qué trae y cuándo fue la última vez. */}
         <div className="space-y-0.5 text-xs text-neutral-500">
@@ -1084,4 +1089,21 @@ function IrADespachos() {
       Ir a Despachos<NumeritoAviso clave="despachos" urgente={false} /> →
     </Link>
   )
+}
+
+/** 18-11 (el dueño: «en Por confirmar no tenemos datos del vigilante»): la misma línea de estado de Pagos ME (PC, cuentas,
+ *  última traída, avisos) con ⚙ Conexión a su página. Solo con el permiso de ver Pagos ME. Se relee al terminar cada traída. */
+function EstadoPagosME({ vuelta }: { vuelta: string }) {
+  const u = useSession().data?.user as { role?: 'admin' | 'user'; permisos?: string[] } | undefined
+  const ve = !!u && puede(u, 'ver_pagos_me')
+  const [d, setD] = useState<DatosVigilante | null>(null)
+  useEffect(() => {
+    if (!ve) return
+    let vivo = true
+    fetch('/api/pagos-me?solo=estado', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))
+      .then(x => { if (vivo && x?.vigilante) setD(x) }).catch(() => {})
+    return () => { vivo = false }
+  }, [ve, vuelta])
+  if (!ve || !d) return null
+  return <EstadoVigilante d={d} conexion={{ href: CONEXION_HREF }} />
 }

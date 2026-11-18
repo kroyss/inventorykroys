@@ -4,8 +4,8 @@ import Link from '@/components/ui/Link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
-import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
-import { puede, rutaPermitida } from '@/lib/permisos'
+import { rutaHabilitada } from '@/lib/modulos'
+import { puede, rutaPermitida, listaPagosEnVentas } from '@/lib/permisos'
 import { espacioActual } from '@/lib/espacios'
 import { pestanasML, enPublicaciones, inicioPublicaciones } from '@/components/productos/PublicacionesMLTabs'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
@@ -125,7 +125,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   const visible = (items: NavItem[]) =>
     items.filter(i => rutaPermitida(i.href, u) && i.countries.includes(country) && rutaHabilitada(i.href, modulos)
       && (i.href !== '/publicaciones' || pestanasML({ ...u, modulos, country }).length > 0)
-      && !(i.href === '/pagos-me' && !ventasDesdeML({ modulos })))
+      && !(i.href === '/pagos-me' && listaPagosEnVentas({ ...u, modulos })))
 
   const auto    = espacioActual(pathname, modulos) === 'automatizaciones'
   const tieneAuto = modulos.includes('despachos') || modulos.includes('reportador') || modulos.includes('preguntas')

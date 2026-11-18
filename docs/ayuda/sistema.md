@@ -549,6 +549,18 @@ quedan separadas solas. Borrar un texto no cambia nada en ML.
 Trae **solos** los pagos de MercadoEnvíos (con su comprobante) y las **guías**, desde el portal de MercadoEnvíos,
 para que verifiques los pagos de corrido y despaches.
 
+**Dónde se verifica (18-11):** **sin inventario**, en Pagos ME (pestaña Ventas). **Con inventario** (y acceso a Ventas),
+en **Ventas → Por confirmar**: es la misma lista, así que no se repite; Pagos ME pasa a ser **«Conexión Pagos ME»** (menú
+de tu cuenta, o **⚙ Conexión** en Por confirmar): la PC, las cuentas, el programa y el **Historial de pagos**. Si entras a
+/pagos-me por un enlace viejo, te lleva a Por confirmar. Si apagas o prendes el inventario no se pierde nada: los pagos y lo
+ya verificado son los mismos, solo cambia dónde se ven.
+
+**Línea de estado (arriba, en Pagos ME y en Por confirmar):** una sola línea con la PC (● verde = en espera, naranja = el
+despertador no corre pero Chrome sí, rojo = sin señal), sus cuentas, y **«✓ traído hh:mm · N nuevos»** si la última
+traída salió bien. Debajo solo los avisos que piden algo (cuenta desconectada, Chrome sin conectar, cuenta del portal
+equivocada). La caja grande sale solo mientras trae, si falla o si quedó incompleta. **⚙ Conexión** despliega: agregar
+cuenta, descargar programa, extensión, conectar o desconectar PCs. La **ⓘ** junto al título resume cómo funciona.
+
 **Cómo funciona:** un programa en tu PC (Windows) trae tus pagos y guías usando tu Google Chrome, con tu sesión de
 MercadoEnvíos ya iniciada. **Tu contraseña nunca sale de tu PC.** Si se va la luz no se pierde nada: al prender
 la PC trae lo que faltaba.

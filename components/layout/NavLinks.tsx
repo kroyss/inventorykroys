@@ -3,8 +3,8 @@ import Link from '@/components/ui/Link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
-import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
-import { puede, rutaPermitida } from '@/lib/permisos'
+import { rutaHabilitada } from '@/lib/modulos'
+import { puede, rutaPermitida, listaPagosEnVentas } from '@/lib/permisos'
 import { espacioActual, type Espacio } from '@/lib/espacios'
 import { pestanasML, enPublicaciones, inicioPublicaciones } from '@/components/productos/PublicacionesMLTabs'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
@@ -62,7 +62,8 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
   const links = allLinks.filter(
     l => rutaPermitida(l.href, u) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
       && (l.espacio ?? 'inventario') === espacioActual(pathname, modulos)
-      && (!l.soloDesdeML || ventasDesdeML({ modulos }))
+      // Pagos ME en la barra: solo donde es la lista de pagos (sin inventario o sin Ventas); si no, es «Conexión Pagos ME» en la cuenta.
+      && (!l.soloDesdeML || !listaPagosEnVentas({ ...u, modulos }))
       && (l.href !== '/publicaciones' || pestanasML({ ...u, modulos, country }).length > 0)
   )
   // 18-11: «Publicaciones» lleva a su primera pestaña (Stock vs inventario si la tiene); la clave del menú sigue siendo /publicaciones.

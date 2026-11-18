@@ -65,6 +65,8 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cada cuánto se revisa?', respuesta: 'Sola cada hora. Con **Revisar ahora** buscas en el momento (cada 10 minutos como máximo).' },
   ],
   '/pagos-me': [
+    { pregunta: '¿Dónde verifico los pagos si llevo inventario?',
+      respuesta: 'En **Ventas → Por confirmar**: es la misma lista. Pagos ME queda como **Conexión Pagos ME** (menú de tu cuenta o **⚙ Conexión** en Por confirmar) para la PC, las cuentas y el **Historial de pagos**.' },
     { pregunta: '¿Cómo verifico un pago rápido?',
       respuesta: 'Toca el chip azul **Pago por verificar · Bs …** y elige **✓ Sí, verificado** (o **✗ Inválido**). Queda verificado como cuando cuadra con el banco y el botón pasa a **Registrar venta**. Si te equivocaste, toca **deshacer**.' },
     { pregunta: '¿Cómo conecto MercadoEnvíos?', video: 'Conéctate con Mercadoenvios',

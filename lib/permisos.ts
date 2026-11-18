@@ -130,3 +130,10 @@ export function rutaPermitida(href: string, user: { role?: UserRole; permisos?: 
 export interface AccesoCompras { editar: boolean; costos: boolean }
 export const accesoCompras = (user: Parameters<typeof puede>[0]): AccesoCompras =>
   ({ editar: puede(user, 'compras_editar'), costos: puede(user, 'costos') })
+
+/** 18-11 (el dueño: «Pagos ME y Por confirmar son casi lo mismo»): con inventario y acceso a Ventas, la lista de pagos por
+ *  confirmar vive SOLO en Ventas → Por confirmar, y Pagos ME queda como su conexión (PC, cuentas, programa) e historial.
+ *  Sin inventario (o sin Ventas) Pagos ME sigue siendo la lista. Se calcula en cada visita: prender o apagar el inventario
+ *  solo cambia dónde se ve; los pagos y su verificación son los mismos. */
+export const listaPagosEnVentas = (user: { role?: UserRole; permisos?: string[]; modulos?: string[] } | null | undefined) =>
+  !!user && tieneModulo(user, 'inventario') && puede(user, 'ver_ventas')

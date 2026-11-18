@@ -46,9 +46,9 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, plataforma, de
     avisos && { href: '/mis-avisos', label: 'Mis avisos' },
     // Ajustes es del inventario (tasa, exceso, categorías): en Automatizaciones cada herramienta tiene los suyos adentro.
     ajustes && espacioDe(pathname) === 'inventario' && { href: '/tasas', label: 'Ajustes' },
-    // Pagos ME (2026-10-12): se verifica desde Ventas; aquí queda el vigilante, el horario y el historial.
-    // Sin "despachos_ventas" (ventas de ML) va en la barra de Automatizaciones, junto a Despachos.
-    pagosME && espacioDe(pathname) === 'inventario' && { href: '/pagos-me', label: 'Pagos MercadoEnvíos' },
+    // Pagos ME: con inventario los pagos se verifican en Ventas → Por confirmar; aquí queda su conexión (PC, cuentas,
+    // programa) y el historial (18-11). Sin inventario va en la barra de Automatizaciones, como su lista.
+    pagosME && { href: '/pagos-me?vista=conexion', label: 'Conexión Pagos ME' },
     // Mi plan (02-11, mig. 141): el admin de un cliente ve su plan y reporta el pago.
     // Mi IA (06-11): la misma página que en Preguntas y Mensajes.
     miIA       && { href: '/mi-ia',      label: 'Mi IA', nuevo: 'mi_ia' as const },

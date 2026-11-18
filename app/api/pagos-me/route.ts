@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME } from '@/lib/pagosME'
 import { esDemo } from '@/lib/demo'
 import { tieneModulo } from '@/lib/modulos'
+import { puede } from '@/lib/permisos'
 import { asegurarPagosDemo, entregarDemo } from '@/lib/demoDatos'
 
 /**
@@ -53,14 +54,19 @@ export async function GET(req: NextRequest) {
     }
     const estado = req.nextUrl.searchParams.get('estado') ?? 'pendiente'
     const filtro = ['pendiente', 'valido', 'invalido'].includes(estado) ? estado : null
+    // ?solo=estado (18-11): solo la PC, las cuentas y la última traída, para la línea de estado de Ventas → Por confirmar
+    // (sin la lista de pagos). Es de Pagos ME: pide su permiso.
+    const soloEstado = req.nextUrl.searchParams.get('solo') === 'estado'
+    if (soloEstado && !puede(s.session.user, 'ver_pagos_me')) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
+    const vacio = Promise.resolve({ rows: [] as Record<string, unknown>[] })
     const [{ rows: pagos }, { rows: conteo }, { rows: latidos }, { rows: [pedido] }, { rows: [clave] }, { rows: cuentasML }] = await Promise.all([
-      s.db.query(
+      soloEstado ? vacio : s.db.query(
         `${SELECT_PAGOS}
          WHERE ($1::text IS NULL OR p.verificacion = $1) AND p.fecha_orden > NOW() - INTERVAL '30 days'
            -- Completada en MercadoEnvíos (28-10): ya se despachó, no queda pago por revisar antes de imprimir.
            AND NOT ($1::text IS NOT DISTINCT FROM 'pendiente' AND p.estado_me = 'completed')
          ORDER BY p.fecha_orden DESC NULLS LAST, p.id DESC LIMIT 300`, [filtro]),
-      s.db.query(`SELECT CASE WHEN verificacion = 'pendiente' AND estado_me = 'completed' THEN 'completada' ELSE verificacion END AS verificacion,
+      soloEstado ? vacio : s.db.query(`SELECT CASE WHEN verificacion = 'pendiente' AND estado_me = 'completed' THEN 'completada' ELSE verificacion END AS verificacion,
                          COUNT(*)::int AS n FROM me_pagos
                   WHERE fecha_orden > NOW() - INTERVAL '30 days' GROUP BY 1`),
       // Perfiles con señal en los últimos 3 días: uno que ya no se usa (extensión quitada, perfil viejo) no

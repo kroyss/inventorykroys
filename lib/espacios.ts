@@ -18,7 +18,8 @@ export function espacioDe(pathname: string): Espacio {
 export function espacioActual(pathname: string, modulos: string[]): Espacio {
   if (!modulos.includes('inventario')) return 'automatizaciones'
   // Pagos ME es de Automatizaciones donde Despachos trabaja con las ventas de ML (inventario simple);
-  // con ventas cargadas (SolucionesMC) sigue en Inventario, al lado de Ventas.
+  // con ventas cargadas (SolucionesMC) sigue en Inventario, al lado de Ventas. (18-11: sin cambios; la conexión se abre
+  // desde el menú de la cuenta, que está en los dos espacios.)
   if ((pathname === '/pagos-me' || pathname.startsWith('/pagos-me/')) && !modulos.includes('despachos_ventas')) return 'automatizaciones'
   return espacioDe(pathname)
 }
