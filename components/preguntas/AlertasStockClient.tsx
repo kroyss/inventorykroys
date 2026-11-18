@@ -283,13 +283,14 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
           const poner = vista === 'pausadas' ? null : conReparto ? f.sugerido! : f.inventario
           const puedePoner = poner != null && poner > f.disponible && !!datos?.puedeStock
           return (
-            <p className={`text-[11px] whitespace-nowrap ${f.inventario > 0 ? 'font-medium text-emerald-700' : 'text-neutral-500'}`}>
+            // 18-11 (el dueño): «inventario N» en gris (dato); en verde solo «sugerido X» (la acción).
+            <p className="text-[11px] whitespace-nowrap text-neutral-500">
               <span className="num">inventario {f.inventario}</span>
               {puedePoner && <>
                 {' · '}
                 <button type="button" onClick={() => escribir(f, String(poner))}
                   title={conReparto && poner! < f.inventario! ? `Lo que sugiere Stock vs inventario: reparte las ${f.inventario} u. entre tus publicaciones. Toca para ponerlo en MercadoLibre` : 'Toca para poner este número como stock en MercadoLibre'}
-                  className="underline underline-offset-2 hover:text-emerald-900">sugerido {poner}</button>
+                  className="font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-900">sugerido {poner}</button>
               </>}
             </p>
           )
