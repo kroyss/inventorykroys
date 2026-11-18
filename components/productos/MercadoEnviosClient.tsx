@@ -21,14 +21,15 @@ const STATUS_META: Record<ShipStatus, { label: string; chip: string }> = {
 
 type Filter = 'all' | 'unregistered' | 'sin_peso_ml' | 'capped' | 'aggregate' | 'impossible' | 'distintos'
 
-export default function MercadoEnviosClient({ initialProducts, inicialTasa = null, pagosME = false, descuento = true }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null; pagosME?: boolean; descuento?: boolean }) {
+export default function MercadoEnviosClient({ initialProducts, inicialTasa = null, pagosME = false, descuento = true, inicialFiltro }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null; pagosME?: boolean; descuento?: boolean; inicialFiltro?: 'sin_peso_ml' }) {
   const router = useRouter()
   const [products, setProducts] = useState<Product[]>(initialProducts)
   // 14-11: «Traer pesos de ML» (pesos del portal de MercadoEnvíos vía Pagos ME).
   const [trayendo, setTrayendo] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const [search, setSearch]     = useState('')
-  const [filter, setFilter]     = useState<Filter>('all')
+  // 18-11 (el dueño): desde Primeros pasos llega ?filtro=sin_peso_ml → abre justo en los que faltan.
+  const [filter, setFilter]     = useState<Filter>(inicialFiltro ?? 'all')
   const [weights, setWeights]   = useState<Record<number, string>>(
     () => Object.fromEntries(initialProducts.map(p => [p.id, p.weight_kg != null ? String(p.weight_kg) : '']))
   )

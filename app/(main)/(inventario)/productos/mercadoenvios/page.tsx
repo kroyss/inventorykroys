@@ -12,7 +12,7 @@ import { PESOS_VINCULADOS, SQL_PESOS_DISTINTOS, SQL_EN_ML_ACTIVA } from '@/lib/p
 
 export const metadata = { title: 'MercadoEnvíos' }
 
-export default async function MercadoEnviosPage() {
+export default async function MercadoEnviosPage({ searchParams }: { searchParams: Promise<{ filtro?: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session || !puede(session.user, 'ver_productos')) redirect('/dashboard')
   // Función exclusiva de VE (tabla de envíos por peso de ML Venezuela). 14-11: para todos con Inventario; el
@@ -42,6 +42,7 @@ export default async function MercadoEnviosPage() {
   // 12-11 (rapidez): tasa y Ajustes en el HTML.
   return <>
     <PublicacionesMLTabs user={session.user} actual="envios" />
-    <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} inicialTasa={await tasaYAjustes()} pagosME={tieneModulo(session.user, 'pagos_me')} descuento={tieneModulo(session.user, 'descuento_ml')} />
+    <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} inicialTasa={await tasaYAjustes()} pagosME={tieneModulo(session.user, 'pagos_me')} descuento={tieneModulo(session.user, 'descuento_ml')}
+      inicialFiltro={(await searchParams).filtro === 'sin_peso_ml' ? 'sin_peso_ml' : undefined} />
   </>
 }
