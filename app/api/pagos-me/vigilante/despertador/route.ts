@@ -5,7 +5,7 @@ import { autenticarVigilante, INTENTOS_ME, PEDIDO_VIGENTE_MIN } from '@/lib/pago
 // 14-11 (el dueño): con Chrome abierto se consultaba en 2 lados — la extensión tomaba el pedido sola y el despertador
 // abría además una ventana nueva. Ahora el despertador solo despierta lo que está DORMIDO: si todos los perfiles que
 // faltan dieron señal hace poco (Chrome abierto, la extensión lo toma en ≤ 1 min), no se le pasa el pedido. Si a los
-// ESPERA_VIVOS_MIN siguen sin terminar, se le pasa igual (por si la extensión se trabó). Sin perfiles conocidos, como antes.
+// ESPERA_VIVOS_MIN siguen sin terminar, se le pasaba igual (19-11 tarde: ya NO, ver abajo). Sin perfiles conocidos, como antes.
 // 19-11: si todos ya leyeron BIEN no se pasa nunca; si uno leyó con error, la extensión reintenta una vez (INTENTOS_ME) y
 // el despertador solo entra si ese perfil tampoco está vivo.
 const VIVO_MIN = 2
@@ -43,9 +43,14 @@ export async function POST(req: NextRequest) {
        ORDER BY COALESCE(conexion_id::text, cuenta, perfil), visto_at DESC`, [VIVO_MIN])
     const faltan = perfiles.filter(x => !hechos.includes(x.perfil))
     if (perfiles.length && !faltan.length) return NextResponse.json({ pedido: null, hechos: [] })
-    // Con Chrome abierto la extensión lo toma sola en ≤ 1 min (también el reintento si falló): se le da ESPERA_VIVOS_MIN.
-    if (!p.viejo && perfiles.length && faltan.every(x => x.vivo)) return NextResponse.json({ pedido: null, hechos: [] })
-    return NextResponse.json({ pedido: Number(p.id), hechos })
+    // 19-11 tarde: un perfil con Chrome ABIERTO (dio señal hace poco) nunca se despierta, ni pasados ESPERA_VIVOS_MIN:
+    // la extensión lo toma sola, y abrir otra ventana del portal en ese mismo perfil cortaba la lectura en curso
+    // («Frame with ID 0 was removed» / «Failed to fetch»: SolucionesMC, Chrome abierto todo el día en la PC remota).
+    // Se despiertan solo los perfiles dormidos; los vivos van en `hechos` para que el script no los abra.
+    const vivos = faltan.filter(x => x.vivo).map(x => x.perfil as string)
+    if (perfiles.length && faltan.length === vivos.length) return NextResponse.json({ pedido: null, hechos: [] })
+    // Sin perfiles conocidos (todavía ninguno dio señal) o con alguno dormido: se le pasa el pedido para esos.
+    return NextResponse.json({ pedido: Number(p.id), hechos: [...hechos, ...vivos] })
   } catch (err) {
     return apiError(err)
   }

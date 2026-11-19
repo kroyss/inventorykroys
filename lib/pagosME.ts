@@ -27,8 +27,10 @@ const DIR = path.join(UPLOAD_DIR, 'pagos-me')
 export const MAX_ARCHIVO = 5 * 1024 * 1024
 /** Un pedido de "Traer pagos y guías" vale por este tiempo: después los perfiles lo ignoran. */
 export const PEDIDO_VIGENTE_MIN = 30
-/** 19-11: un perfil que leyó con ERROR vuelve a intentar (extensión o despertador) hasta este total de intentos por pedido. */
-export const INTENTOS_ME = 2
+/** Intentos por perfil y pedido. 19-11 tarde: vuelve a 1 (sin reintento automático). Con 2, el reintento que la extensión
+ *  1.3.6 tomaba enseguida, en la misma pestaña que acababa de fallar, se colgaba y la dejaba «trabajando» para siempre: no
+ *  tomaba más pedidos ni cerraba ventanas (SolucionesMC, Chrome abierto todo el día en la PC remota). El error queda a la vista. */
+export const INTENTOS_ME = 1
 /** SQL: el perfil $perfil todavía tiene que leer este pedido (no respondió, o falló y le quedan intentos). */
 export const SQL_PERFIL_PENDIENTE = (perfil: string) => `(NOT (resultados ? ${perfil}::text) OR ((resultados->${perfil}::text->>'ok') = 'false'
   AND COALESCE((resultados->${perfil}::text->>'intentos')::int, 1) < ${INTENTOS_ME}))`
