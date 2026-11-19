@@ -78,7 +78,8 @@ async function latido() {
   if (!cfg.perfil || !cfg.servidor || !cfg.clave) return { texto: 'Falta configurar perfil, sistema y clave.' }
   try {
     const d = await api(cfg, 'latido')
-    if (d.pedido && !trabajando) procesarConVigia(cfg, d.pedido, !!d.pesos, d.desde ?? null)
+    // 1.3.10: `corte` + `revisar` (lectura corta segura). El `desde` de la 1.3.9 ya no se usa.
+    if (d.pedido && !trabajando) procesarConVigia(cfg, d.pedido, !!d.pesos, d.corte ? { corte: d.corte, revisar: d.revisar ?? [] } : null)
     // Abierto por el despertador pero ya no hay nada que hacer aquí (otro lo hizo, venció): se cierra.
     if (!d.pedido && !trabajando) for (const t of await tabsDelDespertador()) cerrarVentana(t)
     const texto = d.pedido ? `Conectado: trayendo pagos y guías (pedido ${d.pedido})…` : 'Conectado ✓ (esperando pedidos)'
@@ -92,7 +93,7 @@ async function latido() {
 
 /** Corre la traída con un vigía de avance: si se cuelga, la suelta y reporta el error (el turno viejo, si algún día
  *  termina, ya no toca nada). */
-async function procesarConVigia(cfg, pedido, pesos, desde = null) {
+async function procesarConVigia(cfg, pedido, pesos, plan = null) {
   const mio = ++turno
   trabajando = true
   avance()
@@ -100,7 +101,7 @@ async function procesarConVigia(cfg, pedido, pesos, desde = null) {
   const colgada = new Promise(resolve => {
     vigia = setInterval(() => { if (Date.now() - ultimoAvance > SIN_AVANCE_MS) resolve('colgada') }, 10000)
   })
-  const r = await Promise.race([procesar(cfg, pedido, pesos, mio, desde).then(() => 'ok'), colgada])
+  const r = await Promise.race([procesar(cfg, pedido, pesos, mio, plan).then(() => 'ok'), colgada])
   clearInterval(vigia)
   if (r === 'colgada' && turno === mio) {
     turno++   // el procesar colgado queda huérfano
@@ -111,7 +112,7 @@ async function procesarConVigia(cfg, pedido, pesos, desde = null) {
   }
 }
 
-async function procesar(cfg, pedido, pesos = false, mio = turno, desde = null) {
+async function procesar(cfg, pedido, pesos = false, mio = turno, plan = null) {
   const t0 = Date.now()
   const vigente = () => turno === mio
   let tabId = null
@@ -137,13 +138,13 @@ async function procesar(cfg, pedido, pesos = false, mio = turno, desde = null) {
 
     avance()
     const aviso = avisador(cfg, pedido)
-    let leido = await leerPorPaginas(tabId, desde, aviso, vigente)
+    let leido = await leerPorPaginas(tabId, plan, aviso, vigente)
     avance()
     // Sesión vencida (MercadoEnvíos la cierra a diario): se entra solo con "Ingresar con mi cuenta
     // de Mercado Libre", que pasa directo si este Chrome tiene la sesión de ML. Nunca escribe claves:
     // si ML pide clave o código, queda como sin sesión y la ventana abierta para hacerlo a mano.
     if (leido?.error === 'sin_sesion' && await reingresar(tabId)) {
-      leido = await leerPorPaginas(tabId, desde, aviso, vigente)
+      leido = await leerPorPaginas(tabId, plan, aviso, vigente)
     }
     if (!vigente()) return
     if (!leido?.ok) throw new Error(leido?.error || 'No se pudo leer el portal')
@@ -195,10 +196,10 @@ async function procesar(cfg, pedido, pesos = false, mio = turno, desde = null) {
       await api(cfg, 'notas', { cuenta: leido.cuenta || cfg.perfil, ordenes: leido.notas }).catch(() => {})
     }
     if (!vigente()) return
-    await api(cfg, 'fin', { pedido, ok: true, cuenta: leido.cuenta || cfg.perfil, vistas, nuevas, saltadas: leido.saltadas ?? [],
+    await api(cfg, 'fin', { pedido, ok: true, cuenta: leido.cuenta || cfg.perfil, vistas, nuevas, saltadas: (leido.saltadas ?? []).slice(0, 500),
       modo: leido.parcial ? 'parcial' : leido.modo, segundos: Math.round((Date.now() - t0) / 1000) })
     const nSalt = leido.saltadas?.length ?? 0
-    await anotar(`Listo${leido.modo === 'corta' ? ' (solo lo modificado desde la última traída)' : ''}: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.${nSalt ? ` ${nSalt} sin pago o sin guía todavía.` : ''}`
+    await anotar(`Listo${leido.modo === 'corta' ? ' (lo nuevo desde la última traída y las pendientes)' : ''}: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.${nSalt ? ` ${nSalt} sin pago o sin guía todavía.` : ''}`
       + (leido.parcial ? ' El portal estaba lento: se leyeron solo las más recientes.' : ''))
   } catch (e) {
     if (!vigente()) return
@@ -355,8 +356,11 @@ function avisador(cfg, pedido) {
 
 /** 1.3.9: lee la lista de órdenes de a una página (de LIMITE_PAGINA). Con `desde` (fecha de corte que da el sistema),
  *  ordena por última modificación y para al pasar esa fecha: casi siempre 1 página. Sin `desde`, los 7 días. */
-async function leerPorPaginas(tabId, desde, aviso, vigente) {
-  const corte = desde ? Date.parse(desde) : null
+async function leerPorPaginas(tabId, plan, aviso, vigente) {
+  // 1.3.10: `plan` = { corte (fecha de CREACIÓN desde la que leer la lista), revisar (números de las pendientes) }.
+  const corte = plan?.corte ? Date.parse(plan.corte) : null
+  const revisar = corte && Array.isArray(plan?.revisar) ? plan.revisar.map(String) : []
+  const vistosIds = new Set()
   const modo = corte ? 'corta' : 'completa'
   const inicioVentana = corte ?? Date.now() - DIAS * 864e5
   const medida = medidor()
@@ -374,7 +378,7 @@ async function leerPorPaginas(tabId, desde, aviso, vigente) {
     let r
     try {
       r = await ejecutar(tabId, leerOrdenes, [DIAS, medida.espera(), INTENTOS_ADAPT, 0,
-        { off, paginas: 1, limite: LIMITE_PAGINA, orden: corte ? 'last_updated' : 'date_created', corte, conCuenta: off === 0 }])
+        { off, paginas: 1, limite: LIMITE_PAGINA, orden: 'date_created', corte, conCuenta: off === 0 }])
     } catch (e) {
       if (off === 0) throw e
       parcial = true
@@ -388,6 +392,7 @@ async function leerPorPaginas(tabId, desde, aviso, vigente) {
     medida.anotar(Date.now() - tp)
     avance()
     if (off === 0) cuenta = r.cuenta
+    for (const id of r.vistos ?? []) vistosIds.add(id)
     // Al leer por última modificación una orden puede cambiar mientras tanto y aparecer dos veces: se cuenta una.
     for (const o of r.ordenes) if (!vistasO.has(o.venta)) { vistasO.add(o.venta); ordenes.push(o) }
     for (const x of r.notas) if (!vistasN.has(x.orden)) { vistasN.add(x.orden); notas.push(x) }
@@ -399,6 +404,37 @@ async function leerPorPaginas(tabId, desde, aviso, vigente) {
     const frac = r.ultima ? (ahora - r.ultima) / Math.max(1, ahora - inicioVentana) : 0
     const total = frac > 0.05 ? Math.max(leidas + LIMITE_PAGINA, Math.round(leidas / Math.min(1, frac))) : null
     aviso('leyendo', leidas, total, total ? medida.faltan(Math.ceil((total - leidas) / LIMITE_PAGINA)) : null, false, modo)
+  }
+  // 1.3.10: las que la traída anterior dejó esperando pago o guía, de a una por su número (las nuevas ya vinieron en la
+  // lista). Así el pago de una orden de hace 6 días entra aunque el portal no le cambie la fecha.
+  const pendientes = parcial ? [] : revisar.filter(id => !vistosIds.has(id))
+  if (pendientes.length) {
+    const tanda = 5
+    const med = medidor()
+    for (let i = 0; i < pendientes.length; i += tanda) {
+      if (!vigente()) break
+      const ids = pendientes.slice(i, i + tanda)
+      aviso('revisando', i, pendientes.length, med.faltan(Math.ceil((pendientes.length - i) / tanda)), false, modo)
+      const tp = Date.now()
+      let r
+      try {
+        r = await ejecutar(tabId, leerOrdenes, [DIAS, med.espera(), INTENTOS_ADAPT, 0, { ids, conCuenta: false }])
+      } catch (e) { r = { ok: false, error: e.message } }
+      if (r?.error === 'sin_sesion') return r
+      if (!r?.ok) {
+        // Si falla una tanda, esas quedan anotadas como no leídas: se revisan en la próxima.
+        for (const id of ids) saltadas.push({ orden: id, venta: /^\d{10,20}$/.test(id) ? id : null, motivo: 'no_leida', estado: null, fecha: null })
+        continue
+      }
+      med.anotar(Date.now() - tp)
+      avance()
+      for (const o of r.ordenes) if (!vistasO.has(o.venta)) { vistasO.add(o.venta); ordenes.push(o) }
+      for (const x of r.notas) if (!vistasN.has(x.orden)) { vistasN.add(x.orden); notas.push(x) }
+      for (const x of r.saltadas) if (!vistasS.has(x.orden)) { vistasS.add(x.orden); saltadas.push(x) }
+    }
+  } else if (parcial && revisar.length) {
+    // Lectura cortada a mitad: las pendientes siguen pendientes (se revisan en la próxima).
+    for (const id of revisar) if (!vistosIds.has(id) && !vistasS.has(id)) saltadas.push({ orden: id, venta: /^\d{10,20}$/.test(id) ? id : null, motivo: 'no_leida', estado: null, fecha: null })
   }
   return { ok: true, cuenta, ordenes, notas, saltadas, parcial, modo }
 }
@@ -439,7 +475,10 @@ async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000,
   const inicio = Date.now()
   const limite = op?.limite ?? 50
   const ordenPor = op?.orden === 'last_updated' ? 'last_updated' : 'date_created'
-  const corte = ordenPor === 'last_updated' && op?.corte ? op.corte : null
+  // 1.3.10: el corte vale con cualquier orden (la 1.3.10 lo usa por fecha de CREACIÓN: MercadoEnvíos no siempre cambia
+  // last_updated al llegar un pago). Con `op.ids` se piden esas órdenes de a una (/orders/{id}/) en vez de la lista.
+  const corte = op?.corte ? op.corte : null
+  const soloIds = Array.isArray(op?.ids) ? op.ids : null
   const fechaDe = o => new Date(ordenPor === 'last_updated' ? (o.last_updated ?? o.date_created) : o.date_created).getTime()
   const espera = ms => new Promise(r => setTimeout(r, ms))
   // 1.3.8: cada consulta con tope de tiempo y reintentos (el portal a veces tarda 5–30 s o da 502/503/504 «Gateway
@@ -503,26 +542,45 @@ async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000,
     let n = 0
     let ultima = null
     const off0 = op?.off ?? 0
-    const offMax = op ? off0 + (op.paginas ?? 1) * limite : 1000
+    const offMax = soloIds ? off0 + 1 : op ? off0 + (op.paginas ?? 1) * limite : 1000
+    const vistos = []
+    const noLeidas = []
     for (let off = off0; off < offMax; off += limite) {
       // 1.3.8: con el portal lento, pasado maxMs se sube lo ya leído (son las más nuevas); el resto, en la próxima.
       if (off > off0 && maxMs && Date.now() - inicio > maxMs) { parcial = true; break }
-      let res
-      try {
-        res = await json(`/api/v1/seller/orders/?limit=${limite}&offset=${off}&order_by=${ordenPor}&direction=desc`)
-      } catch (e) {
-        // La primera página es obligatoria; si falla una de las siguientes, se sube lo leído.
-        if (off === off0 || e.message === 'sin_sesion') throw e
-        parcial = true
-        break
+      let rs
+      if (soloIds) {
+        rs = []
+        for (const id of soloIds) {
+          try {
+            const r = await json(`/api/v1/seller/orders/${encodeURIComponent(id)}/`)
+            const d = r?.data ?? r
+            if (d && d._id != null) rs.push(d); else noLeidas.push(String(id))
+          } catch (e) {
+            if (e.message === 'sin_sesion') throw e
+            noLeidas.push(String(id))
+          }
+        }
+        fin = true
+      } else {
+        let res
+        try {
+          res = await json(`/api/v1/seller/orders/?limit=${limite}&offset=${off}&order_by=${ordenPor}&direction=desc`)
+        } catch (e) {
+          // La primera página es obligatoria; si falla una de las siguientes, se sube lo leído.
+          if (off === off0 || e.message === 'sin_sesion') throw e
+          parcial = true
+          break
+        }
+        rs = res?.data?.results ?? []
       }
-      const rs = res?.data?.results ?? []
+      for (const o of rs) vistos.push(String(o._id))
       if (rs.length === 0) { fin = true; break }
       n += rs.length
       ultima = fechaDe(rs[rs.length - 1])
       for (const o of rs) {
         if (new Date(o.date_created).getTime() < desde) continue
-        if (corte && fechaDe(o) < corte) continue
+        if (corte && !soloIds && fechaDe(o) < corte) continue
         const p = o.payment || {}
         const mk = p.method && p[p.method] ? p.method : METODOS.find(k => p[k] && typeof p[k] === 'object')
         const m = mk ? p[mk] : null
@@ -566,10 +624,13 @@ async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000,
           },
         })
       }
+      if (soloIds) break
       if ((corte && ultima < corte) || (ordenPor === 'date_created' && ultima < desde)) { fin = true; break }
       if (rs.length < limite) { fin = true; break }
     }
-    return { ok: true, cuenta, ordenes, notas, saltadas, parcial, fin, n, ultima }
+    // No se pudieron leer: quedan anotadas para revisarlas en la próxima traída (si no, se perderían de vista).
+    for (const id of noLeidas) saltadas.push({ orden: corto(id, 60), venta: /^\d{10,20}$/.test(id) ? id : null, motivo: 'no_leida', estado: null, fecha: null })
+    return { ok: true, cuenta, ordenes, notas, saltadas, parcial, fin, n, ultima, vistos }
   } catch (e) {
     return { ok: false, error: e.message }
   }

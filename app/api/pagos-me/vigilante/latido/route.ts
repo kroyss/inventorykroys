@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { autenticarVigilante, PEDIDO_VIGENTE_MIN, SQL_PERFIL_PENDIENTE } from '@/lib/pagosME'
 
-/** Cada cuánto se lee completo (7 días) aunque haya fecha de corte: atrapa lo que la lectura corta pudiera saltarse. */
-const COMPLETA_CADA_H = 20
-/** Margen hacia atrás de la fecha de corte (reloj del portal vs el nuestro, órdenes modificadas mientras se leía). */
+/** Sin una lectura buena de este perfil en estos días, se lee completo (7 días). */
+const COMPLETA_SI_NO_HAY_DIAS = 3
+/** Con más órdenes pendientes que esto, sale más barato leer la lista completa. */
+const MAX_REVISAR = 200
+/** Margen hacia atrás de la fecha de corte (reloj del portal vs el nuestro, órdenes creadas mientras se leía). */
 const MARGEN_CORTE_MIN = 30
 
 /**
@@ -37,22 +39,41 @@ export async function POST(req: NextRequest) {
         pesos = !f?.fresco
       }
     }
-    // 19-11 (extensión 1.3.9): fecha de corte. Si este perfil hizo una lectura COMPLETA (7 días) buena en las últimas
-    // COMPLETA_CADA_H horas, solo lee lo modificado en el portal desde su última lectura buena y entera (menos un margen):
-    // casi siempre 1 página en vez de 6 (cada orden pesa ~17 KB; la línea de la PC de SolucionesMC bajaba a ~10 KB/s).
-    // Sin eso (primera del día, perfil nuevo, la última se cortó), desde = null → lectura completa. Las versiones
-    // anteriores ignoran el dato y leen siempre los 7 días.
-    let desde: string | null = null
+    // 19-11 noche (extensión 1.3.10): lectura corta SEGURA. La 1.3.9 leía por «última modificación» del portal, pero
+    // MercadoEnvíos NO siempre la cambia al llegar un pago (6 de 14 pagos tardíos de PIKEKE quedaron con la fecha de
+    // creación): se perdían. Ahora `corte` es por FECHA DE CREACIÓN (lo nuevo desde la última lectura buena, menos un
+    // margen) y `revisar` son los números de las órdenes que esa lectura dejó esperando pago o guía (saltadas, o con pago
+    // y sin guía o al revés): la extensión las pide de a una (/orders/{id}/, ~10 KB). Lo que ya tenía pago y guía no se
+    // vuelve a bajar. Lectura completa (7 días: las órdenes vencen a los 7) si no hubo una lectura buena en 3 días.
+    // `desde` (la de la 1.3.9) ya no se manda: la 1.3.9 lee siempre completo (lenta pero no pierde nada).
+    let corte: string | null = null
+    let revisar: string[] = []
     if (p) {
       const { rows: [u] } = await a.db.query(
-        `SELECT MAX(pedido_at) FILTER (WHERE r->>'modo' = 'completa') > NOW() - make_interval(hours => $2) AS completa_reciente,
-                MAX(pedido_at) - make_interval(mins => $3) AS desde
+        `SELECT id, pedido_at - make_interval(mins => $2) AS corte, r->'saltadas' AS saltadas
          FROM me_pedidos, LATERAL (SELECT resultados->$1::text AS r) x
-         WHERE pedido_at > NOW() - INTERVAL '2 days' AND r->>'ok' = 'true' AND r->>'modo' IN ('completa', 'corta')`,
-        [a.perfil, COMPLETA_CADA_H, MARGEN_CORTE_MIN])
-      if (u?.completa_reciente && u.desde) desde = new Date(u.desde).toISOString()
+         WHERE pedido_at > NOW() - make_interval(days => $3) AND r->>'ok' = 'true' AND r->>'modo' IN ('completa', 'corta')
+         ORDER BY pedido_at DESC LIMIT 1`,
+        [a.perfil, MARGEN_CORTE_MIN, COMPLETA_SI_NO_HAY_DIAS])
+      // Con la lista de saltadas llena (500, el tope que guarda fin) puede faltar alguna: completa.
+      if (u?.corte && !(Array.isArray(u.saltadas) && u.saltadas.length >= 500)) {
+        const ids = new Set<string>()
+        for (const x of (Array.isArray(u.saltadas) ? u.saltadas : []) as { orden?: string; motivo?: string; fecha?: string }[]) {
+          if (!x?.orden || !['sin_pago_ni_guia', 'no_leida'].includes(x.motivo ?? '')) continue
+          if (x.fecha && Date.parse(x.fecha) < Date.now() - 7 * 864e5) continue   // ya vencida en el portal
+          ids.add(String(x.orden))
+        }
+        // Traídas a medias (pago sin guía o guía sin pago) de esta cuenta en la ventana: la otra mitad puede llegar.
+        const { rows: medias } = await a.db.query(
+          `SELECT p.venta FROM me_pagos p
+           WHERE p.creado_at > NOW() - INTERVAL '7 days' AND (p.guia_path IS NULL OR p.comprobante_path IS NULL)
+             AND p.cuenta = (SELECT cuenta FROM me_latidos WHERE perfil = $1)
+           LIMIT 300`, [a.perfil])
+        for (const m of medias) if (/^\d{10,}$/.test(m.venta)) ids.add(m.venta)
+        if (ids.size <= MAX_REVISAR) { corte = new Date(u.corte).toISOString(); revisar = [...ids] }
+      }
     }
-    return NextResponse.json({ pedido: p ? Number(p.id) : null, pesos, desde })
+    return NextResponse.json({ pedido: p ? Number(p.id) : null, pesos, corte, revisar })
   } catch (err) {
     return apiError(err)
   }

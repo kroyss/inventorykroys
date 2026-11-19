@@ -19,7 +19,7 @@ export interface CuentaTraida { perfil: string; nombre: string; hecho: boolean; 
   lenta?: boolean
   /** 1.3.9 (mig. 190): cómo va mientras trabaja. Las versiones anteriores no lo mandan. */
   avance?: AvanceCuenta | null }
-export interface AvanceCuenta { fase: 'leyendo' | 'bajando' | 'pesos'; hechas: number; total: number | null; faltan_s: number | null; modo: 'completa' | 'corta' | null }
+export interface AvanceCuenta { fase: 'leyendo' | 'revisando' | 'bajando' | 'pesos'; hechas: number; total: number | null; faltan_s: number | null; modo: 'completa' | 'corta' | null }
 export interface EstadoTraida {
   id: number; pedido_at: string; pesos: boolean; automatico: boolean
   /** Corriendo: hay perfiles que todavía no respondieron y la PC está conectada. */

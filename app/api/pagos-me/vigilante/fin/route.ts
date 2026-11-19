@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
        , avance = p.avance - $2::text
        WHERE p.id = $1`,
       [b.pedido, a.perfil, b.ok, b.cuenta ?? null, b.vistas, b.nuevas, b.error ?? null,
-       b.saltadas ? JSON.stringify(b.saltadas.slice(0, 200)) : null, b.modo ?? null, b.segundos ?? null])
+       b.saltadas ? JSON.stringify(b.saltadas.slice(0, 500)) : null, b.modo ?? null, b.segundos ?? null])
     // Nombre de la cuenta de MercadoEnvíos (093): la pantalla lo muestra en vez del nombre técnico del perfil.
     if (b.cuenta) await a.db.query(
       `INSERT INTO me_latidos (perfil, cuenta, visto_at) VALUES ($1, $2, NOW())

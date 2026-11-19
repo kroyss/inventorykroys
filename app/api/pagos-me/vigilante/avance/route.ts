@@ -6,7 +6,7 @@ import { autenticarVigilante } from '@/lib/pagosME'
 const Body = z.object({
   pedido: z.number().int().positive(),
   // leyendo = recorriendo la lista de órdenes del portal; bajando = guías y comprobantes de las nuevas; pesos = productos.
-  fase: z.enum(['leyendo', 'bajando', 'pesos']),
+  fase: z.enum(['leyendo', 'revisando', 'bajando', 'pesos']),
   hechas: z.number().int().min(0).max(100000),
   total: z.number().int().min(0).max(100000).nullish(),     // null = todavía no se sabe (lectura corta)
   faltan_s: z.number().int().min(0).max(36000).nullish(),   // estimado con lo que viene tardando

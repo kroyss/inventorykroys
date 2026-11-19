@@ -143,6 +143,7 @@ const ERROR_CUENTA: Record<string, string> = { sin_sesion: 'sin sesión de Merca
 /** «leyendo órdenes 40 de ~120 · faltan ~30 s» (extensión 1.3.9). */
 function textoAvance(a: AvanceCuenta) {
   const que = a.fase === 'leyendo' ? (a.modo === 'corta' ? 'leyendo órdenes nuevas' : 'leyendo órdenes')
+    : a.fase === 'revisando' ? 'revisando las que esperaban pago'
     : a.fase === 'bajando' ? 'bajando guías y pagos' : 'leyendo pesos'
   const cuantas = a.total ? `${a.hechas} de ${a.fase === 'leyendo' ? '~' : ''}${a.total}` : a.hechas ? `${a.hechas}` : ''
   const falta = a.faltan_s == null ? '' : a.faltan_s < 60 ? ` · faltan ~${Math.max(5, Math.round(a.faltan_s / 5) * 5)} s`
