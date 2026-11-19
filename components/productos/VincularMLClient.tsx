@@ -58,8 +58,11 @@ const coincide = (f: Fila, palabras: string[]) => { if (!palabras.length) return
 const ConStock = createContext(false)
 const fecha = (f: string) => new Date(f).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
 
-export default function VincularMLClient({ conCuentas, paraQuien = 'el administrador', buscarInicial = '', vistaInicial, conStock = false }: {
+export default function VincularMLClient({ conCuentas, paraQuien = 'el administrador', buscarInicial = '', vistaInicial, conStock = false, enPanel = false }: {
   conCuentas: boolean; paraQuien?: string; buscarInicial?: string; vistaInicial?: Filtro; conStock?: boolean
+  /** 19-11 (el dueño): abierta desde Stock vs inventario en un panel lateral, ya filtrada por el producto. Sin
+   *  encabezado, avance ni avisos, y sin salir a buscar publicaciones nuevas a ML cada vez que se abre. */
+  enPanel?: boolean
 }) {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -81,6 +84,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
   useEffect(() => {
     if (!conCuentas) return
     cargar()
+    if (enPanel) return
     setBuscando(true)
     fetch('/api/vincular-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'buscar_nuevas' }) })
       .then(r => r.json()).then(d => { if (d?.nuevas > 0) return cargar() }).catch(() => {}).finally(() => setBuscando(false))
@@ -152,12 +156,12 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     <ConStock.Provider value={conStock}>
     <div className="space-y-4">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      <EncabezadoInfo info={<><li>Une cada publicación (o cada color/modelo) con su producto, con un clic.</li><li>Así cada venta de MercadoLibre descuenta el producto correcto y Stock vs inventario puede comparar.</li><li>Las que faltan salen en el numerito del botón Vincular de <b className="font-medium text-neutral-800">Mis publicaciones</b> y en su fila («Sin vincular»).</li></>} title="Vincular con MercadoLibre"
+      {!enPanel && <EncabezadoInfo info={<><li>Une cada publicación (o cada color/modelo) con su producto, con un clic.</li><li>Así cada venta de MercadoLibre descuenta el producto correcto y Stock vs inventario puede comparar.</li><li>Las que faltan salen en el numerito del botón Vincular de <b className="font-medium text-neutral-800">Mis publicaciones</b> y en su fila («Sin vincular»).</li></>} title="Vincular con MercadoLibre"
         subtitle="Une cada publicación (o cada color/modelo) con su producto. Así las ventas de ML descuentan el producto correcto."
-        actions={datos.esDueno ? <Link href="/productos/importar-ml" className={`${sinProductos ? 'btn-primary' : 'btn-secondary'} text-sm`} title="Crear productos nuevos a partir de publicaciones">Crear productos desde ML</Link> : undefined} />
+        actions={datos.esDueno ? <Link href="/productos/importar-ml" className={`${sinProductos ? 'btn-primary' : 'btn-secondary'} text-sm`} title="Crear productos nuevos a partir de publicaciones">Crear productos desde ML</Link> : undefined} />}
 
       {/* Sin productos todavía (25-10): no hay con qué vincular; el paso es crearlos desde las publicaciones. */}
-      {sinProductos && (
+      {sinProductos && !enPanel && (
         <div className="rounded-xl border border-lime-300 bg-lime-50 p-5 sm:flex sm:items-center sm:gap-6">
           <div className="flex-1">
             <div className="text-lg font-semibold text-neutral-900">Todavía no tienes productos</div>
@@ -172,7 +176,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
       )}
 
       {/* 13-11: publicaciones nuevas (últimos 15 días) sin producto en el inventario. */}
-      {n.nuevas > 0 && filtro !== 'nuevas' && (
+      {n.nuevas > 0 && filtro !== 'nuevas' && !enPanel && (
         <div className="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sky-900"><b>{n.nuevas} publicaci{n.nuevas === 1 ? 'ón nueva' : 'ones nuevas'}</b> sin producto en el inventario: dile al sistema a qué producto corresponde{datos.esDueno ? ' o crea el producto' : ''}.</span>
           <button onClick={() => { setFiltro('nuevas'); setVer(POR_PAGINA) }} className="btn-primary shrink-0 text-xs">Ver nuevas</button>
@@ -181,7 +185,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
       {buscando && <p className="text-xs text-neutral-400">Buscando publicaciones nuevas en MercadoLibre…</p>}
 
       {/* Avance */}
-      <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      {!enPanel && <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
           <span><b className="text-xl tabular-nums">{vinculadas}</b> <span className="text-neutral-500">de {total} vinculadas</span></span>
           <span className="text-neutral-500">Hoy: <b className="text-neutral-800">{datos.hoy.todos + hechosHoy}</b>{datos.hoy.mios + hechosHoy ? ` (tú ${datos.hoy.mios + hechosHoy})` : ''}</span>
@@ -190,7 +194,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-100">
           <div className="h-full rounded-full bg-lime-500" style={{ width: `${total ? Math.round(vinculadas * 100 / total) : 0}%` }} />
         </div>
-      </div>
+      </div>}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">

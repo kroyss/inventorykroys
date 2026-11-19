@@ -1139,7 +1139,7 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   stock que no se vendería. Con pocas unidades, primero van las publicaciones activas.
   **Bodega** (con el permiso «Cambiar el stock en MercadoLibre»; no hace falta tocar el inventario):
   **Pausar** (en cada publicación, con motivo opcional: dañado, sin foto…) deja de venderla; «Poner en ML lo que hay» no la reactiva
-  hasta que alguien toque **Activar** (necesita stock en ML); en la fila dice «pausada a mano». **Se acabó** (en el producto,
+  hasta que alguien toque **Activar** (necesita stock en ML); en la fila dice «pausada a mano». **Se acabó** (en el menú **⋯** del producto,
   cuando no está en bodega aunque el sistema diga que hay): todas sus publicaciones a 0 en ML y quedan en 0 hasta que
   entre mercancía o se ajuste el inventario (o **Ya hay**); al admin le llega por Telegram para que ajuste el inventario.
   **Estado** (en **Filtros**): Activas en ML / Pausadas en ML, se combina con las tarjetas, la cuenta y el
@@ -1153,6 +1153,12 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   publicación para un producto nuevo (Vincular con ML), el vínculo con el producto desactivado se quita solo.
   **Historial** (arriba) y **Ver cambios** (en cada producto): quién cambió qué en ML (stock, pausas, reactivaciones,
   desde cualquier pantalla). El admin ve los de todos y filtra por persona; los demás ven los suyos.
+  **Cada producto** (desde el 19-11-2026): debajo del nombre, botones iguales: **🔗 N vínculos** (o «Sin vincular» en
+  ámbar) abre **Vincular con ML de ese producto en un panel a la derecha** (en el celular, pantalla completa): vinculas,
+  desvinculas o cambias «trae N u.» sin salir, y al tocar **Listo** el producto se recalcula con los vínculos nuevos sin
+  perder el filtro ni dónde estabas (solo con el permiso de vincular); **Corregir stock**; **Ver cambios**; y **⋯** con
+  **Se acabó**. A la derecha, **Disponible** en grande y debajo «stock N − M sin registrar» (y «publicable» si hay
+  reserva); el peso solo aparece si falta («⚠ sin peso»).
   En **Automatizaciones → Stock** sale una franja roja si hay productos en 0 a la venta (con inventario).
   **Vende de más** (tarjeta roja, se abre sola cuando hay): productos que MercadoLibre ofrece y no tienes — en **0** con
   alguna publicación activa con stock (rojo: si alguien compra no puedes cumplir) o con menos de lo que suman tus
@@ -1400,7 +1406,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   precio de la promo y si mantiene el envío gratis. **+ Campaña propia**.
 - **Stock vs inventario** (Publicaciones): cada producto con todas sus publicaciones; arriba Vende de más (urgente),
   Tienes y no vendes y Por ajustar. **Poner en ML** cambia la publicación; **Corregir stock** cambia el inventario.
-  Más de 10 a la vez van por la cola. Por publicación, también en Mis publicaciones. «⚠ Desde N u. pierde envío gratis»
+  **🔗 N vínculos** abre Vincular de ese producto en un panel, sin salir. Más de 10 a la vez van por la cola. Por publicación, también en Mis publicaciones. «⚠ Desde N u. pierde envío gratis»
   revisa cada cantidad hasta 20 (con la promo) y ofrece **Crear pack**; «✓ Envío gratis aunque lleve hasta N u.» da la
   confianza para subir el stock.
 - **Vincular:** une cada publicación (o color/modelo) con su producto, para que cada venta descuente el correcto y Stock
