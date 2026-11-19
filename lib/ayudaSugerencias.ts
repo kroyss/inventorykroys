@@ -6,7 +6,7 @@ export interface Sugerencia { pregunta: string; respuesta: string; video?: strin
 const S: Record<string, Sugerencia[]> = {
   '/automatizaciones': [
     { pregunta: '¿Por dónde empiezo?', video: 'Así trabajas desde hoy',
-      respuesta: '1. Mira los videos de **Aprendizaje** (son cortos).\n2. Conecta tu cuenta en **Cuentas de MercadoLibre**.\n3. Empieza por **Preguntas** y **Mensajes**: ahí entra lo de todas tus cuentas.' },
+      respuesta: '1. Lee el **Manual de Automatizaciones** en **Aprendizaje** (cada capítulo trae su video corto).\n2. Conecta tu cuenta en **Cuentas de MercadoLibre**.\n3. Empieza por **Preguntas** y **Mensajes**: ahí entra lo de todas tus cuentas.' },
     { pregunta: '¿Cómo conecto mi cuenta de MercadoLibre?', video: 'Conectar tu cuenta de MercadoLibre',
       respuesta: 'En **Cuentas de MercadoLibre** toca **Conectar cuenta**, entra a ML con esa cuenta y acepta. Para otra cuenta, cierra sesión en ML (o usa otra ventana) y repite.' },
   ],

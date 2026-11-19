@@ -15,11 +15,12 @@ export const dynamic = 'force-dynamic'
 
 // Aprendizaje → Manuales → Automatizaciones (18-11, el dueño): sale de docs/ayuda/sistema.md como el de Inventario; el
 // manual manda (está al día con las pantallas) y cada capítulo enlaza sus videos grabados como demostración de apoyo.
-export default async function ManualAutomatizacionesPage() {
+export default async function ManualAutomatizacionesPage({ searchParams }: { searchParams: Promise<{ video?: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
   if (!conAutomatizaciones(session.user)) redirect('/aprendizaje')
   const u = session.user
+  const pedido = Number((await searchParams).video) || null   // la Ayuda enlaza ?video=ID: abre ese video en su capítulo
   const [capitulos, videos] = await Promise.all([
     manualAutomatizaciones(m => tieneModulo(u, m as Modulo)),
     videosDeUsuario(u.id, llevaInventario(u), tieneModulo(u, 'pagos_me')).catch(() => []),
@@ -33,5 +34,5 @@ export default async function ManualAutomatizacionesPage() {
     if (vs.length) deCapitulo[c.id] = vs as VideoApoyo[]
   }
   return <><VistoNuevo clave="manual_automatizaciones" /><ManualVista titulo="Manual de Automatizaciones" capitulos={capitulos} capturas={capturas} base="/manual/automatizaciones"
-    reabrirGuia={false} videos={deCapitulo} /></>
+    reabrirGuia={false} videos={deCapitulo} videoInicial={pedido} /></>
 }

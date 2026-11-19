@@ -12,12 +12,6 @@ export interface Video {
   visto_seg: number; duracion_seg: number; posicion_seg: number; completado: boolean
 }
 
-const NOMBRE_SERIE: Record<Video['serie'], string> = { automatizaciones: 'Automatiza', mercadoenvios: 'MercadoEnvíos', inventario: 'Inventario' }
-/** Duración a mostrar: la cargada en Plataforma o, si falta, la que reportó el reproductor. */
-const duracionDe = (v: Video) => v.duracion_video ?? (v.duracion_seg > 0 ? v.duracion_seg : null)
-const reloj = (seg: number) => `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
-const minutos = (seg: number) => seg < 3600 ? `${Math.max(1, Math.round(seg / 60))} min`
-  : `${Math.floor(seg / 3600)} h ${Math.round(seg % 3600 / 60)} min`
 
 // API de YouTube (iframe), lo mínimo que se usa.
 interface YTPlayer { getCurrentTime(): number; getDuration(): number; getPlayerState(): number; setPlaybackRate(r: number): void; destroy(): void }
@@ -40,8 +34,6 @@ function cargarApiYoutube() {
   return apiYoutube
 }
 
-const COMPLETO = 0.5   // = PORCENTAJE_COMPLETO de lib/aprendizaje.ts (26-10, antes 0.8)
-const pct = (v: Video) => (v.duracion_seg > 0 ? Math.min(100, Math.round(v.visto_seg / v.duracion_seg * 100)) : 0)
 
 /** Aprendizaje: videos en el orden recomendado, dentro de la web. Todos libres (28-10): el cliente llega con una
  *  necesidad concreta (p.ej. conectar MercadoEnvíos) y el candado lo frenaba; el orden queda como sugerencia. */
@@ -85,169 +77,45 @@ function Manuales({ inventario, automatizaciones }: { inventario: boolean; autom
 }
 
 export default function AprendizajeClient({ manualInventario = false, manualAutomatizaciones = false }: { manualInventario?: boolean; manualAutomatizaciones?: boolean }) {
-  const [videos, setVideos] = useState<Video[] | null>(null)
-  const [agendar, setAgendar] = useState<string | null>(null)
-  const [conectar, setConectar] = useState(false)   // empresa sin cuenta de ML y el usuario es admin
-  const [inventario, setInventario] = useState(true) // la empresa lleva inventario (si no, se le ofrece al terminar)
-  const [actual, setActual] = useState<number | null>(null)
+  // 19-11 (el dueño): Aprendizaje queda solo con los Manuales; los videos viven dentro de su capítulo del manual.
+  const [d, setD] = useState<{ agendar: string | null; conectar: boolean; inventario: boolean } | null>(null)
 
   useEffect(() => {
+    // Enlaces viejos a /aprendizaje?video=ID: abren ese video dentro del manual.
+    const pedido = Number(new URLSearchParams(window.location.search).get('video'))
+    if (pedido && manualAutomatizaciones) { window.location.replace(`/aprendizaje/manual/automatizaciones?video=${pedido}`); return }
     let vivo = true
     fetch('/api/aprendizaje', { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : null))
-      .then(d => {
-        if (!vivo || !d) return
-        setVideos(d.videos); setAgendar(d.agendar); setConectar(!!d.sinCuentas && !!d.esAdmin)
-        setInventario(!!d.inventario || !!d.exento)
-        // ?video=ID (lo enlaza la ayuda) abre ese; si no, el primero sin terminar.
-        const pedido = Number(new URLSearchParams(window.location.search).get('video'))
-        setActual(a => a ?? (d.videos.find((v: Video) => v.id === pedido) ?? d.videos.find((v: Video) => !v.completado) ?? d.videos[0])?.id ?? null)
+      .then(x => {
+        if (!vivo || !x) return
+        setD({ agendar: x.agendar ?? null, conectar: !!x.sinCuentas && !!x.esAdmin, inventario: !!x.inventario || !!x.exento })
       })
       .catch(() => {})
     return () => { vivo = false }
-  }, [])
-
-  if (!videos) return <PageHeader title="Aprendizaje" subtitle="Cargando…" />
-  if (videos.length === 0) {
-    return <div className="space-y-5"><PageHeader title="Aprendizaje" subtitle="Por dónde empezar" />
-      <Manuales inventario={manualInventario} automatizaciones={manualAutomatizaciones} />
-      <PrimerosPasos agendar={agendar} hayVideos={false} /></div>
-  }
-
-  const hechos = videos.filter(v => v.completado).length
-  const total = videos.length
-  // Sugerencia (no candado): queda un video anterior de su serie sin terminar.
-  const saltado = (i: number) => videos.slice(0, i).some(x => x.serie === videos[i].serie && !x.completado)
-  const v = videos.find(x => x.id === actual) ?? videos[0]
-  const idx = videos.indexOf(v)
-  const siguiente = videos[idx + 1]
-  const series = [...new Set(videos.map(x => x.serie))]
-  const numero = (x: Video) => videos.filter(y => y.serie === x.serie).indexOf(x) + 1
-  const restante = videos.filter(x => !x.completado).reduce((t, x) => t + (duracionDe(x) ?? 0), 0)
-  const autoHecha = videos.filter(x => x.serie === 'automatizaciones').every(x => x.completado)
-  const durV = duracionDe(v)
-
-  // Avance que reporta el reproductor (se refleja al instante en la lista).
-  const avance = (id: number, visto: number, duracion: number, completado: boolean) =>
-    setVideos(vs => vs && vs.map(x => (x.id === id
-      ? { ...x, visto_seg: Math.max(x.visto_seg, visto), duracion_seg: duracion, completado: x.completado || completado } : x)))
+  }, [manualAutomatizaciones])
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Aprendizaje" subtitle="Manuales y videos cortos para sacarle todo el provecho al sistema" />
+      <PageHeader title="Aprendizaje" subtitle="Manuales para sacarle todo el provecho al sistema: cada pantalla explicada, con capturas, buscador y videos de apoyo" />
       <Manuales inventario={manualInventario} automatizaciones={manualAutomatizaciones} />
 
-      {/* Empujón a conectar (nunca bloquea: los videos se pueden seguir viendo sin conectar). */}
-      {conectar && hechos >= 1 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-lime-50 border border-lime-300 rounded-xl px-5 py-4">
-          <div>
-            <p className="text-sm font-semibold text-neutral-900">¿Listo? Conecta tu cuenta de MercadoLibre</p>
-            <p className="text-sm text-neutral-600">Desde ese día empiezan tus días gratis. Puedes seguir viendo los videos igual.</p>
+      {d?.conectar && <PrimerosPasos agendar={d.agendar} manual={manualAutomatizaciones} />}
+      {!d?.conectar && !manualInventario && !manualAutomatizaciones && d && <PrimerosPasos agendar={d.agendar} manual={false} />}
+
+      {/* Inventario es OPCIONAL: las automatizaciones trabajan solas con MercadoLibre; a quien no lo tiene se le ofrece. */}
+      {d && !d.inventario && !d.conectar && manualAutomatizaciones && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-5 py-4 shadow-sm">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-neutral-900">Siguiente paso (opcional): Inventario</p>
+            <p className="text-sm text-neutral-600">
+              Si además quieres llevar tu stock, compras, costos y ganancias en el sistema, escríbenos y te lo activamos.
+              No es obligatorio: las automatizaciones funcionan sin él.
+            </p>
           </div>
-          <a href="/conectar" className="btn-primary text-sm">Conectar ahora</a>
+          {d.agendar && <a href={d.agendar} target="_blank" rel="noreferrer" className="btn-secondary text-sm">Quiero Inventario</a>}
         </div>
       )}
-
-      {/* Progreso total */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-5 py-4">
-        <div className="flex items-baseline justify-between text-sm">
-          <span className="font-medium text-neutral-800">Tu avance</span>
-          <span className="text-neutral-500">
-            <b className="text-neutral-900 num">{hechos}</b> de {total} videos · {Math.round(hechos / total * 100)}%
-            {restante > 0 && <> · te quedan <b className="text-neutral-900 num">{minutos(restante)}</b></>}
-          </span>
-        </div>
-        <div className="mt-2 h-2 rounded-full bg-neutral-100 overflow-hidden">
-          <div className="h-full bg-lime-500 transition-[width] duration-500" style={{ width: `${hechos / total * 100}%` }} />
-        </div>
-        {hechos === total && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 bg-lime-50 border border-lime-300 rounded-lg px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold text-neutral-900">¡Completaste el curso! 🎉</p>
-              <p className="text-sm text-neutral-600">Ya puedes agendar tu sesión de configuración.</p>
-            </div>
-            {agendar && <a href={agendar} target="_blank" rel="noreferrer" className="btn-primary text-sm">Agendar mi configuración</a>}
-          </div>
-        )}
-        {/* Inventario es OPCIONAL: las automatizaciones trabajan solas con MercadoLibre. Al terminar
-            esa serie, a quien no lo tiene se le ofrece (lo activa el dueño de la plataforma). */}
-        {autoHecha && !inventario && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-neutral-200 rounded-lg px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-neutral-900">Siguiente paso (opcional): Inventario</p>
-              <p className="text-sm text-neutral-600">
-                Si además quieres llevar tu stock, compras, costos y ganancias en el sistema, escríbenos y te lo activamos
-                con sus videos. No es obligatorio: todo lo que ya aprendiste funciona sin él.
-              </p>
-            </div>
-            {agendar && <a href={agendar} target="_blank" rel="noreferrer" className="btn-secondary text-sm">Quiero Inventario</a>}
-          </div>
-        )}
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        {/* Reproductor */}
-        <section className="space-y-3 min-w-0">
-          <Reproductor key={v.id} video={v} onAvance={avance} />
-          <div>
-            <h2 className="text-lg font-semibold text-neutral-900">
-              {series.length > 1 && <span className="text-neutral-400 font-normal">{NOMBRE_SERIE[v.serie]} · </span>}
-              {numero(v)}. {v.titulo}
-              {durV && <span className="ml-2 text-sm font-normal text-neutral-400 num">{reloj(durV)}</span>}
-            </h2>
-            {v.descripcion && <p className="text-sm text-neutral-600 mt-1 whitespace-pre-line">{v.descripcion}</p>}
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <span className={v.completado ? 'text-emerald-700 font-medium' : 'text-neutral-500'}>
-              {v.completado ? '✓ Visto' : `Visto ${pct(v)}% · se completa al llegar al ${COMPLETO * 100}%`}
-            </span>
-            {siguiente && (
-              <button onClick={() => setActual(siguiente.id)} className="btn-primary text-sm">Siguiente →</button>
-            )}
-          </div>
-        </section>
-
-        {/* Lista */}
-        <ol className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 self-start overflow-hidden">
-          {videos.map((x, i) => {
-            const antes = saltado(i)
-            const activo = x.id === v.id
-            const dur = duracionDe(x)
-            const titulo = series.length > 1 && (i === 0 || videos[i - 1].serie !== x.serie)
-            return (
-              <li key={x.id}>
-                {titulo && (
-                  <p className="px-4 pt-3 pb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500 bg-neutral-50">
-                    {NOMBRE_SERIE[x.serie]}
-                  </p>
-                )}
-                <button onClick={() => setActual(x.id)}
-                  title={antes && !x.completado ? 'Recomendado: mira antes el anterior' : undefined}
-                  className={`w-full text-left px-4 py-3 flex items-center gap-3 ${activo ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
-                  <span className={`grid place-items-center w-7 h-7 shrink-0 rounded-full text-xs font-semibold ${
-                    x.completado ? 'bg-lime-500 text-white' : activo ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-500'}`}>
-                    {x.completado
-                      ? <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M20 6 9 17l-5-5" /></svg>
-                      : numero(x)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline gap-2">
-                      <span className="text-sm font-medium text-neutral-900 truncate">{x.titulo}</span>
-                      {x.nuevo && !x.completado && <span className="shrink-0 rounded-full bg-lime-100 px-1.5 py-px text-[10px] font-semibold uppercase text-lime-800">Nuevo</span>}
-                      {dur && <span className="ml-auto shrink-0 text-xs text-neutral-400 num">{reloj(dur)}</span>}
-                    </span>
-                    {!x.completado && x.visto_seg > 0 && (
-                      <span className="mt-1 block h-1 rounded-full bg-neutral-100 overflow-hidden">
-                        <span className="block h-full bg-lime-400" style={{ width: `${pct(x)}%` }} />
-                      </span>
-                    )}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ol>
-      </div>
     </div>
   )
 }
@@ -372,11 +240,12 @@ export function Reproductor({ video, onAvance }: {
 }
 
 /** Los primeros pasos, en orden (lo primero que ve un cliente nuevo). Sin videos todavía, es la guía. */
-function PrimerosPasos({ agendar, hayVideos }: { agendar: string | null; hayVideos: boolean }) {
+function PrimerosPasos({ agendar, manual }: { agendar: string | null; manual: boolean }) {
   const pasos: { titulo: string; texto: string; link?: { href: string; label: string; externo?: boolean } }[] = [
-    { titulo: 'Aprende primero', texto: hayVideos
-        ? 'Mira los videos de esta página, en orden. Tus días de prueba no corren mientras no conectes tu cuenta.'
-        : 'Los videos cortos aparecerán en esta página. Mientras tanto, recorre Automatiza con calma: tus días de prueba no corren mientras no conectes tu cuenta.' },
+    { titulo: 'Aprende primero', texto: manual
+        ? 'Lee el Manual de Automatizaciones: cada capítulo trae su video. Tus días de prueba no corren mientras no conectes tu cuenta.'
+        : 'Recorre el sistema con calma: tus días de prueba no corren mientras no conectes tu cuenta.',
+      link: manual ? { href: '/aprendizaje/manual/automatizaciones', label: 'Abrir el manual →' } : undefined },
     { titulo: 'Conecta tu cuenta de MercadoLibre', texto: 'Con la cuenta PRINCIPAL abierta en este navegador. Desde ese día empiezan tus días de prueba.',
       link: { href: '/conectar', label: 'Conectar ahora →' } },
     { titulo: 'Escribe tus políticas', texto: 'Envíos, garantía, horarios y formas de pago: con eso la IA responde tus preguntas como tú.',

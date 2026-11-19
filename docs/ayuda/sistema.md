@@ -1277,7 +1277,8 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
 
 *Cómo lo pregunta la gente:* videos, tutoriales, cómo se usa, qué hay de nuevo.
 
-- **Central de aprendizaje** (menú Aprendizaje): videos cortos paso a paso; guarda por dónde vas en cada uno. Los videos nuevos o con versión nueva muestran «Nuevo» durante 14 días.
+- **Aprendizaje** (menú Aprendizaje): son los **Manuales**. Los videos cortos ya no van en una lista aparte: cada uno está
+  dentro de su capítulo del manual (guarda por dónde vas y marca ✓). Los videos nuevos o con versión nueva muestran «Nuevo» durante 14 días.
 - **Manuales** (arriba en Aprendizaje): el **Manual de Inventario** (para empresas con Inventario) explica cada pantalla
   —Para empezar, Inicio, Productos, Publicaciones, Ventas, Inventario, Compras, Reportes y Ajustes— con capturas (se
   abren grandes al tocarlas), índice y buscador. Dice lo mismo que el asistente de Ayuda (salen del mismo texto) y

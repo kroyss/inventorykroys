@@ -216,7 +216,7 @@ export default function BurbujaAyuda() {
                   <div className="max-w-[92%] rounded-2xl rounded-bl-sm bg-neutral-100 px-3 py-2 space-y-1 text-neutral-800">
                     <Texto t={t.respuesta} />
                     {t.video && (
-                      <a href={`/aprendizaje?video=${t.video.id}`} className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-neutral-800 border border-neutral-200 hover:border-lime-400">
+                      <a href={`/aprendizaje/manual/automatizaciones?video=${t.video.id}`} className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-neutral-800 border border-neutral-200 hover:border-lime-400">
                         ▶ Video: {t.video.titulo}
                       </a>
                     )}

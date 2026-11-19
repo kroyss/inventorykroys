@@ -56,17 +56,27 @@ function Texto({ texto }: { texto: string }) {
   return <div className="space-y-2">{bloques}</div>
 }
 
-export default function ManualVista({ titulo, capitulos, capturas, base, reabrirGuia, videos }: {
+export default function ManualVista({ titulo, capitulos, capturas, base, reabrirGuia, videos, videoInicial }: {
   titulo: string; capitulos: Capitulo[]; capturas: Record<string, number>; base: string; reabrirGuia: boolean
   /** Por capítulo: los videos que lo muestran (Manual de Automatizaciones). */
   videos?: Record<string, VideoApoyo[]>
+  /** Video a dejar abierto al entrar (la Ayuda enlaza ?video=ID): se abre en su capítulo y baja hasta ahí. */
+  videoInicial?: number | null
 }) {
   const router = useRouter()
   const [buscar, setBuscar] = useState('')
   const [grande, setGrande] = useState<string | null>(null)
   const [abriendo, setAbriendo] = useState(false)
   // Video abierto (uno a la vez) y si está ampliado. Ampliar solo cambia el marco: el reproductor sigue donde iba.
-  const [viendo, setViendo] = useState<{ cap: string; id: number } | null>(null)
+  const [viendo, setViendo] = useState<{ cap: string; id: number } | null>(() => {
+    const cap = videoInicial ? Object.keys(videos ?? {}).find(k => videos![k].some(v => v.id === videoInicial)) : undefined
+    return cap && videoInicial ? { cap, id: videoInicial } : null
+  })
+  useEffect(() => {
+    if (viendo) document.getElementById(viendo.cap)?.scrollIntoView({ block: 'start' })
+  // solo al entrar
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [ampliado, setAmpliado] = useState(false)
   const [vistos, setVistos] = useState<Set<number>>(() => new Set(Object.values(videos ?? {}).flat().filter(v => v.completado).map(v => v.id)))
   useEffect(() => {
