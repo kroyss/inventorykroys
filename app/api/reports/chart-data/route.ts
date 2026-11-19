@@ -17,21 +17,31 @@ export async function GET(req: NextRequest) {
   const ALLOWED_TRUNCS = new Set(['hour', 'day', 'month'])
 
   let rangeSql: string
+  // 19-11 (Inicio nuevo): el mismo tramo del período anterior, corrido hacia adelante (shiftSql) para que caiga en las
+  // mismas etiquetas del gráfico (día 5 de octubre → «día 5» de noviembre) y se dibuje como línea de comparación.
+  let prevSql: string
+  let shiftSql: string
   let queryParams: unknown[] = []
   let trunc: string
 
   switch (period) {
     case 'today':
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN CURRENT_DATE AND NOW()`
+      prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN CURRENT_DATE - 1 AND NOW() - INTERVAL '1 day'`
+      shiftSql = `INTERVAL '1 day'`
       trunc    = 'hour'
       break
     case 'quarter':
       // Rolling 3-month window INCLUDING the current month (so today's sales show)
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) - INTERVAL '2 months' AND NOW()`
+      prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) - INTERVAL '5 months' AND NOW() - INTERVAL '3 months'`
+      shiftSql = `INTERVAL '3 months'`
       trunc    = 'day'
       break
     case 'year':
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('year', NOW()) AND NOW()`
+      prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('year', NOW()) - INTERVAL '1 year' AND NOW() - INTERVAL '1 year'`
+      shiftSql = `INTERVAL '1 year'`
       trunc    = 'month'
       break
     case 'custom':
@@ -43,11 +53,15 @@ export async function GET(req: NextRequest) {
       }
       // Use parameterized query for user-supplied dates (defense-in-depth)
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN $1::date AND $2::date`
+      prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN $1::date - ($2::date - $1::date + 1) AND $2::date - ($2::date - $1::date + 1)`
+      shiftSql = `make_interval(days => $2::date - $1::date + 1)`
       queryParams = [dateFrom, dateTo]
       trunc       = 'day'
       break
     default: // month
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) AND NOW()`
+      prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) - INTERVAL '1 month' AND NOW() - INTERVAL '1 month'`
+      shiftSql = `INTERVAL '1 month'`
       trunc    = 'day'
   }
 
@@ -76,6 +90,21 @@ export async function GET(req: NextRequest) {
       ) si_cost ON si_cost.sale_id = s.id
       WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
         AND ${rangeSql}
+      GROUP BY periodo
+      ORDER BY periodo ASC
+    `, queryParams)
+    const { rows: prevRows } = await db.query(`
+      SELECT DATE_TRUNC('${trunc}', COALESCE(s.processed_at, s.created_at) + ${shiftSql}) AS periodo,
+             COALESCE(SUM(s.total_amount), 0) AS ventas,
+             COALESCE(SUM(si_cost.costo), 0)  AS costos,
+             COUNT(DISTINCT s.id)             AS cantidad_ventas
+      FROM sales s
+      LEFT JOIN (
+        SELECT si.sale_id, SUM(si.quantity * (COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0))) AS costo
+        FROM sale_items si GROUP BY si.sale_id
+      ) si_cost ON si_cost.sale_id = s.id
+      WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
+        AND ${prevSql}
       GROUP BY periodo
       ORDER BY periodo ASC
     `, queryParams)
@@ -110,8 +139,27 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    // Período anterior: por etiqueta (para la línea gris) y en total (para el ▲▼ de las cifras del Inicio).
+    const ant = { ventas: 0, costos: 0, cantidad: 0 }
+    const antPorLabel = new Map<string, number>()
+    for (const r of prevRows) {
+      const v = parseFloat(r.ventas) || 0
+      ant.ventas += v; ant.costos += parseFloat(r.costos) || 0; ant.cantidad += parseInt(r.cantidad_ventas, 10) || 0
+      const l = (r.periodo instanceof Date ? r.periodo.toISOString() : String(r.periodo ?? '')).slice(0, labelLen)
+      antPorLabel.set(l, (antPorLabel.get(l) ?? 0) + Math.round(v * 100) / 100)
+    }
+    // Etiquetas = las del período + las del anterior que no tuvieron ventas ahora (así la línea gris no se corta).
+    const actuales = new Set(chartData.map(d => d.label))
+    for (const l of antPorLabel.keys()) if (!actuales.has(l)) chartData.push({ label: l, ventas: 0, costos: 0, cantidad: 0 })
+    chartData.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0)
+
     return NextResponse.json({
-      chart_data: chartData,
+      chart_data: chartData.map(d => ({ ...d, anterior: antPorLabel.get(d.label) ?? 0 })),
+      anterior: {
+        ventas:   Math.round(ant.ventas * 100) / 100,
+        ganancia: Math.round((ant.ventas - ant.costos) * 100) / 100,
+        cantidad: ant.cantidad,
+      },
       summary: {
         ventas:       Math.round(totalVentas  * 100) / 100,
         costos:       Math.round(totalCostos  * 100) / 100,

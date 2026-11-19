@@ -29,8 +29,10 @@ function Cambio({ ahora, antes, menosEsMejor = false }: { ahora: number | null; 
   return <span className={bueno ? 'text-emerald-600' : 'text-red-600'}>{c > 0 ? '▲' : '▼'} {Math.abs(c)}%</span>
 }
 
-function Tarjeta({ titulo, valor, ahora, antes, menosEsMejor, detalle }: {
+function Tarjeta({ titulo, valor, ahora, antes, menosEsMejor, detalle, conNumero = false }: {
   titulo: string; valor: string; ahora?: number | null; antes?: number | null; menosEsMejor?: boolean; detalle?: string
+  /** 19-11: «antes N» en vez de % (con bases chicas el % engaña: de 8 a 62 es «▲675 %»). */
+  conNumero?: boolean
 }) {
   return (
     <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
@@ -38,7 +40,10 @@ function Tarjeta({ titulo, valor, ahora, antes, menosEsMejor, detalle }: {
       <div className="num mt-0.5 text-xl font-semibold tracking-tight text-neutral-900">{valor}</div>
       {(ahora !== undefined || detalle) && (
         <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs">
-          {ahora !== undefined && <Cambio ahora={ahora ?? null} antes={antes ?? null} menosEsMejor={menosEsMejor} />}
+          {ahora !== undefined && (conNumero && ahora != null && antes != null
+            ? <span className={ahora === antes ? 'text-neutral-500' : ahora > antes ? 'text-emerald-700' : 'text-red-600'}>
+                {ahora === antes ? '' : ahora > antes ? '▲ ' : '▼ '}antes {n(antes)}</span>
+            : <Cambio ahora={ahora ?? null} antes={antes ?? null} menosEsMejor={menosEsMejor} />)}
           {detalle && <span className="text-neutral-500">{detalle}</span>}
         </div>
       )}
@@ -154,7 +159,7 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
               <Seccion titulo="Por cuenta de MercadoLibre" ayuda={`Ventas de ML no canceladas, ${contra}.${!d.historialML ? ' Las ventas de ML guardadas no llegan tan atrás: la comparación queda incompleta.' : ''}`}>
                 <div className="grid grid-cols-2 gap-3">
                   {d.cuentas.map(k => (
-                    <Tarjeta key={k.cuenta} titulo={k.cuenta} valor={`${n(k.ventas)} ventas`} ahora={k.ventas} antes={k.antes_ventas}
+                    <Tarjeta key={k.cuenta} titulo={k.cuenta} valor={`${n(k.ventas)} ventas`} ahora={k.ventas} antes={k.antes_ventas} conNumero
                       detalle={`${k.moneda === 'VES' ? 'Bs' : '$'} ${k.monto.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`} />
                   ))}
                 </div>
@@ -190,15 +195,21 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
         </Seccion>
       )}
 
+      {/* 19-11: las calificaciones en una sola línea (casi siempre «8 · 0 · 0 · 0»); lo malo se pinta solo si hay. */}
       {c && (
-        <Seccion titulo="Calificaciones recibidas" ayuda={`En MercadoLibre, ${contra}.`} link={{ href: '/reputacion', t: 'Reputación' }}>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Tarjeta titulo="Positivas" valor={n(c.positivas)} />
-            <Tarjeta titulo="Neutrales" valor={n(c.neutrales)} />
-            <Tarjeta titulo="Negativas" valor={n(c.negativas)} ahora={c.negativas} antes={c.antes_negativas} menosEsMejor />
-            <Tarjeta titulo="Contradictorias" valor={n(c.contradictorias)} detalle="Dijo una cosa y tú otra: se corrigen en Reputación" />
-          </div>
-        </Seccion>
+        <Link href="/reputacion" title={`Calificaciones recibidas en MercadoLibre, ${contra}. Contradictorias: dijo una cosa y tú otra (se corrigen en Reputación).`}
+          className="group flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm shadow-sm transition hover:border-neutral-300 hover:shadow-md">
+          <span className="font-semibold text-neutral-700">Calificaciones</span>
+          <span className="num text-neutral-700"><b className="font-semibold text-neutral-900">{n(c.positivas)}</b> positivas</span>
+          <span className="num text-neutral-500"><b className="font-semibold text-neutral-700">{n(c.neutrales)}</b> neutrales</span>
+          <span className={`num ${c.negativas ? 'font-medium text-red-700' : 'text-neutral-500'}`}>
+            {c.negativas > 0 && <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" />}
+            <b className={`font-semibold ${c.negativas ? '' : 'text-neutral-700'}`}>{n(c.negativas)}</b> negativas
+            {c.negativas > 0 && c.antes_negativas != null && <span className="ml-1 text-xs font-normal text-neutral-500">(antes {n(c.antes_negativas)})</span>}</span>
+          {c.contradictorias > 0 && <span className="num font-medium text-amber-800">
+            <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-500" /><b>{n(c.contradictorias)}</b> contradictorias</span>}
+          <span className="ml-auto text-xs font-medium text-sky-700 group-hover:underline">Reputación →</span>
+        </Link>
       )}
     </div>
   )

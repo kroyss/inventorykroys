@@ -114,6 +114,9 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Desde cuánto es «Sana»?', respuesta: 'Por defecto, rentabilidad desde **25 %** es verde (Sana), de 0 a 25 % naranja (Ajustada) y menos de 0 rojo (Pérdida). Se cambia en **Productos → Costos ML**.' },
   ],
   '/dashboard': [
+    { pregunta: '¿Qué es la línea gris del gráfico?', respuesta: 'Las **ventas del período anterior**, en los mismos días: con **Mes**, el mes pasado; con **Hoy**, ayer; con **Año**, el año pasado. Si las barras azules quedan por encima de la línea gris, vas vendiendo más que antes. Al pasar el dedo o el mouse ves el detalle de cada día.' },
+    { pregunta: '¿Por qué no veo todas las tarjetas de pendientes?', respuesta: 'Solo salen las que tienen algo, ordenadas por urgencia. Las que están en 0 aparecen en la línea gris **Al día**. Si no hay nada, dice **Nada pendiente hoy**.' },
+    { pregunta: '¿Qué es el diferencial?', respuesta: 'Cuánto más cara está la tasa **paralela** que la **oficial**, en %. Antes se llamaba «spread». Con él (y el exceso) se calcula el **Descuento ML** sugerido.' },
     { pregunta: '¿Por qué dice que la ganancia es aproximada?', respuesta: 'Porque parte de lo vendido es de productos con **costo estimado** (un % del precio, puesto al importar). Toca **Completar costos** y pon el real: las ventas se corrigen solas y el aviso se va.' },
     { pregunta: '¿Qué es la rentabilidad del Inicio?', respuesta: 'La ganancia del período ÷ lo que te costó la mercancía vendida. **30 %** = ganaste $30 por cada $100 en mercancía. Es la misma cuenta que ves en cada producto. No descuenta los gastos del mes.' },
   ],

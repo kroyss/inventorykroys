@@ -1078,7 +1078,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                           <p className="text-[11px] text-amber-700 font-medium">Tasas actuales</p>
                           <p className="text-[11px] text-neutral-600">Oficial: <b>Bs {fmt(veRate?.official ?? 0)}</b></p>
                           <p className="text-[11px] text-neutral-600">Paralelo: <b>Bs {fmt(veRate?.parallel ?? 0)}</b></p>
-                          <p className="text-[11px] text-neutral-600">Spread: <b>{spread.toFixed(1)}%</b></p>
+                          <p className="text-[11px] text-neutral-600">Diferencial: <b>{spread.toFixed(1)}%</b></p>
                         </div>
                       </>
                     )}

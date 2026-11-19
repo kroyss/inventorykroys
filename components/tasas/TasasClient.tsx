@@ -220,7 +220,7 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
       <div className={`grid grid-cols-2 gap-3 ${descuento ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
         <KPICard label="Oficial"  value={`Bs ${money(latest.official_rate)}`} />
         <KPICard label="Paralelo" value={`Bs ${money(latest.parallel_rate)}`} />
-        <KPICard label="Spread"   value={`${latest.spread_percentage}%`} accent="text-amber-600" />
+        <KPICard label="Diferencial"   value={`${latest.spread_percentage}%`} accent="text-amber-600" />
         {descuento && <KPICard label="Descuento recom." value={`${latest.recommended_discount}%`} accent="text-neutral-900" />}
       </div>
 
@@ -472,7 +472,7 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
                   <th className="px-4 py-2 text-left">Fecha</th>
                   <th className="px-4 py-2 text-right">Oficial</th>
                   <th className="px-4 py-2 text-right">Paralelo</th>
-                  <th className="px-4 py-2 text-right">Spread</th>
+                  <th className="px-4 py-2 text-right">Diferencial</th>
                   {descuento && <th className="px-4 py-2 text-right">Descuento</th>}
                   <th className="px-4 py-2 text-center">Fuente</th>
                 </tr>

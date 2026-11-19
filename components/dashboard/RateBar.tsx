@@ -16,8 +16,12 @@ const fmt = (n: number) => Math.round(Number(n)).toLocaleString('de-DE')
 const pct = (n: number) => Number(n).toLocaleString('de-DE', { maximumFractionDigits: 2 })
 
 // 14-11 (el dueño: "estas 2 líneas podrían ser una sola"): la tasa va como subtítulo del Inicio, en una línea, sin
-// caja propia. Solo <span> (vive dentro del <p> del PageHeader). En el celular se acomoda en dos renglones.
+// caja propia. Solo <span> (19-11: ya no vive en un PageHeader, pero se deja así). En el celular se acomoda en dos renglones.
 // descuento: módulo Descuento ML (sin él no se muestra el sugerido) · exceso: módulo precios_categorias.
+function Dato({ t, v }: { t: string; v: string }) {
+  return <span className="whitespace-nowrap">{t} <b className="num font-medium text-neutral-700">{v}</b></span>
+}
+
 export default function RateBar({ puedeActualizar = false, descuento = true, exceso = true }: {
   puedeActualizar?: boolean; descuento?: boolean; exceso?: boolean
 }) {
@@ -35,20 +39,20 @@ export default function RateBar({ puedeActualizar = false, descuento = true, exc
 
   if (!rate) return <span className="inline-block h-4 w-72 max-w-full animate-pulse rounded bg-neutral-100 align-middle" aria-hidden />
 
-  const Dato = ({ t, v }: { t: string; v: string }) => <span className="whitespace-nowrap">{t} <b className="num font-medium text-neutral-700">{v}</b></span>
   const sep = <span className="text-neutral-300" aria-hidden>·</span>
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-neutral-500">
+      {/* 19-11 (el dueño): primero las tasas y su diferencia, después lo que sale de ellas (exceso → descuento). */}
+      <Dato t="Oficial" v={`Bs ${fmt(rate.official_rate)}`} />{sep}
+      <Dato t="Paralelo" v={`Bs ${fmt(rate.parallel_rate)}`} />{sep}
+      <span title="Cuánto más cara está la tasa paralela que la oficial"><Dato t="Diferencial" v={`${pct(rate.spread_percentage)}%`} /></span>
+      {exceso && <>{sep}<Dato t="Exceso" v={`${pct(rate.excess_percentage)}%`} /></>}
       {descuento && <>
+        {sep}
         <span className="whitespace-nowrap" title="Descuento a poner en MercadoLibre para no perder por la diferencia entre la tasa oficial y la paralela">
           Descuento ML <b className="num font-semibold text-neutral-900">{pct(rate.recommended_discount)}%</b>
         </span>
-        {sep}
       </>}
-      <Dato t="Oficial" v={`Bs ${fmt(rate.official_rate)}`} />{sep}
-      <Dato t="Paralelo" v={`Bs ${fmt(rate.parallel_rate)}`} />{sep}
-      <Dato t="Spread" v={`${pct(rate.spread_percentage)}%`} />
-      {exceso && <>{sep}<Dato t="Exceso" v={`${pct(rate.excess_percentage)}%`} /></>}
       {rate.rate_date && <>{sep}<span className="whitespace-nowrap text-xs text-neutral-400">al {parseLocalDate(rate.rate_date).toLocaleDateString('es-VE', { day: 'numeric', month: 'numeric' })}</span></>}
       {/* La tasa es común a todas las empresas: solo la actualiza el dueño de la plataforma (al resto, el cron). */}
       {puedeActualizar && (
