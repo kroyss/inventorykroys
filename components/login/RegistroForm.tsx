@@ -8,13 +8,18 @@ import { eventoPixel, iniciarPixel } from '@/lib/metaPixel'
 // Prueba gratis de 15 días (26-10, app/registro/page.tsx → POST /api/registro). Mismo formato que la entrada:
 // panel negro de marca a la izquierda y el formulario a la derecha. Al crear la cuenta entra sola y va al inicio,
 // donde el primer paso es conectar MercadoLibre (sin eso no funciona nada y los 15 días no arrancan).
+// 19-11 (el dueño): título y lista al día con el anuncio (la IA responde sola, Radar incluido, Inventario como paso
+// opcional); sin «Usuario para entrar» (se arma desde el correo y se entra con usuario o correo).
+const TITULO = <>Automatiza tu tienda de MercadoLibre y <span className="text-lime-400">recupera tu tiempo.</span></>
 const INCLUYE = [
-  { t: 'Preguntas con IA',     d: 'Respuestas sugeridas para todas tus cuentas, en un solo lugar' },
+  { t: 'Preguntas con IA',     d: 'La IA responde sola tus preguntas, a cualquier hora, en todas tus cuentas' },
   { t: 'Mensajes y calificaciones', d: 'Ninguna venta sin atender, calificaciones en bloque' },
   { t: 'Pagos MercadoEnvíos',  d: 'Los pagos y comprobantes traídos solos, listos para verificar' },
   { t: 'Despachos',            d: 'Las guías de todas tus cuentas en un PDF, con manifiesto y aviso al comprador' },
   { t: 'Stock y avisos por Telegram', d: 'Lo que se agota y lo pendiente del día, aunque no entres' },
+  { t: 'Radar',                d: 'Mira qué se vende en MercadoLibre y a qué precio' },
 ]
+const EN_CELULAR = ['La IA responde sola', 'Pagos de MercadoEnvíos', 'Guías en un clic']
 const PASOS = [
   'Crea tu cuenta (1 minuto).',
   'Conecta tu cuenta de MercadoLibre: tus 15 días corren desde que te registras.',
@@ -25,6 +30,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [verClave, setVerClave] = useState(false)
+  const [creada, setCreada]     = useState<{ usuario: string; correo: string } | null>(null)
 
   // Contador de visitas (27-10, migración 128): una por carga en el navegador; de dónde vino = utm_source o el sitio.
   useEffect(() => {
@@ -40,14 +46,16 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
     e.preventDefault()
     setLoading(true); setError('')
     const f = new FormData(e.currentTarget)
-    const datos = Object.fromEntries(['negocio', 'nombre', 'usuario', 'correo', 'whatsapp', 'telegram', 'clave', 'sitio'].map(k => [k, String(f.get(k) ?? '')]))
+    const datos = Object.fromEntries(['negocio', 'nombre', 'correo', 'whatsapp', 'telegram', 'clave', 'sitio'].map(k => [k, String(f.get(k) ?? '')]))
     const r = await fetch('/api/registro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo crear la cuenta. Intenta de nuevo.'); setLoading(false); return }
     await eventoPixel('CompleteRegistration')   // Meta aprende quién se registra (sin datos personales)
-    const s = await signIn('credentials', { username: datos.usuario.trim().toLowerCase(), password: datos.clave, redirect: false })
-    // Navegación completa (como la entrada): la sesión nueva se lee desde el servidor.
-    window.location.assign(s?.ok ? '/' : '/login')
+    const usuario = String(d.usuario ?? '')
+    const s = usuario ? await signIn('credentials', { username: usuario, password: datos.clave, redirect: false }) : null
+    // Le mostramos con qué entra (no eligió usuario) y sigue solo. Navegación completa: la sesión se lee del servidor.
+    setCreada({ usuario, correo: datos.correo.trim().toLowerCase() })
+    setTimeout(() => window.location.assign(s?.ok ? '/' : '/login'), 4500)
   }
 
   const campo = 'w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-lime-600 focus:ring-2 focus:ring-lime-400/50'
@@ -64,9 +72,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
 
         <div className="relative flex flex-col flex-1 justify-center max-w-md">
           <p className="inline-flex w-fit rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">15 días gratis</p>
-          <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight">
-            Prueba todo con <span className="text-lime-400">tus propias ventas.</span>
-          </h1>
+          <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight">{TITULO}</h1>
           <p className="text-neutral-400 mt-3 text-sm leading-relaxed">Sin tarjeta ni pago por adelantado. {marca.lema}</p>
           <ul className="mt-8 space-y-4">
             {INCLUYE.map(p => (
@@ -79,6 +85,11 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
               </li>
             ))}
           </ul>
+          <p className="mt-5 flex gap-3 text-sm text-neutral-500">
+            <span className="mt-1.5 w-2 h-2 rounded-full border border-neutral-500 shrink-0" aria-hidden="true" />
+            <span><span className="font-semibold text-neutral-300">Cuando quieras: Inventario</span> · stock, compras, ventas y cuánto
+              ganas de verdad. Se activa después y te ayudamos a cargarlo.</span>
+          </p>
           <ol className="mt-9 space-y-2 border-t border-white/10 pt-6">
             {PASOS.map((p, i) => (
               <li key={p} className="flex gap-3 text-sm text-neutral-300">
@@ -97,15 +108,27 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
       <header className="lg:hidden relative overflow-hidden bg-neutral-950 text-white px-6 py-6">
         <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 w-48 h-48 rounded-full border border-lime-400/20" />
         <p className="relative text-[11px] uppercase tracking-[0.18em] text-lime-400">15 días gratis</p>
-        <p className="relative mt-1 text-xl font-semibold leading-snug tracking-tight">
-          Prueba todo con <span className="text-lime-400">tus propias ventas.</span>
-        </p>
-        <p className="relative mt-1 text-xs text-neutral-400">Los 15 días corren desde que te registras.</p>
+        <p className="relative mt-1 text-xl font-semibold leading-snug tracking-tight">{TITULO}</p>
+        <ul className="relative mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-200">
+          {EN_CELULAR.map(t => <li key={t} className="flex items-center gap-1"><span className="text-lime-400" aria-hidden="true">✓</span>{t}</li>)}
+        </ul>
+        <p className="relative mt-2 text-xs text-neutral-400">Sin tarjeta. Los 15 días corren desde que te registras.</p>
       </header>
 
       {/* Formulario */}
       <main className="flex flex-col items-center justify-center px-6 py-10 bg-neutral-50 lg:bg-white">
         <div className="w-full max-w-sm">
+          {creada ? (
+            <div role="status" className="rounded-2xl border border-lime-300 bg-lime-50 p-6">
+              <p className="text-2xl font-semibold text-neutral-900 tracking-tight">¡Tu cuenta está lista!</p>
+              <p className="mt-3 text-sm text-neutral-700">Para entrar usa tu correo <b className="break-all">{creada.correo}</b>
+                {creada.usuario && <> o tu usuario <b>{creada.usuario}</b></>}, con la contraseña que elegiste.</p>
+              <p className="mt-4 flex items-center gap-2 text-sm text-neutral-500">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-lime-600 border-t-transparent" aria-hidden="true" />
+                Entrando a tu cuenta…
+              </p>
+            </div>
+          ) : <>
           <h2 className="text-2xl font-semibold text-neutral-900 tracking-tight">Crea tu cuenta</h2>
           <p className="text-sm text-neutral-500 mt-1 mb-6">MercadoLibre Venezuela · prueba de 15 días.</p>
 
@@ -132,12 +155,6 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
             <div>
               <label htmlFor="correo" className={etiqueta}>Correo</label>
               <input id="correo" name="correo" type="email" required maxLength={120} autoComplete="email" className={campo} />
-            </div>
-            <div>
-              <label htmlFor="usuario" className={etiqueta}>Usuario para entrar</label>
-              <input id="usuario" name="usuario" required minLength={3} maxLength={30} autoComplete="username" autoCapitalize="none" spellCheck={false}
-                pattern="[A-Za-z0-9._\-]{3,30}" title="3 a 30 caracteres: letras, números, punto, guion o guion bajo (sin espacios)" className={campo} />
-              <p className="mt-1 text-xs text-neutral-400">Sin espacios. Con esto y tu contraseña entras.</p>
             </div>
             <div>
               <label htmlFor="clave" className={etiqueta}>Contraseña</label>
@@ -172,6 +189,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
           <p className="text-sm text-neutral-500 mt-6">Al terminar la prueba eliges tu plan · <a href="/precios" className="font-medium text-lime-700 underline underline-offset-2">Ver planes</a></p>
           <p className="text-sm text-neutral-500 mt-2">¿Ya tienes cuenta? <a href="/login" className="font-medium text-lime-700 underline underline-offset-2">Entrar</a></p>
           <p className="text-xs text-neutral-400 mt-2">¿Dudas? <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer" className="underline">Escríbenos por Telegram</a>.</p>
+          </>}
           <p className="lg:hidden text-xs text-neutral-400 mt-10 text-center">
             © {new Date().getFullYear()} El Comerciante Digital · Todos los derechos reservados
           </p>

@@ -35,7 +35,7 @@ export default function Renovar({ usuario, radar = false }: { usuario?: string; 
   return (
     <form onSubmit={entrar} className="space-y-3 max-w-sm">
       <p className="text-sm text-neutral-600">{radar ? 'Entra con el mismo usuario y contraseña del Radar para pagar tu mes.' : 'Entra con tu usuario y contraseña para ver tu plan y reportar tu pago.'}</p>
-      <input name="usuario" autoComplete="username" placeholder="Usuario" defaultValue={usuario} className={campo} required />
+      <input name="usuario" autoComplete="username" placeholder="Usuario o correo" defaultValue={usuario} className={campo} required />
       <input name="clave" type="password" autoComplete="current-password" placeholder="Contraseña" className={campo} required />
       {error && <p className="text-sm text-red-700">{error}</p>}
       <button disabled={enviando} className="w-full rounded-lg bg-lime-400 px-4 py-2.5 text-sm font-semibold text-neutral-950 hover:bg-lime-300 disabled:opacity-50">

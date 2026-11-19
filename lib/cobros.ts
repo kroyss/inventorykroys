@@ -11,6 +11,7 @@
 //
 // Vencido o en prueba vencida no puede iniciar sesión: entra a /renovar con su usuario y clave y recibe un acceso
 // firmado (2 h) que solo sirve para "Mi plan".
+import { usuarioPorLogin } from '@/lib/loginUsuario'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import path from 'path'
@@ -673,10 +674,9 @@ export function verificarAcceso(token: string | null): { userId: number; orgId: 
   return { userId: u, orgId: o }
 }
 
-/** Usuario y clave → la organización (no la propietaria) donde es admin. Para /renovar. */
+/** Usuario (o correo) y clave → la organización (no la propietaria) donde es admin. Para /renovar. */
 export async function entrarParaRenovar(db: Pool, usuario: string, clave: string) {
-  const { rows: [u] } = await db.query(
-    `SELECT id, password_hash, is_active FROM users WHERE username = $1`, [usuario.toLowerCase().trim()])
+  const u = await usuarioPorLogin<{ id: number; password_hash: string; is_active: boolean }>(db, usuario, 'id, password_hash, is_active')
   if (!u || !u.is_active || !(await compare(clave, u.password_hash))) return null
   const { rows: [o] } = await db.query(
     `SELECT DISTINCT e.organizacion_id AS id FROM usuario_empresas ue JOIN empresas e ON e.id = ue.empresa_id

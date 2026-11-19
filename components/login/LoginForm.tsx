@@ -134,7 +134,7 @@ export default function LoginForm({ marca }: { marca: Marca }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-neutral-700 mb-1">Usuario</label>
+              <label htmlFor="username" className="block text-sm font-medium text-neutral-700 mb-1">Usuario o correo</label>
               <input id="username" name="username" type="text" required autoFocus
                 autoComplete="username" autoCapitalize="none" spellCheck={false}
                 className={campo} />

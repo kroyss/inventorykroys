@@ -115,7 +115,7 @@ function MisDatos({ d, onGuardado }: { d: Datos; onGuardado: (x: Partial<Datos>)
   return (
     <Tarjeta titulo="Mis datos" ayuda="Con ellos recuperas tu clave y soporte puede ayudarte por WhatsApp o Telegram.">
       <form onSubmit={enviar} className="space-y-3">
-        <div className="text-xs text-neutral-500">Usuario para entrar: <b className="font-mono text-neutral-800">{d.username}</b> <span className="text-neutral-400">(no se cambia)</span></div>
+        <div className="text-xs text-neutral-500">Usuario para entrar: <b className="font-mono text-neutral-800">{d.username}</b> <span className="text-neutral-400">(no se cambia; también entras con tu correo)</span></div>
         <label className="block text-xs font-medium text-neutral-600">Nombre
           <input value={f.full_name} onChange={e => setF({ ...f, full_name: e.target.value })} autoComplete="name" className={campo} />
         </label>

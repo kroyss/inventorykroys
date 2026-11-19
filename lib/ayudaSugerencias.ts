@@ -149,6 +149,7 @@ const S: Record<string, Sugerencia[]> = {
 
 const GENERALES: Sugerencia[] = [
   { pregunta: '¿Qué hace cada sección?', respuesta: 'En **Automatizaciones** atiendes lo de MercadoLibre (preguntas, mensajes, stock, despachos, guías y calificaciones). En **Inventario** (si lo tienes) llevas productos, ventas y compras. Pregúntame por cualquiera.' },
+  { pregunta: 'Olvidé mi usuario', respuesta: 'Entra con tu **correo** en lugar del usuario, con tu misma contraseña. Tu usuario también aparece en **Mi cuenta**.' },
   { pregunta: 'Olvidé mi contraseña', respuesta: 'El administrador de tu empresa te pone una nueva en **Usuarios → Cambiar contraseña**. Si el olvido es del administrador, escríbenos a Soporte.' },
 ]
 

@@ -1,3 +1,4 @@
+import { usuarioPorLogin } from '@/lib/loginUsuario'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare } from 'bcryptjs'
 import { dbGlobal } from '@/lib/db'
@@ -77,11 +78,9 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.username || !credentials?.password) return null
 
         const db = dbGlobal()
-        const { rows: [user] } = await db.query(
-          `SELECT id, username, full_name, password_hash, is_active, session_version AS sv
-           FROM users WHERE username = $1`,
-          [credentials.username.toLowerCase().trim()],
-        )
+        // Usuario o correo (19-11, lib/loginUsuario.ts).
+        const user = await usuarioPorLogin<{ id: number; username: string; full_name: string; password_hash: string; is_active: boolean; sv: number }>(
+          db, credentials.username, 'id, username, full_name, password_hash, is_active, session_version AS sv')
         if (!user || !user.is_active) return null
         if (!(await compare(credentials.password, user.password_hash))) return null
 

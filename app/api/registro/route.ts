@@ -6,6 +6,7 @@ import { dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_RE } from '@/lib/usuarios'
 import { choqueAlta, crearCuenta } from '@/lib/altaCuenta'
+import { usuarioDesdeCorreo } from '@/lib/loginUsuario'
 import { avisarDuenoPlataforma, MODULOS_PRUEBA } from '@/lib/registro'
 import { precioRadarMes } from '@/lib/planes'
 import { currentDate } from '@/lib/tz'
@@ -17,7 +18,8 @@ import { esc } from '@/lib/telegram'
 const Registro = z.object({
   negocio:  z.string().trim().min(2, 'Escribe el nombre de tu negocio').max(80),
   nombre:   z.string().trim().min(2, 'Escribe tu nombre').max(100),
-  usuario:  z.string().trim().toLowerCase().regex(USERNAME_RE, 'Usuario: 3 a 30 caracteres, solo letras, números, punto, guion o guion bajo (sin espacios)'),
+  // 19-11: /registro ya no lo pide (se arma desde el correo, lib/loginUsuario.ts); el registro del Radar lo sigue mandando.
+  usuario:  z.string().trim().toLowerCase().regex(USERNAME_RE, 'Usuario: 3 a 30 caracteres, solo letras, números, punto, guion o guion bajo (sin espacios)').optional().or(z.literal('')),
   correo:   z.string().trim().toLowerCase().email('Revisa el correo').max(120),
   // WhatsApp o Telegram: los dos opcionales, pero al menos uno (26-10, pedido del dueño).
   whatsapp: z.string().trim().regex(/^([+\d\s()-]{7,20})?$/, 'Revisa el número de WhatsApp').max(20).optional(),
@@ -85,7 +87,8 @@ async function registrar(req: NextRequest): Promise<NextResponse> {
 
     const contacto = [b.whatsapp && `WhatsApp ${esc(b.whatsapp)}`, b.telegram && `@${esc(b.telegram)}`, esc(b.correo)].filter(Boolean).join(' · ')
     await client.query('BEGIN')
-    const choque = await choqueAlta(client, b.negocio, b.usuario)
+    const usuario = b.usuario || await usuarioDesdeCorreo(client, b.correo)
+    const choque = await choqueAlta(client, b.negocio, usuario)
     if (choque) { await client.query('ROLLBACK'); return NextResponse.json({ error: choque }, { status: 400 }) }
     const radar = b.para === 'radar'
     // Desde el Radar: la misma empresa de siempre, pero con SOLO el módulo Radar (sin prueba del Sistema). Los demás
@@ -93,7 +96,7 @@ async function registrar(req: NextRequest): Promise<NextResponse> {
     const c = await crearCuenta(client, {
       // 18-11 (el dueño, mig 186): la prueba de 15 días trae también el Radar, en su vista de prueba (10 búsquedas en 7 días).
       nombre: b.negocio, country: 'VE', modulos: radar ? ['radar'] : [...MODULOS_PRUEBA, 'radar'], alta: radar ? 'radar' : 'prueba',
-      admin: { username: b.usuario, full_name: b.nombre, password: b.clave, email: b.correo },
+      admin: { username: usuario, full_name: b.nombre, password: b.clave, email: b.correo },
       origenOrgId: ORGANIZACION_PLATAFORMA, origen: radar ? 'radar' : 'autoregistro',
       registro: { correo: b.correo, whatsapp: b.whatsapp || null, telegram: b.telegram || null, ip_hash: ipHash,
                   ...(radar && b.promo ? { promo: b.promo.toLowerCase() } : {}),
@@ -102,12 +105,12 @@ async function registrar(req: NextRequest): Promise<NextResponse> {
     await client.query('COMMIT')
 
     avisarDuenoPlataforma(radar
-      ? `📡 <b>Nuevo registro al Radar</b> ${b.promo ? `(promo ${esc(b.promo)})` : `(Radar mensual ${precioRadarMes(currentDate()).precio} USD: falta que pague)`}\n${esc(b.negocio)} · ${esc(b.nombre)} · ${esc(b.usuario)}\n${contacto}`
+      ? `📡 <b>Nuevo registro al Radar</b> ${b.promo ? `(promo ${esc(b.promo)})` : `(Radar mensual ${precioRadarMes(currentDate()).precio} USD: falta que pague)`}\n${esc(b.negocio)} · ${esc(b.nombre)} · ${esc(usuario)}\n${contacto}`
       : `🆕 <b>Nueva prueba gratis (15 días)</b>\n${esc(b.negocio)} · ${esc(b.nombre)}\n`
         + contacto + '\n'
         + 'Sus 15 días corren desde hoy.')
       .catch(e => console.error('[registro] aviso', e instanceof Error ? e.message : e))
-    return NextResponse.json({ ok: true, empresa: c.empresaId, radar }, { status: 201 })
+    return NextResponse.json({ ok: true, empresa: c.empresaId, radar, usuario }, { status: 201 })
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
     return apiError(err)

@@ -69,7 +69,7 @@ está: **verde** todo al día, **amarillo** algo viejo. Abre un panel con cada c
 
 *Cómo lo pregunta la gente:* clave, contraseña, no puedo entrar, login, registrarme, crear cuenta, prueba gratis, días de prueba, vencida.
 
-- **Dirección:** app.elcomerciantedigital.com. Se entra con **usuario y contraseña** (no con correo).
+- **Dirección:** app.elcomerciantedigital.com. Se entra con **usuario o correo** y contraseña (desde el 19-11-2026 el correo también sirve; si dos cuentas tuvieran el mismo correo, entra con tu usuario).
 - **Una cuenta por persona.** Si una persona trabaja en varias empresas, usa el mismo usuario y elige la empresa
   en el selector de arriba (navbar).
 - **Olvidé mi contraseña:** en la pantalla de entrar toca **«¿Olvidaste tu contraseña?»**, escribe tu usuario o
@@ -79,8 +79,11 @@ está: **verde** todo al día, **amarillo** algo viejo. Abre un panel con cada c
   Telegram a medio tapar, p. ej. con•••@gmail.com y @con•••; si escribiste el correo, se ve completo). Si no te llega el correo, mira en spam o promociones.
   Si tu cuenta no tiene correo ni Telegram, la pantalla te lo dice: si eres empleado, el administrador de tu empresa
   te pone una nueva en **Mi cuenta → Mi equipo → Cambiar contraseña**; si eres el administrador, escríbenos a Soporte por Telegram.
-- **Crear cuenta:** app.elcomerciantedigital.com/registro (nombre del negocio, tu nombre, usuario, contraseña y un
-  contacto: WhatsApp o Telegram).
+- **Crear cuenta:** app.elcomerciantedigital.com/registro (nombre del negocio, tu nombre, un contacto —WhatsApp o
+  Telegram—, correo y contraseña). El **usuario se arma solo** desde tu correo (marcos.c@… → marcos.c; si ya existe,
+  marcos.c2) y te lo muestra al crear la cuenta; entras con ese usuario **o con tu correo**. Lo ves en **Mi cuenta**.
+  La página lista lo que trae la prueba (la IA responde sola tus preguntas, Mensajes, Pagos MercadoEnvíos, Despachos,
+  Stock, Radar) y menciona **Inventario** como paso opcional que se activa después.
 - **Prueba gratis de 15 días:** incluye Automatizaciones y Pagos ME (sin Inventario). Los días **corren desde que te
   registras**: conecta tu cuenta de MercadoLibre cuanto antes para aprovecharlos. Cada cuenta de MercadoLibre puede usar
   una sola prueba. Al terminar la prueba, para seguir se elige el plan y se paga en **Mi plan** (ver
