@@ -274,6 +274,16 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false, 
 
   // Sin inventario: imprimir o no el título y la nota en la etiqueta (opción de la empresa, admin).
   const [impresion, setImpresion] = useState<Impresion>({ sin_titulo: false, sin_nota: false })
+  // 19-11 (el dueño): hoja A4 (4 por hoja) o térmica 10x15 (1 por etiqueta). Se recuerda en ESTE navegador:
+  // la impresora es de cada PC (una puede tener la térmica y otra la láser).
+  const [formato, setFormatoEstado] = useState<Formato>('a4')
+  useEffect(() => {
+    try { if (localStorage.getItem(CLAVE_FORMATO) === 'termica') setFormatoEstado('termica') } catch {}
+  }, [])
+  const setFormato = (f: Formato) => {
+    setFormatoEstado(f)
+    try { localStorage.setItem(CLAVE_FORMATO, f) } catch {}
+  }
   useEffect(() => {
     if (!desdeML) return
     fetch('/api/despachos/config').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setImpresion(d) }).catch(() => {})
@@ -290,13 +300,17 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false, 
 
   const generar = async (lote: LoteDetalle) => {
     setBusy(`generar-${lote.id}`); setError(null); setAviso(null); setFallas([])
-    const res = await fetch(`/api/despachos/lotes/${lote.id}/generar`, { method: 'POST' })
+    const res = await fetch(`/api/despachos/lotes/${lote.id}/generar`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ formato }),
+    })
     const body = await errorDe(res)
     setBusy(null)
     if (!res.ok) { setError(body.error ?? 'Error'); setFallas(body.fallas ?? []); cargar(); return }
     descargar(`/api/despachos/lotes/${lote.id}/pdf`)
     const pasaron = (body as { pasaron?: number }).pasaron ?? 0
-    setAviso('PDF generado y verificado. Ábrelo con tu visor de PDF e imprime a "Tamaño real" (100%), no "Ajustar a la página".'
+    setAviso((formato === 'termica'
+      ? 'PDF generado y verificado (1 etiqueta por página, 10 × 15 cm). En la impresora térmica elige papel 100 × 150 mm (4 × 6"), «Tamaño real» (100 %) y márgenes «Ninguno».'
+      : 'PDF generado y verificado. Ábrelo con tu visor de PDF e imprime a "Tamaño real" (100%), no "Ajustar a la página".')
       + (pasaron ? ` ${pasaron} guía${pasaron === 1 ? '' : 's'} que no se imprimi${pasaron === 1 ? 'ó' : 'eron'} (pago sin verificar o destildada${pasaron === 1 ? '' : 's'}) ${pasaron === 1 ? 'pasó' : 'pasaron'} al lote pendiente.` : ''))
     cargar()
   }
@@ -364,7 +378,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false, 
         title="Despachos"
         info={<>
           <li>Arrastra los PDFs de MercadoEnvíos (o entran solos desde Pagos ME): forman un <b className="font-medium text-neutral-800">lote</b>.</li>
-          <li>Revisa cada etiqueta (venta, productos y nota; la nota se guarda también en MercadoLibre) y toca <b className="font-medium text-neutral-800">Generar PDF</b>: 4 por hoja.</li>
+          <li>Revisa cada etiqueta (venta, productos y nota; la nota se guarda también en MercadoLibre) y toca <b className="font-medium text-neutral-800">Generar PDF</b>: 4 por hoja A4, o 1 por página en <b className="font-medium text-neutral-800">Térmica 10×15</b> si tienes impresora de etiquetas (se elige junto al botón y se recuerda en este equipo).</li>
           <li>Imprime a <b className="font-medium text-neutral-800">«Tamaño real» (100 %)</b>, no «Ajustar a la página».</li>
           <li>Una guía ya impresa no sale dos veces: entra en rojo «Ya impresa». Si una no debe salir todavía, apártala (<b className="font-medium text-neutral-800">En espera</b>).</li>
           <li>Al final del día: <b className="font-medium text-neutral-800">Cerrar jornada → Manifiesto</b>, uno por transportista. Si usas el Reportador, ahí entran a su cola.</li>
@@ -412,6 +426,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false, 
       {pendientes.map(l => (
         <LotePendiente key={l.id} lote={l} busy={busy} desdeML={desdeML}
           impresion={impresion} onImpresion={isAdmin ? cambiarImpresion : undefined}
+          formato={formato} onFormato={setFormato}
           onNota={(e, nota) => patchEtiqueta(l.id, e, { nota })}
           onToggle={e => patchEtiqueta(l.id, e, { incluida: !e.incluida })}
           onForzarPago={(e, v) => patchEtiqueta(l.id, e, { forzar_pago: v })}
@@ -572,6 +587,9 @@ function Dropzone({ onFiles, busy, compact, agregaALote }: {
 }
 
 // ── Qué se imprime en la etiqueta (sin inventario) ─────────────────────────
+type Formato = 'a4' | 'termica'
+const CLAVE_FORMATO = 'despachos_formato'
+
 type Impresion = { sin_titulo: boolean; sin_nota: boolean }
 
 /** Interruptor ON/OFF en el encabezado de la columna. Sin onChange (no admin) se ve pero no se mueve. */
@@ -626,11 +644,13 @@ function NotaEditable({ e, onGuardar }: { e: Etiqueta; onGuardar: (nota: string 
 }
 
 // ── Lote pendiente (revisión antes de generar) ──────────────────────────────
-function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, onToggle, onForzarPago, onReimprimir, onQuitar, onApartar, onRevalidar, onAgregar, onGenerar, onDescartar }: {
+function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, formato, onFormato, onNota, onToggle, onForzarPago, onReimprimir, onQuitar, onApartar, onRevalidar, onAgregar, onGenerar, onDescartar }: {
   lote: LoteDetalle
   desdeML: boolean
   impresion: Impresion
   onImpresion?: (cambio: Partial<Impresion>) => void
+  formato: Formato
+  onFormato: (f: Formato) => void
   onNota: (e: Etiqueta, nota: string | null) => void
   busy: string | null
   onToggle: (e: Etiqueta) => void
@@ -660,9 +680,15 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
           </p>
 
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={onRevalidar} className="btn-secondary text-xs" title={desdeML ? 'Volver a buscar las ventas y las notas en MercadoLibre' : 'Volver a cruzar con las ventas (p.ej. después de cargar una venta que faltaba)'}>↻ Revalidar</button>
           <button onClick={onDescartar} className="btn-secondary text-xs">Descartar</button>
+          <select value={formato} onChange={e => onFormato(e.target.value as Formato)} disabled={generando}
+            className="rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs" aria-label="Formato del PDF"
+            title="Hoja A4: 4 guías por hoja (impresora común). Térmica 10×15: una guía por página de 100 × 150 mm (impresora de etiquetas). Se recuerda en este equipo.">
+            <option value="a4">Hoja A4 (4 por hoja)</option>
+            <option value="termica">Térmica 10×15 (1 por etiqueta)</option>
+          </select>
           <button onClick={onGenerar} disabled={generando || lote.imprimibles === 0} className="btn-primary text-sm">
             {generando ? 'Generando y verificando…' : `Generar PDF (${lote.imprimibles})`}
           </button>

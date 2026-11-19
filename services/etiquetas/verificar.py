@@ -39,8 +39,10 @@ def _esperados(page):
     return confirmados
 
 
-def verificar(etiquetas, pdf_armado):
-    """etiquetas: [pdf_bytes] en el orden de armado (4 por página).
+def verificar(etiquetas, pdf_armado, por_pagina=4, dpi=DPI):
+    """etiquetas: [pdf_bytes] en el orden de armado (`por_pagina` por página: 4 en A4, 1 en la térmica).
+    El armado se lee a `dpi`: 300 para A4 (láser/tinta); 203 para la térmica, que es lo que imprimen casi
+    todas (más exigente: si se lee a 203, la impresora también).
     Devuelve [{indice, esperados, faltan}] con una entrada por etiqueta."""
     resultado = []
     with fitz.open(stream=pdf_armado, filetype="pdf") as out:
@@ -48,9 +50,9 @@ def verificar(etiquetas, pdf_armado):
         for i, data in enumerate(etiquetas):
             with fitz.open(stream=data, filetype="pdf") as src:
                 esperados = _esperados(src[0])
-            pag = i // 4
+            pag = i // por_pagina
             if pag not in leidos_por_pagina:
-                leidos_por_pagina[pag] = _codigos(out[pag])
+                leidos_por_pagina[pag] = _codigos(out[pag], dpi)
             faltan = sorted(t for _, t in esperados - leidos_por_pagina[pag])
             resultado.append({
                 "indice": i,

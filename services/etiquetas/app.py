@@ -3,7 +3,7 @@ Servicio de etiquetas del módulo Despachos (uso interno: solo lo llama
 inventory_next dentro de la red de Docker; no publica puertos).
 
   POST /leer        PDFs de Mercado Envíos (ZOOM o TEALCA) -> carrier, venta, guía, remitente, destinatario
-  POST /armar       PDFs + productos/nota por venta -> PDF 4xA4 + verificación de códigos
+  POST /armar       PDFs + productos/nota por venta -> PDF 4xA4 (o 1 por página 10x15, formato="termica") + verificación
   POST /manifiesto  envíos de la jornada -> PDF del manifiesto
   GET  /salud
 """
@@ -59,6 +59,7 @@ class ArmarIn(BaseModel):
     pdfs: list[str]  # base64, en orden de impresión
     filas: list[Fila]
     ventas: list[str] = []  # venta de cada etiqueta, en el mismo orden (las Tealca no la traen)
+    formato: str = "a4"  # "a4" = 4 por hoja A4 · "termica" = 1 por página de 100 x 150 mm
 
 
 @app.post("/armar")
@@ -66,7 +67,8 @@ def armar(body: ArmarIn):
     etiquetas = [_bytes(b) for b in body.pdfs]
     sales_map = armar_sales_map([f.model_dump() for f in body.filas])
     try:
-        pdf = armar_pdf(etiquetas, sales_map, body.ventas)
+        termica = body.formato == "termica"
+        pdf = armar_pdf(etiquetas, sales_map, body.ventas, "termica" if termica else "a4")
     except (KeyError, IndexError) as e:
         raise HTTPException(400, f"Venta sin productos: {e}")
     with fitz.open(stream=pdf, filetype="pdf") as d:
@@ -74,7 +76,7 @@ def armar(body: ArmarIn):
     return {
         "pdf": _b64(pdf),
         "paginas": paginas,
-        "verificacion": verificar(etiquetas, pdf),
+        "verificacion": verificar(etiquetas, pdf, 1, 203) if termica else verificar(etiquetas, pdf),
     }
 
 

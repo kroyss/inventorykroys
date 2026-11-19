@@ -46,7 +46,7 @@ export default async function AutomatizacionesPage() {
       items: [
         { href: '/despachos', titulo: 'Despachos', icono: 'despachos', activa: despachos, aviso: 'despachos',
           pendiente: 'impresos, falta cerrar jornada',
-          texto: 'Subes las etiquetas de Mercado Envíos (Zoom y Tealca) y salen 4 por hoja con el producto y la nota de cada venta. Manifiesto por transportista.' },
+          texto: 'Subes las etiquetas de Mercado Envíos (Zoom y Tealca) y salen 4 por hoja (o una por etiqueta en impresora térmica 10×15) con el producto y la nota de cada venta. Manifiesto por transportista.' },
         { href: '/reportador', titulo: 'Reportador', icono: 'reportador', activa: reportador, aviso: 'reportador',
           pendiente: 'guías por avisar',
           texto: 'Le escribe a cada comprador su número de guía después de cerrar la jornada: por la API, sin programa, o con el programa de la PC.' },

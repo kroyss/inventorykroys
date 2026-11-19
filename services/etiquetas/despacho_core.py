@@ -42,6 +42,16 @@ TEXT_SIZE_MIN = 6.5
 # no toca los códigos.
 OVERFLOW_HINT = "(ver sistema)"
 
+# ===== Formato térmico 10x15 (19-11-2026, el dueño) =====
+# Una etiqueta por página de 100 x 150 mm (4x6", el estándar de las etiquetas de envío): el PDF sale del tamaño
+# exacto del rollo y la térmica lo imprime tal cual, sin software de etiquetas. La guía ZOOM mide ~105,6 x 159 mm:
+# entra al ~91 % (en A4 va al 80 %), así que los códigos salen MÁS grandes que en la hoja. Mismo pegado vectorial,
+# mismo texto; solo cambia el tamaño de la página y que hay una celda. El camino A4 no se toca.
+TERMICA_W_PT = 100 / 25.4 * 72
+TERMICA_H_PT = 150 / 25.4 * 72
+TERMICA_MARGEN_PT = 6     # ~2 mm: borde que muchas térmicas no imprimen
+TERMICA_SCALE_CAP = 1.0   # puede ir a tamaño real si cupiera (nunca agranda de más: lo limita la celda)
+
 
 # ===== Copiadas de etiquetas_ml.py =====
 def compute_grid(page_rect, margin=PAGE_MARGIN_PT, gap=CELL_GAP_PT):
@@ -218,15 +228,22 @@ def armar_sales_map(filas):
     return sales_map
 
 
-def armar_pdf(etiquetas, sales_map, ventas=None):
+def armar_pdf(etiquetas, sales_map, ventas=None, formato="a4"):
     """etiquetas: [pdf_bytes] en el orden de impresión. Devuelve el PDF 4xA4 en bytes.
     Cuerpo del Paso 2/3 de etiquetas_ml.py main(), sin cambios en el armado ZOOM.
     Las etiquetas Tealca (ver tealca.py) ocupan su celda con otro dibujo; como no traen
     número de venta, `ventas` (una por etiqueta, en el mismo orden) lo da."""
     ventas = ventas or []
     out = fitz.open()
-    out_rect = fitz.paper_rect(OUTPUT_PAPER)
-    grid = compute_grid(out_rect)
+    if formato == "termica":
+        out_rect = fitz.Rect(0, 0, TERMICA_W_PT, TERMICA_H_PT)
+        grid = [fitz.Rect(TERMICA_MARGEN_PT, TERMICA_MARGEN_PT,
+                          TERMICA_W_PT - TERMICA_MARGEN_PT, TERMICA_H_PT - TERMICA_MARGEN_PT)]
+        cap = TERMICA_SCALE_CAP
+    else:
+        out_rect = fitz.paper_rect(OUTPUT_PAPER)
+        grid = compute_grid(out_rect)
+        cap = SCALE_CAP
     fuentes = []  # se cierran después de guardar: show_pdf_page las referencia
     hay_tealca = False
 
@@ -234,7 +251,7 @@ def armar_pdf(etiquetas, sales_map, ventas=None):
     while i < len(etiquetas):
         out_page = out.new_page(width=out_rect.width, height=out_rect.height)
 
-        for cell_idx in range(4):
+        for cell_idx in range(len(grid)):
             if i >= len(etiquetas):
                 break
             src = fitz.open(stream=etiquetas[i], filetype="pdf")
@@ -251,7 +268,7 @@ def armar_pdf(etiquetas, sales_map, ventas=None):
                 continue
 
             clip = find_label_border_rect(sp)
-            dest = place_rect(clip.width, clip.height, grid[cell_idx])
+            dest = place_rect(clip.width, clip.height, grid[cell_idx], cap)
 
             # Pegar vectorial (NO rasteriza)
             out_page.show_pdf_page(dest, src, 0, clip=clip)

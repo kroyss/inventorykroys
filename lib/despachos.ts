@@ -133,10 +133,13 @@ export function leerEtiquetas(pdfs: Buffer[], nombres: string[]) {
 export interface FilaVenta { venta: string; producto: string; cantidad: number; nota: string }
 export interface Verificacion { indice: number; esperados: number; faltan: string[] }
 
+// a4 = 4 por hoja A4 (siempre) · termica = 1 por página de 100 x 150 mm (impresora de etiquetas, 19-11-2026).
+export type FormatoEtiqueta = 'a4' | 'termica'
+
 // `ventas`: la venta de cada PDF, en el mismo orden (las etiquetas TEALCA no la traen).
-export async function armarLote(pdfs: Buffer[], filas: FilaVenta[], ventas: string[]) {
+export async function armarLote(pdfs: Buffer[], filas: FilaVenta[], ventas: string[], formato: FormatoEtiqueta = 'a4') {
   const r = await llamar<{ pdf: string; paginas: number; verificacion: Verificacion[] }>(
-    '/armar', { pdfs: pdfs.map(b => b.toString('base64')), filas, ventas }, 300_000,
+    '/armar', { pdfs: pdfs.map(b => b.toString('base64')), filas, ventas, formato }, 300_000,
   )
   return { pdf: Buffer.from(r.pdf, 'base64'), paginas: r.paginas, verificacion: r.verificacion }
 }

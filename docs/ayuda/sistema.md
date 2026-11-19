@@ -702,9 +702,10 @@ banco, no el que escribió el comprador.
 
 ## 9. Despachos (Automatizaciones → Despachos) · Venezuela
 
-*Cómo lo pregunta la gente:* etiquetas, imprimir guías, guías ZOOM, guías TEALCA, PDF de MercadoEnvíos, 4 por hoja, lote, jornada, manifiesto, apartar, en espera, cancelar envío.
+*Cómo lo pregunta la gente:* etiquetas, imprimir guías, guías ZOOM, guías TEALCA, PDF de MercadoEnvíos, 4 por hoja, impresora térmica, etiqueta 10x15, 4x6, una por hoja, lote, jornada, manifiesto, apartar, en espera, cancelar envío.
 
-Imprime las etiquetas de MercadoEnvíos (ZOOM / TEALCA) **4 por hoja**, con la cantidad y la nota de cada paquete,
+Imprime las etiquetas de MercadoEnvíos (ZOOM / TEALCA) **4 por hoja A4** o **una por etiqueta en impresora térmica
+(10 × 15 cm)**, con la cantidad y la nota de cada paquete,
 y arma el **manifiesto** al final del día. Cuando un producto va **2 o más unidades**, la cantidad sale en un círculo
 negro y escrita en palabra y negrita («❷ DOS - …», «❸ TRES - …») para no equivocarse al armar el paquete; con 1
 unidad queda normal («1 - …»). La **ⓘ** junto al título resume cómo funciona.
@@ -716,7 +717,14 @@ unidad queda normal («1 - …»). La **ⓘ** junto al título resume cómo func
    del paquete: se guarda **también en MercadoLibre** (la misma nota en Despachos, Pagos ME, Mensajes y ML; hasta
    300 caracteres). Si MercadoLibre no la acepta en ese momento, queda solo en la etiqueta (✎) y avisa. Dejarla
    vacía la quita solo de la etiqueta (en ML no se borra). También puedes elegir si en la etiqueta se imprime el título y/o la nota.
-3. Genera el PDF y **imprime a «Tamaño real» (100%)**, no «Ajustar a la página».
+3. Elige el formato junto al botón **Generar PDF**: **Hoja A4 (4 por hoja)** para una impresora común, o **Térmica
+   10×15 (1 por etiqueta)** para una impresora de etiquetas (rollo de 100 × 150 mm, también llamado 4 × 6"). La
+   elección se recuerda **en ese equipo** (cada PC puede tener su impresora). En la térmica la guía sale más grande
+   que en la hoja (≈ 91 % de su tamaño original, en la hoja ≈ 80 %) y los códigos se comprueban igual antes de
+   entregar el PDF.
+   Genera el PDF y **imprime a «Tamaño real» (100%)**, no «Ajustar a la página». En la térmica, además, elige en la
+   ventana de impresión el papel 100 × 150 mm (4 × 6") y márgenes «Ninguno». Si sale cortada o chiquita, casi
+   siempre es el tamaño de papel configurado en la impresora.
 4. Al final del día: **Cerrar jornada → Manifiesto**. Se genera un manifiesto por transportista (ZOOM / TEALCA) con
    todos los envíos de la jornada. La jornada se abre sola con el primer lote.
 
@@ -1450,7 +1458,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   inventario se verifica en Ventas → Por confirmar y aquí queda la conexión y el historial. Las guías pagadas pasan
   solas a Despachos. La línea de arriba dice si la PC está lista; ⚙ Conexión: cuentas, programa, extensión y PC.
 - **Despachos:** arrastra los PDFs de MercadoEnvíos (o entran solos desde Pagos ME) y forman un lote; revisa cada
-  etiqueta y **Generar PDF** (4 por hoja, imprimir a «Tamaño real»). Una guía impresa no sale dos veces («Ya impresa»);
+  etiqueta y **Generar PDF** (4 por hoja A4, o 1 por página en «Térmica 10×15», se recuerda en el equipo; imprimir a «Tamaño real»). Una guía impresa no sale dos veces («Ya impresa»);
   **En espera** la aparta. Al final del día, **Cerrar jornada** → Manifiesto por transportista (y cola del Reportador).
 - **Reportador:** reporta las guías impresas en Despachos al cerrar la jornada (las de TEALCA, al escribir la guía
   final); lo impreso directo en ML no se entera. Trabaja en el servidor (se puede cerrar la pantalla) y revisa la

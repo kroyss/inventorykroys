@@ -10,14 +10,15 @@ import {
 import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
 
 /**
- * POST /api/despachos/lotes/[id]/generar — arma el PDF 4xA4 del lote.
+ * POST /api/despachos/lotes/[id]/generar — arma el PDF del lote: 4 por hoja A4, o con body { formato: 'termica' }
+ * una etiqueta por página de 100 x 150 mm (impresora térmica). La elección vive en el navegador (la impresora es de cada PC).
  *
  * Todo o nada: si CUALQUIER código de barras / Data Matrix de una etiqueta no se lee
  * igual en el PDF armado, no se guarda nada y se devuelven las etiquetas con problema.
  * Si sale bien: el lote entra a la jornada abierta (se abre una si no hay), las guías
  * quedan impresas y las ventas PROCESADA pasan a DESCARGADA (como el export del Excel).
  */
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { session, db } = await getSessionDb()
@@ -26,6 +27,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (denied) return denied
 
   const userId = parseInt(session.user.id, 10)
+  const cuerpo = await req.json().catch(() => null) as { formato?: unknown } | null
+  const formato = cuerpo?.formato === 'termica' ? 'termica' : 'a4'
   // Sin inventario: las ventas son las de MercadoLibre; no hay venta del sistema que bloquear
   // ni pasar a DESCARGADA. Todo lo demás (armado, jornada, manifiesto, Reportador) es igual.
   const desdeML = ventasDesdeML(session.user)
@@ -75,7 +78,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const filas = filasDeVentas(aImprimir).map(f => ({
       ...f, producto: imp.sin_titulo ? '' : f.producto, nota: imp.sin_nota ? '' : f.nota,
     }))
-    const { pdf, paginas, verificacion } = await armarLote(pdfs, filas, aImprimir.map(e => e.venta ?? ''))
+    const { pdf, paginas, verificacion } = await armarLote(pdfs, filas, aImprimir.map(e => e.venta ?? ''), formato)
 
     const fallas = verificacion
       .filter(v => v.esperados === 0 || v.faltan.length > 0)
