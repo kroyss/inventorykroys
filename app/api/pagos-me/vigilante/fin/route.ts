@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       `UPDATE me_pedidos p SET resultados = p.resultados || jsonb_build_object($2::text,
          jsonb_build_object('ok', $3::boolean, 'cuenta', $4::text, 'vistas', $5::int, 'nuevas', $6::int,
                             'error', $7::text, 'at', NOW(),
+                            'intentos', COALESCE((p.resultados->$2::text->>'intentos')::int, 0) + 1,
                             'pesos', CASE WHEN p.pesos AND $3::boolean THEN EXISTS (SELECT 1 FROM me_productos m
                                        WHERE m.cuenta = COALESCE($4::text, $2::text) AND m.actualizado_at >= p.pedido_at) END))
        WHERE p.id = $1`,

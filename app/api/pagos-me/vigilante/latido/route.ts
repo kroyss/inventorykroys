@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
-import { autenticarVigilante, PEDIDO_VIGENTE_MIN } from '@/lib/pagosME'
+import { autenticarVigilante, PEDIDO_VIGENTE_MIN, SQL_PERFIL_PENDIENTE } from '@/lib/pagosME'
 
 /**
  * POST /api/pagos-me/vigilante/latido (clave del vigilante + x-perfil) → cada ~1 min desde la extensión.
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
        ON CONFLICT (empresa_id, perfil) DO UPDATE SET visto_at = NOW()`, [a.perfil])
     const { rows: [p] } = await a.db.query(
       `SELECT id, pesos FROM me_pedidos
-       WHERE pedido_at > NOW() - make_interval(mins => $1) AND NOT (resultados ? $2)
+       WHERE pedido_at > NOW() - make_interval(mins => $1) AND ${SQL_PERFIL_PENDIENTE('$2')}   -- 19-11: si leyó con error, reintenta una vez
        ORDER BY id DESC LIMIT 1`, [PEDIDO_VIGENTE_MIN, a.perfil])
     // Pesos del portal (Promociones, migración 094): la primera traída del día de cada cuenta, o la
     // pedida con "Actualizar pesos". La extensión 1.3.2+ los lee; las anteriores ignoran el dato.

@@ -27,6 +27,11 @@ const DIR = path.join(UPLOAD_DIR, 'pagos-me')
 export const MAX_ARCHIVO = 5 * 1024 * 1024
 /** Un pedido de "Traer pagos y guías" vale por este tiempo: después los perfiles lo ignoran. */
 export const PEDIDO_VIGENTE_MIN = 30
+/** 19-11: un perfil que leyó con ERROR vuelve a intentar (extensión o despertador) hasta este total de intentos por pedido. */
+export const INTENTOS_ME = 2
+/** SQL: el perfil $perfil todavía tiene que leer este pedido (no respondió, o falló y le quedan intentos). */
+export const SQL_PERFIL_PENDIENTE = (perfil: string) => `(NOT (resultados ? ${perfil}::text) OR ((resultados->${perfil}::text->>'ok') = 'false'
+  AND COALESCE((resultados->${perfil}::text->>'intentos')::int, 1) < ${INTENTOS_ME}))`
 /** En pantalla, una traída se muestra "trayendo" a lo sumo esto (una normal tarda 1–2 min): pasado
  *  este tiempo, la cuenta que no respondió se muestra como "no respondió: revisa la PC". */
 export const TRAIDA_EN_CURSO_MIN = 5
