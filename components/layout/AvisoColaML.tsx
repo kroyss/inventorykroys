@@ -11,7 +11,7 @@
 import { comun } from '@/lib/comun'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/ui/Link'
-import type { EstadoTraida } from '@/lib/meTraida'
+import { AYUDA_TRABADA, type EstadoTraida } from '@/lib/meTraida'
 
 interface Lote { id: number; tipo: string; titulo: string; estado: string; total: number; ok: number; sin_cambio: number
   saltadas: number; errores: number; pendientes: number }
@@ -162,7 +162,8 @@ function TraidaME({ t }: { t: EstadoTraida }) {
         {t.cuentas.map(c => (
           <li key={c.perfil} className="flex flex-wrap gap-x-1.5">
             <b className="text-neutral-800 truncate max-w-[10rem]">{c.nombre}</b>
-            {!c.hecho ? <span className="text-neutral-400">{corre ? '⟳ trabajando…' : 'no respondió'}</span>
+            {!c.hecho ? (c.lenta && corre ? <span className="text-amber-700">⟳ tarda más de lo normal: {AYUDA_TRABADA}</span>
+                : <span className={corre ? 'text-neutral-400' : 'text-red-700'}>{corre ? '⟳ trabajando…' : `no respondió: ${AYUDA_TRABADA}`}</span>)
               : !c.ok ? <span className="text-red-700">⚠ {ERROR_CUENTA[c.error ?? ''] ?? c.error ?? 'error'}</span>
               : <span>✓ {c.vistas} órdenes{c.nuevas ? ` · ${c.nuevas} nuevas` : ''}</span>}
             {c.hecho && c.ok && c.pesos === true && <span className="text-emerald-700">· pesos ✓</span>}

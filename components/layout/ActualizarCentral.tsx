@@ -79,12 +79,13 @@ export default function ActualizarCentral({ grupos }: { grupos: Grupo[] }) {
     router.refresh()
   }, [router])
 
-  // Pagos ME: la traída la hace la PC (1 a 3 min). Se mira cada 5 s hasta que termina (como mucho 8 min).
+  // Pagos ME: la traída la hace la PC (1 a 3 min). Se mira cada 5 s hasta que termina (como mucho 12 min: el servidor
+  // la da por en curso hasta 10, TRAIDA_EN_CURSO_MIN).
   const seguirME = useCallback(async () => {
     if (esperandoME.current) return
     esperandoME.current = true
     try {
-      for (let i = 0; i < 96; i++) {
+      for (let i = 0; i < 144; i++) {
         await new Promise(r => setTimeout(r, 5000))
         const gs = await leer()
         const me = gs?.find(x => x.grupo === 'pagosme')

@@ -15,6 +15,14 @@ const PORTAL = 'https://www.mercadoenvios.com.ve'
 const MARCA = '#vigilante'   // la pone el despertador en la dirección que abre
 
 let trabajando = false
+// 1.3.7 (19-11): si el portal deja de responder a mitad de una traída, la extensión quedaba «trabajando» para siempre
+// (Chrome abierto, latido al día, pero sin tomar pedidos nuevos). Ahora cada paso anota avance; si pasan
+// SIN_AVANCE_MS sin ninguno, la traída se da por fallida (el sistema la reintenta) y queda libre. No es un tope
+// total: con conexión lenta pero avanzando (subiendo órdenes una a una) sigue el tiempo que haga falta.
+const SIN_AVANCE_MS = 4 * 60 * 1000
+let ultimoAvance = 0
+let turno = 0
+const avance = () => { ultimoAvance = Date.now() }
 
 chrome.runtime.onInstalled.addListener(() => chrome.alarms.create('latido', { periodInMinutes: 1 }))
 // Abierto por el despertador: no espera la alarma (1 min), pregunta ya.
@@ -53,7 +61,7 @@ async function latido() {
   if (!cfg.perfil || !cfg.servidor || !cfg.clave) return { texto: 'Falta configurar perfil, sistema y clave.' }
   try {
     const d = await api(cfg, 'latido')
-    if (d.pedido && !trabajando) procesar(cfg, d.pedido, !!d.pesos)
+    if (d.pedido && !trabajando) procesarConVigia(cfg, d.pedido, !!d.pesos)
     // Abierto por el despertador pero ya no hay nada que hacer aquí (otro lo hizo, venció): se cierra.
     if (!d.pedido && !trabajando) for (const t of await tabsDelDespertador()) cerrarVentana(t)
     const texto = d.pedido ? `Conectado: trayendo pagos y guías (pedido ${d.pedido})…` : 'Conectado ✓ (esperando pedidos)'
@@ -65,8 +73,29 @@ async function latido() {
   }
 }
 
-async function procesar(cfg, pedido, pesos = false) {
+/** Corre la traída con un vigía de avance: si se cuelga, la suelta y reporta el error (el turno viejo, si algún día
+ *  termina, ya no toca nada). */
+async function procesarConVigia(cfg, pedido, pesos) {
+  const mio = ++turno
   trabajando = true
+  avance()
+  let vigia
+  const colgada = new Promise(resolve => {
+    vigia = setInterval(() => { if (Date.now() - ultimoAvance > SIN_AVANCE_MS) resolve('colgada') }, 10000)
+  })
+  const r = await Promise.race([procesar(cfg, pedido, pesos, mio).then(() => 'ok'), colgada])
+  clearInterval(vigia)
+  if (r === 'colgada' && turno === mio) {
+    turno++   // el procesar colgado queda huérfano
+    await api(cfg, 'fin', { pedido, ok: false, error: 'El portal de MercadoEnvíos no respondió (4 min sin avance)' }).catch(() => {})
+    await anotar('El portal de MercadoEnvíos no respondió: se soltó la traída y queda libre para la siguiente.')
+    for (const t of await tabsDelDespertador()) cerrarVentana(t)
+    trabajando = false
+  }
+}
+
+async function procesar(cfg, pedido, pesos = false, mio = turno) {
+  const vigente = () => turno === mio
   let tabId = null
   let creada = false
   let vistas = 0
@@ -88,9 +117,11 @@ async function procesar(cfg, pedido, pesos = false) {
       await esperarCarga(tabId)
     }
 
+    avance()
     let [{ result: leido }] = await chrome.scripting.executeScript({
       target: { tabId }, world: 'MAIN', func: leerOrdenes, args: [DIAS],
     })
+    avance()
     // Sesión vencida (MercadoEnvíos la cierra a diario): se entra solo con "Ingresar con mi cuenta
     // de Mercado Libre", que pasa directo si este Chrome tiene la sesión de ML. Nunca escribe claves:
     // si ML pide clave o código, queda como sin sesión y la ventana abierta para hacerlo a mano.
@@ -99,6 +130,7 @@ async function procesar(cfg, pedido, pesos = false) {
         target: { tabId }, world: 'MAIN', func: leerOrdenes, args: [DIAS],
       })
     }
+    if (!vigente()) return
     if (!leido?.ok) throw new Error(leido?.error || 'No se pudo leer el portal')
     vistas = leido.ordenes.length
 
@@ -113,6 +145,8 @@ async function procesar(cfg, pedido, pesos = false) {
     for (const venta of faltan) {
       const o = porVenta.get(venta)
       if (!o) continue
+      if (!vigente()) return
+      avance()
       const [{ result: archivos }] = await chrome.scripting.executeScript({
         target: { tabId }, world: 'MAIN', func: bajarArchivos, args: [o.guia_url, o.comprobante_url],
       })
@@ -124,18 +158,22 @@ async function procesar(cfg, pedido, pesos = false) {
         comprobante_ext: archivos?.comprobante_ext ?? null,
       })
       nuevas++
+      avance()
     }
     // Pesos de las publicaciones (1.3.2, Promociones): la primera traída del día o al pedirlos. Si falla,
     // la traída de pagos igual se da por buena.
-    if (pesos) {
+    if (pesos && vigente()) {
+      avance()
       try {
         const [{ result: prod }] = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', func: leerProductos })
         if (prod?.ok) await api(cfg, 'productos', { cuenta: leido.cuenta || cfg.perfil, completo: prod.completo, items: prod.items })
       } catch (e) { await anotar(`No se pudieron leer los pesos: ${e.message}`) }
     }
+    if (!vigente()) return
     await api(cfg, 'fin', { pedido, ok: true, cuenta: leido.cuenta || cfg.perfil, vistas, nuevas })
     await anotar(`Listo: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.`)
   } catch (e) {
+    if (!vigente()) return
     const error = String(e.message || e).slice(0, 280)
     sinSesion = error === 'sin_sesion'
     await api(cfg, 'fin', { pedido, ok: false, vistas, nuevas, error }).catch(() => {})
@@ -146,9 +184,11 @@ async function procesar(cfg, pedido, pesos = false) {
         : `Error: ${error}`)
   } finally {
     if (creada && tabId != null) chrome.tabs.remove(tabId).catch(() => {})
-    // Sin sesión la ventana queda abierta: quien entre a la PC inicia sesión ahí mismo.
-    if (despertada && !sinSesion) cerrarVentana(despertada)
-    trabajando = false
+    if (vigente()) {
+      // Sin sesión la ventana queda abierta: quien entre a la PC inicia sesión ahí mismo.
+      if (despertada && !sinSesion) cerrarVentana(despertada)
+      trabajando = false
+    }
   }
 }
 
@@ -183,6 +223,10 @@ const anotarMarca = async (tabId, url) => {
   if (!(url || '').includes(MARCA)) return
   const { marcadas = [] } = await chrome.storage.session.get('marcadas')
   if (!marcadas.includes(tabId)) await chrome.storage.session.set({ marcadas: [...marcadas, tabId] })
+  // 1.3.7: ya anotada, se le quita la marca a la dirección (es solo para la extensión; el portal no la necesita).
+  chrome.scripting.executeScript({ target: { tabId }, world: 'ISOLATED',
+    func: m => { if (location.hash === m) history.replaceState(history.state, '', location.pathname + location.search) }, args: [MARCA],
+  }).catch(() => {})
 }
 chrome.tabs.onCreated.addListener(t => anotarMarca(t.id, t.pendingUrl || t.url))
 chrome.tabs.onUpdated.addListener((id, info, t) => anotarMarca(id, info.url || t.pendingUrl || t.url))
@@ -206,6 +250,7 @@ async function reingresar(tabId) {
   // Pasa por ML y vuelve al portal (a /comprador/dashboard). Hasta 40 s.
   for (let i = 0; i < 40; i++) {
     await new Promise(r => setTimeout(r, 1000))
+    avance()
     const t = await chrome.tabs.get(tabId).catch(() => null)
     if (!t) return false
     const u = t.url || ''

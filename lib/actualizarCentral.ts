@@ -11,7 +11,7 @@ import { sincronizarOrdenes, DIAS_RECIENTES } from '@/lib/calificacionesML'
 import { sincronizarEmpresa } from '@/lib/preguntas'
 import { revisarStockCuenta } from '@/lib/alertasStock'
 import { actualizarPromocionesEmpresa } from '@/lib/promocionesML'
-import { estadoTraida, ocupada } from '@/lib/meTraida'
+import { estadoTraida, ocupada, AYUDA_TRABADA } from '@/lib/meTraida'
 import { esDemo } from '@/lib/demo'
 import { asegurarPagosDemo, traerDemo } from '@/lib/demoDatos'
 
@@ -45,6 +45,8 @@ export async function estadoCentral(db: Pool, grupos: Grupo[]): Promise<EstadoGr
     } else if (g === 'pagosme') {
       const e = await estadoTraida(db)
       const errores = e?.cuentas.filter(x => x.hecho && !x.ok).map(x => `${x.nombre}: ${x.error ?? 'error'}`) ?? []
+      // 19-11: la que no terminó también se dice (antes quedaba como lista sin esa cuenta), con qué hacer.
+      if (e && !ocupada(e)) for (const x of e.cuentas) if (!x.hecho) errores.push(`${x.nombre} no respondió: ${AYUDA_TRABADA}`)
       res.push({ grupo: g, at: e?.terminada_at ?? null, ocupado: ocupada(e), sinPC: !!e?.esperando_pc,
         error: errores.length ? errores.join(' · ').slice(0, 200) : null })
     }

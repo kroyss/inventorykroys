@@ -9,6 +9,7 @@ import VigilanteConConexion, { CodigoConexion, DESCARGA_PROGRAMA } from './Conex
 import { type PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from './PagoME'
 import PorConfirmar, { usePorConfirmar } from '@/components/ventas/PorConfirmar'
+import { AYUDA_TRABADA } from '@/lib/meTraida'
 
 type Filtro = 'pendiente' | 'valido' | 'invalido' | 'todos'
 interface Resultado { ok: boolean; cuenta: string | null; vistas: number; nuevas: number; error: string | null; at: string }
@@ -414,7 +415,7 @@ function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML, pcPrendid
     'No se pierde nada: cuando la prendas, dale a "Traer pagos y guías" y trae todo lo que faltaba.')
   if (fallas.length || faltan.length) return caja('bg-red-50 border-red-200 text-red-900',
     <>❌ La traída de {cuando} quedó incompleta: revisa antes de despachar.</>,
-    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{nombre(p)}</b> no respondió</span>)}</>)
+    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{nombre(p)}</b> no respondió: {AYUDA_TRABADA}.</span>)}</>)
   // Completa y sin errores (18-11): va en la línea de estado, no en una caja.
   return null
 }
