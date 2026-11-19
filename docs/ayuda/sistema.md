@@ -943,7 +943,8 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   concretadas). Abajo, en dos columnas: a la izquierda **Más vendidos** (top 5 con barra y cuánto subió o bajó; «Ver
   todos los productos» abre Reportes → Ventas → Por producto con esas fechas); a la derecha **Por cuenta de
   MercadoLibre** (ventas y «antes N»), **Atención en MercadoLibre** (preguntas, tiempo de respuesta, cuántas respondió la
-  IA, ventas por pregunta) y **Calificaciones** en una línea (las negativas y contradictorias se marcan solo si hay;
+  IA, ventas por pregunta) y **Calificaciones** (con 1 o 3 cuentas va como tarjeta al lado de la última cuenta; con 2 o 4, en
+  una línea abajo; las negativas y contradictorias se marcan solo si hay;
   lleva a Reputación). Ganancia y costos solo con el permiso de costos.
   **Inicio sin el permiso de costos** (empleado): la misma primera línea (sus pendientes, la píldora de la tasa en VE y
   **+ Nueva venta**); **Pendientes** igual que arriba con lo suyo (Por confirmar, Borradores, Por despachar —lleva a Despachos—, y con

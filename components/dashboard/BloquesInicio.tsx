@@ -108,6 +108,10 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
   const max = Math.max(1, ...(d.top ?? []).map(p => p.unidades))
   const verTodos = `/reportes?tab=ventas&vista=producto&desde=${r.desde}&hasta=${r.hasta}`
   const a = d.atencion, c = d.calificaciones
+  // 19-11 (el dueño): con cuentas impares (1, 3…) las calificaciones van como tarjeta en el hueco al lado de la
+  // última cuenta; con pares, en su línea de abajo como antes.
+  const califEnGrilla = !!c && !!d.cuentas && d.cuentas.length % 2 === 1
+  const tituloCalif = `Calificaciones recibidas en MercadoLibre, ${contra}. Contradictorias: dijo una cosa y tú otra (se corrigen en Reputación).`
 
   return (
     <div className="space-y-6">
@@ -162,6 +166,24 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
                     <Tarjeta key={k.cuenta} titulo={k.cuenta} valor={`${n(k.ventas)} ventas`} ahora={k.ventas} antes={k.antes_ventas} conNumero
                       detalle={`${k.moneda === 'VES' ? 'Bs' : '$'} ${k.monto.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`} />
                   ))}
+                  {califEnGrilla && c && (
+                    <Link href="/reputacion" title={tituloCalif}
+                      className="group min-w-0 rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 shadow-sm transition hover:border-neutral-300 hover:shadow-md">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-xs font-medium text-neutral-500">Calificaciones</span>
+                        <span className="shrink-0 text-xs font-medium text-sky-700 group-hover:underline">Reputación →</span>
+                      </div>
+                      <div className="num mt-0.5 truncate text-lg font-semibold tracking-tight text-neutral-900">{n(c.positivas)} positivas</div>
+                      <div className="num mt-0.5 flex flex-wrap gap-x-2 text-xs text-neutral-500">
+                        <span>{n(c.neutrales)} neutrales</span>
+                        <span className={c.negativas ? 'font-medium text-red-700' : ''}>
+                          {c.negativas > 0 && <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" />}
+                          {n(c.negativas)} negativas{c.negativas > 0 && c.antes_negativas != null && ` (antes ${n(c.antes_negativas)})`}</span>
+                        {c.contradictorias > 0 && <span className="font-medium text-amber-800">
+                          <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-500" />{n(c.contradictorias)} contradictorias</span>}
+                      </div>
+                    </Link>
+                  )}
                 </div>
               </Seccion>
             )}
@@ -192,8 +214,8 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
             )}
 
             {/* 19-11: las calificaciones en una sola línea (casi siempre «8 · 0 · 0 · 0»); lo malo se pinta solo si hay. */}
-            {c && (
-              <Link href="/reputacion" title={`Calificaciones recibidas en MercadoLibre, ${contra}. Contradictorias: dijo una cosa y tú otra (se corrigen en Reputación).`}
+            {c && !califEnGrilla && (
+              <Link href="/reputacion" title={tituloCalif}
                 className="group flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm shadow-sm transition hover:border-neutral-300 hover:shadow-md">
                 <span className="font-semibold text-neutral-700">Calificaciones</span>
                 <span className="num text-neutral-700"><b className="font-semibold text-neutral-900">{n(c.positivas)}</b> positivas</span>
