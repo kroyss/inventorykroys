@@ -14,13 +14,13 @@ export interface Pendiente {
 
 const PUNTO = { problema: 'bg-red-500', atencion: 'bg-amber-500', info: 'bg-neutral-400' } as const
 
-export default function Pendientes({ items }: { items: Pendiente[] }) {
+export default function Pendientes({ items, titulo = true }: { items: Pendiente[]; titulo?: boolean }) {
   const conAlgo = items.filter(p => (p.n ?? 0) > 0)
   const enCero = items.filter(p => p.n === 0)
   const cargando = items.some(p => p.n == null)
   return (
     <section aria-labelledby="pend-t" className="space-y-2">
-      <h2 id="pend-t" className="text-sm font-semibold text-neutral-700">Pendientes</h2>
+      <h2 id="pend-t" className={titulo ? 'text-sm font-semibold text-neutral-700' : 'sr-only'}>Pendientes</h2>
       {conAlgo.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {conAlgo.map(p => (

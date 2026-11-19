@@ -914,9 +914,11 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
 
 > Este espacio se prende por empresa (plan Completo). Si no lo ves, tu empresa trabaja «todo desde MercadoLibre».
 
-- **Inicio:** cómo va tu negocio (rehecho el 19-11-2026). Sin título: arriba la tasa en una línea (VE: **Oficial ·
-  Paralelo · Diferencial** —cuánto más cara está la paralela— **· Exceso · Descuento ML** y la fecha; en CO, la fecha) y
-  los atajos **+ Nueva venta** / **+ Nueva compra**. Luego **Pendientes**: botones chicos con el número, solo los que
+- **Inicio:** cómo va tu negocio (rehecho el 19-11-2026). Sin título. En la primera línea, a la derecha, la tasa en
+  una **píldora chica** (VE): **Bs oficial / paralelo · diferencial %** (diferencial = cuánto más cara está la paralela;
+  al pasar el mouse, el detalle con exceso y fecha; quien entra a Ajustes la toca y va ahí) y, con Descuento ML, otra
+  píldora **Desc. ML %**; al lado los atajos **+ Nueva venta** / **+ Nueva compra**. A la izquierda, **Pendientes**
+  (sin título): botones chicos con el número, solo los que
   tienen algo, por urgencia (Por confirmar, Sin stock, **Reponer**, Stock bajo, **Borradores**, **En caída** —se están
   cayendo: venden la mitad o menos que en los 4 meses anteriores—, **Remate** —tienes stock y casi no se venden—, **En
   camino** —compras—; al pasar el mouse dice qué es cada uno); cada uno lleva a su lista y lo que está en 0 sale en una
@@ -933,8 +935,8 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   MercadoLibre** (ventas y «antes N»), **Atención en MercadoLibre** (preguntas, tiempo de respuesta, cuántas respondió la
   IA, ventas por pregunta) y **Calificaciones** en una línea (las negativas y contradictorias se marcan solo si hay;
   lleva a Reputación). Ganancia y costos solo con el permiso de costos.
-  **Inicio sin el permiso de costos** (empleado): la tasa (VE: Oficial · Paralelo · Diferencial) y **+ Nueva venta**;
-  **Pendientes** igual que arriba con lo suyo (Por confirmar, Borradores, Por despachar —lleva a Despachos—, y con
+  **Inicio sin el permiso de costos** (empleado): la misma primera línea (sus pendientes, la píldora de la tasa en VE y
+  **+ Nueva venta**); **Pendientes** igual que arriba con lo suyo (Por confirmar, Borradores, Por despachar —lleva a Despachos—, y con
   compras por etapas: Por finalizar, Compra en camino, Importación en camino con sus cajas); el bono (si lo ve); **Ventas
   del mes** (cuántas van sumadas día a día, en azul, con el ▲▼ contra el mes pasado a la fecha y en gris cómo iban los
   meses anteriores ese mismo día); y con Reportes, abajo y del mes, los más vendidos (en unidades), atención,

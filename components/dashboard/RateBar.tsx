@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { parseLocalDate } from '@/lib/tz'
+import Link from '@/components/ui/Link'
 
 interface Rate {
   official_rate: number
@@ -13,17 +14,16 @@ interface Rate {
 }
 
 const fmt = (n: number) => Math.round(Number(n)).toLocaleString('de-DE')
-const pct = (n: number) => Number(n).toLocaleString('de-DE', { maximumFractionDigits: 2 })
+const pct = (n: number, d = 2) => Number(n).toLocaleString('de-DE', { maximumFractionDigits: d })
 
-// 14-11 (el dueño: "estas 2 líneas podrían ser una sola"): la tasa va como subtítulo del Inicio, en una línea, sin
-// caja propia. Solo <span> (19-11: ya no vive en un PageHeader, pero se deja así). En el celular se acomoda en dos renglones.
-// descuento: módulo Descuento ML (sin él no se muestra el sugerido) · exceso: módulo precios_categorias.
-function Dato({ t, v }: { t: string; v: string }) {
-  return <span className="whitespace-nowrap">{t} <b className="num font-medium text-neutral-700">{v}</b></span>
-}
+const PILDORA = 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs text-neutral-500 shadow-sm'
 
-export default function RateBar({ puedeActualizar = false, descuento = true, exceso = true }: {
-  puedeActualizar?: boolean; descuento?: boolean; exceso?: boolean
+// 19-11 (el dueño: «la tasa tiene demasiado protagonismo»): una píldora chica «Bs 918 / 1.073 · 16,9 %» (oficial /
+// paralelo · diferencial) con el detalle al pasar el mouse; con `ajustes` lleva a Ajustes. Al lado, si hay módulo
+// Descuento ML, otra píldora con el descuento (el dato que se usa para publicar). Sin caja ni línea propia.
+// descuento: módulo Descuento ML · exceso: módulo precios_categorias (solo va en el detalle).
+export default function RateBar({ puedeActualizar = false, descuento = true, exceso = true, ajustes = false }: {
+  puedeActualizar?: boolean; descuento?: boolean; exceso?: boolean; ajustes?: boolean
 }) {
   const [rate, setRate] = useState<Rate | null>(null)
   const [busy, setBusy] = useState(false)
@@ -37,27 +37,30 @@ export default function RateBar({ puedeActualizar = false, descuento = true, exc
     finally { setBusy(false) }
   }
 
-  if (!rate) return <span className="inline-block h-4 w-72 max-w-full animate-pulse rounded bg-neutral-100 align-middle" aria-hidden />
+  if (!rate) return <span className="inline-block h-7 w-44 animate-pulse rounded-full bg-neutral-100 align-middle" aria-hidden />
 
-  const sep = <span className="text-neutral-300" aria-hidden>·</span>
+  const fecha = rate.rate_date ? parseLocalDate(rate.rate_date).toLocaleDateString('es-VE', { day: 'numeric', month: 'numeric' }) : null
+  const detalle = `Oficial Bs ${fmt(rate.official_rate)} · Paralelo Bs ${fmt(rate.parallel_rate)} · Diferencial ${pct(rate.spread_percentage)} %`
+    + (exceso ? ` · Exceso ${pct(rate.excess_percentage)} %` : '') + (fecha ? ` · al ${fecha}` : '') + (ajustes ? ' · toca para ver Ajustes' : '')
+  const contenido = <>
+    <span>Bs <b className="num font-medium text-neutral-800">{fmt(rate.official_rate)}</b> / <b className="num font-medium text-neutral-800">{fmt(rate.parallel_rate)}</b></span>
+    <span className="text-neutral-300" aria-hidden>·</span>
+    <b className="num font-medium text-neutral-800">{pct(rate.spread_percentage, 1)}%</b>
+  </>
   return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-neutral-500">
-      {/* 19-11 (el dueño): primero las tasas y su diferencia, después lo que sale de ellas (exceso → descuento). */}
-      <Dato t="Oficial" v={`Bs ${fmt(rate.official_rate)}`} />{sep}
-      <Dato t="Paralelo" v={`Bs ${fmt(rate.parallel_rate)}`} />{sep}
-      <span title="Cuánto más cara está la tasa paralela que la oficial"><Dato t="Diferencial" v={`${pct(rate.spread_percentage)}%`} /></span>
-      {exceso && <>{sep}<Dato t="Exceso" v={`${pct(rate.excess_percentage)}%`} /></>}
-      {descuento && <>
-        {sep}
-        <span className="whitespace-nowrap" title="Descuento a poner en MercadoLibre para no perder por la diferencia entre la tasa oficial y la paralela">
-          Descuento ML <b className="num font-semibold text-neutral-900">{pct(rate.recommended_discount)}%</b>
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      {ajustes
+        ? <Link href="/tasas" title={detalle} aria-label={detalle} className={`${PILDORA} transition hover:border-neutral-300 hover:text-neutral-700`}>{contenido}</Link>
+        : <span title={detalle} aria-label={detalle} className={PILDORA}>{contenido}</span>}
+      {descuento && (
+        <span className={PILDORA} title="Descuento a poner en MercadoLibre para no perder por la diferencia entre la tasa oficial y la paralela">
+          Desc. ML <b className="num font-semibold text-neutral-900">{pct(rate.recommended_discount, 1)}%</b>
         </span>
-      </>}
-      {rate.rate_date && <>{sep}<span className="whitespace-nowrap text-xs text-neutral-400">al {parseLocalDate(rate.rate_date).toLocaleDateString('es-VE', { day: 'numeric', month: 'numeric' })}</span></>}
+      )}
       {/* La tasa es común a todas las empresas: solo la actualiza el dueño de la plataforma (al resto, el cron). */}
       {puedeActualizar && (
         <button type="button" onClick={fetchBcv} disabled={busy} title="Actualizar BCV" aria-label="Actualizar BCV"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-60">
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-60">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
             className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} aria-hidden>
             <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" />

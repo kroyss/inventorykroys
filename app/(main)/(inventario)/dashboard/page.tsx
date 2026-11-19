@@ -4,7 +4,7 @@ import DashboardAdmin from '@/components/dashboard/DashboardAdmin'
 import DashboardUser  from '@/components/dashboard/DashboardUser'
 import { tieneModulo } from '@/lib/modulos'
 import { esDuenoPlataforma } from '@/lib/empresa'
-import { puede } from '@/lib/permisos'
+import { puede, rutaPermitida } from '@/lib/permisos'
 import { deApi } from '@/lib/inicial'
 import { GET as resumen } from '@/app/api/dashboard/summary/route'
 import { GET as grafico } from '@/app/api/reports/chart-data/route'
@@ -39,7 +39,7 @@ export default async function DashboardPage() {
       descuento={tieneModulo(session!.user, 'descuento_ml')} importaciones={importaciones}
       analisisStock={analisisStock} etapas={tieneModulo(session!.user, 'compras_etapas')}
       categorias={tieneModulo(session!.user, 'precios_categorias')} porConfirmar={porConfirmar}
-      reportes={reportes} />
+      reportes={reportes} ajustes={rutaPermitida('/tasas', session!.user)} />
     </div>)
   }
   return <div className="space-y-4">{sugerencia}<DashboardUser country={country} bonos={bonos} importaciones={importaciones}

@@ -80,23 +80,21 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
       ...(importaciones ? [{ label: recv && recv.imports_boxes > 0 ? `Importación en camino · ${recv.imports_boxes} cajas` : 'Importación en camino', n: recv?.imports ?? null, tono: 'info' as const, href: '/compras?tab=import&estado=EN_CAMINO', ayuda: 'Importaciones en camino' }] : []),
     ] : []),
   ]
-  const fechaHoy = new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
     <div className="space-y-5">
       <h1 className="sr-only">Inicio</h1>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 text-sm">
-          {country === 'VE'
-            ? <RateBar descuento={false} exceso={false} />
-            : <span className="inline-block text-neutral-500 first-letter:uppercase">{fechaHoy}</span>}
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="order-2 min-w-0 basis-full sm:order-1 sm:flex-1 sm:basis-auto">
+          <Pendientes items={pendientes} titulo={false} />
         </div>
-        <Link href="/ventas?new=1" className="btn-primary text-sm whitespace-nowrap">+ Nueva venta</Link>
+        <div className="order-1 flex w-full flex-wrap items-center justify-between gap-2 sm:order-2 sm:w-auto sm:justify-end">
+          {country === 'VE' && <RateBar descuento={false} exceso={false} />}
+          <Link href="/ventas?new=1" className="btn-primary text-sm whitespace-nowrap">+ Nueva venta</Link>
+        </div>
       </div>
 
       <AvisoStockVerificar n={(summary as { por_verificar?: number }).por_verificar ?? 0} />
-
-      <Pendientes items={pendientes} />
 
       {country === 'VE' && bonos && <BonusPipeline />}
 

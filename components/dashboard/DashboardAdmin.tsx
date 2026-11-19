@@ -97,9 +97,10 @@ function Delta({ ahora, antes }: { ahora: number; antes: number | undefined }) {
   )
 }
 
-export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, reportes = false, inicial }: {
+export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, reportes = false, ajustes = false, inicial }: {
   inicial?: { summary: Summary | null; chart: ChartData | null }   // 12-11: lo que ya vino en el HTML (lib/inicial.ts)
   country: Country; bonos: boolean; puedeTasas: boolean
+  ajustes?: boolean        // 19-11: puede entrar a Ajustes (la píldora de la tasa lleva ahí)
   reportes?: boolean       // permiso Reportes: «Ver todos» de Más vendidos y «Se están cayendo» (14-11, el Resumen vive aquí)
   porConfirmar?: boolean   // cuentas de ML conectadas: pendiente «Por confirmar»
   etapas?: boolean   // módulo compras_etapas (sin él no hay compras en tránsito)
@@ -217,44 +218,42 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
     ...(etapas ? [{ label: 'En camino', n: summary.in_transit, tono: 'info' as const, href: '/reportes?tab=transito', ayuda: 'Compras e importaciones que todavía no llegan' }] : []),
   ]
 
-  const fechaHoy = new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
     <div className="space-y-5">
       <h1 className="sr-only">Inicio</h1>
 
-      {/* Arriba: la tasa (VE) o la fecha, y los dos atajos. Sin título: el menú ya dice dónde estás. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 text-sm">
-          {country === 'VE'
-            ? <RateBar puedeActualizar={puedeTasas} descuento={descuento} exceso={categorias} />
-            : <span className="text-neutral-500 first-letter:uppercase inline-block">{fechaHoy}</span>}
+      {/* 19-11 (el dueño): la primera línea es «lo que hay que hacer»: los pendientes a la izquierda; a la derecha la
+          tasa en una píldora chica (VE) y los atajos. En el celular, atajos y tasa arriba. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="order-2 min-w-0 basis-full sm:order-1 sm:flex-1 sm:basis-auto">
+          <Pendientes items={pendientes} titulo={false} />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href="/ventas?new=1" className="btn-primary text-sm whitespace-nowrap">+ Nueva venta</Link>
-          {!importaciones ? (
-            <Link href="/compras?new=1" className="btn-secondary text-sm whitespace-nowrap">+ Nueva compra</Link>
-          ) : <div className="relative">
-            <button type="button" onClick={() => setCompraMenu(v => !v)} aria-expanded={compraMenu} className="btn-secondary text-sm whitespace-nowrap">
-              + Nueva compra ▾
-            </button>
-            {compraMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setCompraMenu(false)} />
-                <div className="absolute right-0 mt-1 w-44 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 overflow-hidden">
-                  <Link href="/compras?new=1" className="block px-3 py-2 text-sm hover:bg-neutral-50">Compra local</Link>
-                  <Link href="/compras?tab=import&new=1" className="block px-3 py-2 text-sm hover:bg-neutral-50 border-t border-neutral-100">Importación</Link>
-                </div>
-              </>
-            )}
-          </div>}
+        <div className="order-1 flex w-full flex-wrap items-center justify-between gap-2 sm:order-2 sm:w-auto sm:justify-end">
+          {country === 'VE' && <RateBar puedeActualizar={puedeTasas} descuento={descuento} exceso={categorias} ajustes={ajustes} />}
+          <div className="flex items-center gap-2">
+            <Link href="/ventas?new=1" className="btn-primary text-sm whitespace-nowrap">+ Nueva venta</Link>
+            {!importaciones ? (
+              <Link href="/compras?new=1" className="btn-secondary text-sm whitespace-nowrap">+ Nueva compra</Link>
+            ) : <div className="relative">
+              <button type="button" onClick={() => setCompraMenu(v => !v)} aria-expanded={compraMenu} className="btn-secondary text-sm whitespace-nowrap">
+                + Nueva compra ▾
+              </button>
+              {compraMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setCompraMenu(false)} />
+                  <div className="absolute right-0 mt-1 w-44 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                    <Link href="/compras?new=1" className="block px-3 py-2 text-sm hover:bg-neutral-50">Compra local</Link>
+                    <Link href="/compras?tab=import&new=1" className="block px-3 py-2 text-sm hover:bg-neutral-50 border-t border-neutral-100">Importación</Link>
+                  </div>
+                </>
+              )}
+            </div>}
+          </div>
         </div>
       </div>
 
       <AvisoStockVerificar n={summary.por_verificar ?? 0} />
-
-      {/* Pendientes (no dependen del período) */}
-      <Pendientes items={pendientes} />
 
       {country === 'VE' && bonos && <BonusPipeline detalle />}
 
