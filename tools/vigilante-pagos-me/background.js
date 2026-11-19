@@ -78,7 +78,7 @@ async function latido() {
   if (!cfg.perfil || !cfg.servidor || !cfg.clave) return { texto: 'Falta configurar perfil, sistema y clave.' }
   try {
     const d = await api(cfg, 'latido')
-    // 1.3.10: `corte` + `revisar` (lectura corta segura). El `desde` de la 1.3.9 ya no se usa.
+    // 1.4.0: `corte` + `revisar` (lectura corta segura). El `desde` de la 1.3.9 ya no se usa.
     if (d.pedido && !trabajando) procesarConVigia(cfg, d.pedido, !!d.pesos, d.corte ? { corte: d.corte, revisar: d.revisar ?? [] } : null)
     // Abierto por el despertador pero ya no hay nada que hacer aquí (otro lo hizo, venció): se cierra.
     if (!d.pedido && !trabajando) for (const t of await tabsDelDespertador()) cerrarVentana(t)
@@ -357,7 +357,7 @@ function avisador(cfg, pedido) {
 /** 1.3.9: lee la lista de órdenes de a una página (de LIMITE_PAGINA). Con `desde` (fecha de corte que da el sistema),
  *  ordena por última modificación y para al pasar esa fecha: casi siempre 1 página. Sin `desde`, los 7 días. */
 async function leerPorPaginas(tabId, plan, aviso, vigente) {
-  // 1.3.10: `plan` = { corte (fecha de CREACIÓN desde la que leer la lista), revisar (números de las pendientes) }.
+  // 1.4.0: `plan` = { corte (fecha de CREACIÓN desde la que leer la lista), revisar (números de las pendientes) }.
   const corte = plan?.corte ? Date.parse(plan.corte) : null
   const revisar = corte && Array.isArray(plan?.revisar) ? plan.revisar.map(String) : []
   const vistosIds = new Set()
@@ -405,7 +405,7 @@ async function leerPorPaginas(tabId, plan, aviso, vigente) {
     const total = frac > 0.05 ? Math.max(leidas + LIMITE_PAGINA, Math.round(leidas / Math.min(1, frac))) : null
     aviso('leyendo', leidas, total, total ? medida.faltan(Math.ceil((total - leidas) / LIMITE_PAGINA)) : null, false, modo)
   }
-  // 1.3.10: las que la traída anterior dejó esperando pago o guía, de a una por su número (las nuevas ya vinieron en la
+  // 1.4.0: las que la traída anterior dejó esperando pago o guía, de a una por su número (las nuevas ya vinieron en la
   // lista). Así el pago de una orden de hace 6 días entra aunque el portal no le cambie la fecha.
   const pendientes = parcial ? [] : revisar.filter(id => !vistosIds.has(id))
   if (pendientes.length) {
@@ -475,7 +475,7 @@ async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000,
   const inicio = Date.now()
   const limite = op?.limite ?? 50
   const ordenPor = op?.orden === 'last_updated' ? 'last_updated' : 'date_created'
-  // 1.3.10: el corte vale con cualquier orden (la 1.3.10 lo usa por fecha de CREACIÓN: MercadoEnvíos no siempre cambia
+  // 1.4.0: el corte vale con cualquier orden (la 1.4.0 lo usa por fecha de CREACIÓN: MercadoEnvíos no siempre cambia
   // last_updated al llegar un pago). Con `op.ids` se piden esas órdenes de a una (/orders/{id}/) en vez de la lista.
   const corte = op?.corte ? op.corte : null
   const soloIds = Array.isArray(op?.ids) ? op.ids : null

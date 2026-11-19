@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         pesos = !f?.fresco
       }
     }
-    // 19-11 noche (extensión 1.3.10): lectura corta SEGURA. La 1.3.9 leía por «última modificación» del portal, pero
+    // 19-11 noche (extensión 1.4.0): lectura corta SEGURA. La 1.3.9 leía por «última modificación» del portal, pero
     // MercadoEnvíos NO siempre la cambia al llegar un pago (6 de 14 pagos tardíos de PIKEKE quedaron con la fecha de
     // creación): se perdían. Ahora `corte` es por FECHA DE CREACIÓN (lo nuevo desde la última lectura buena, menos un
     // margen) y `revisar` son los números de las órdenes que esa lectura dejó esperando pago o guía (saltadas, o con pago
