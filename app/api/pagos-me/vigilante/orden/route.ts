@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { autenticarVigilante, conectarVenta, guardarArchivoME, MAX_ARCHIVO } from '@/lib/pagosME'
+import { autenticarVigilante, bancoReceptor, conectarVenta, guardarArchivoME, MAX_ARCHIVO } from '@/lib/pagosME'
 
 const txt = (n: number) => z.string().trim().max(n).nullish().transform(v => v || null)
 const num = z.number().finite().nullish().transform(v => v ?? null)
@@ -15,6 +15,8 @@ const Body = z.object({
     metodo_pago: txt(40), banco_emisor: txt(80), banco_receptor: txt(80),
     referencia: txt(60), fecha_pago: txt(40), monto_pagado: num,
     envio_metodo: txt(60), envio_opcion: txt(60), carrier: txt(30), guia: txt(40),
+    // 1.3.7: campos con «bank» del pago (ruta → nombre). El receptor se elige aquí si el portal no lo dio donde se buscaba.
+    bancos: z.array(z.object({ ruta: z.string().max(120), valor: z.string().max(80) })).max(20).nullish(),
   }),
   guia_b64: z.string().max(MAX_ARCHIVO * 1.4).nullish(),
   comprobante_b64: z.string().max(MAX_ARCHIVO * 1.4).nullish(),
@@ -28,6 +30,7 @@ export async function POST(req: NextRequest) {
   try {
     const b = Body.parse(await req.json())
     const o = b.orden
+    const receptor = o.banco_receptor ?? bancoReceptor(o.bancos ?? [])
     const guia = b.guia_b64 ? Buffer.from(b.guia_b64, 'base64') : null
     const comp = b.comprobante_b64 ? Buffer.from(b.comprobante_b64, 'base64') : null
     if (guia && guia.subarray(0, 5).toString('latin1') !== '%PDF-') {
@@ -39,8 +42,8 @@ export async function POST(req: NextRequest) {
     await a.db.query(
       `INSERT INTO me_pagos (venta, cuenta, estado_me, fecha_orden, total_orden, total_orden_usd, metodo_pago,
                              banco_emisor, banco_receptor, referencia, fecha_pago, monto_pagado, envio_metodo,
-                             envio_opcion, carrier, guia, guia_path, comprobante_path)
-       VALUES ($1,$2,$3,$4::timestamptz,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+                             envio_opcion, carrier, guia, guia_path, comprobante_path, bancos_me)
+       VALUES ($1,$2,$3,$4::timestamptz,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb)
        ON CONFLICT (empresa_id, venta) DO UPDATE SET
          cuenta = EXCLUDED.cuenta, estado_me = EXCLUDED.estado_me, fecha_orden = EXCLUDED.fecha_orden,
          total_orden = EXCLUDED.total_orden, total_orden_usd = EXCLUDED.total_orden_usd,
@@ -51,10 +54,11 @@ export async function POST(req: NextRequest) {
          carrier = EXCLUDED.carrier, guia = EXCLUDED.guia,
          guia_path = COALESCE(EXCLUDED.guia_path, me_pagos.guia_path),
          comprobante_path = COALESCE(EXCLUDED.comprobante_path, me_pagos.comprobante_path),
+         bancos_me = COALESCE(EXCLUDED.bancos_me, me_pagos.bancos_me),
          actualizado_at = NOW()`,
       [o.venta, b.cuenta ?? a.perfil, o.estado_me, o.fecha_orden, o.total_orden, o.total_orden_usd, o.metodo_pago,
-       o.banco_emisor, o.banco_receptor, o.referencia, o.fecha_pago, o.monto_pagado, o.envio_metodo,
-       o.envio_opcion, o.carrier, o.guia, guiaPath, compPath])
+       o.banco_emisor, receptor, o.referencia, o.fecha_pago, o.monto_pagado, o.envio_metodo,
+       o.envio_opcion, o.carrier, o.guia, guiaPath, compPath, o.bancos?.length ? JSON.stringify(o.bancos) : null])
 
     // Completada en MercadoEnvíos y todavía sin imprimir aquí (28-10): se despachó por otro lado (Mercasist, guía
     // impresa a mano en el portal…). Se destilda con una nota para que no se imprima ni se reporte dos veces; al

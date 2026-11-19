@@ -169,9 +169,15 @@ async function procesar(cfg, pedido, pesos = false, mio = turno) {
         if (prod?.ok) await api(cfg, 'productos', { cuenta: leido.cuenta || cfg.perfil, completo: prod.completo, items: prod.items })
       } catch (e) { await anotar(`No se pudieron leer los pesos: ${e.message}`) }
     }
+    // 1.3.7: notas del portal. Si falla (p. ej. el sistema todavía no tiene la ruta), la traída igual se da por buena.
+    if (vigente() && leido.notas?.length) {
+      avance()
+      await api(cfg, 'notas', { cuenta: leido.cuenta || cfg.perfil, ordenes: leido.notas }).catch(() => {})
+    }
     if (!vigente()) return
-    await api(cfg, 'fin', { pedido, ok: true, cuenta: leido.cuenta || cfg.perfil, vistas, nuevas })
-    await anotar(`Listo: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.`)
+    await api(cfg, 'fin', { pedido, ok: true, cuenta: leido.cuenta || cfg.perfil, vistas, nuevas, saltadas: leido.saltadas ?? [] })
+    const nSalt = leido.saltadas?.length ?? 0
+    await anotar(`Listo: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.${nSalt ? ` ${nSalt} sin pago o sin guía todavía.` : ''}`)
   } catch (e) {
     if (!vigente()) return
     const error = String(e.message || e).slice(0, 280)
@@ -248,18 +254,34 @@ async function reingresar(tabId) {
   })
   if (!tocado) return false
   // Pasa por ML y vuelve al portal (a /comprador/dashboard). Hasta 40 s.
-  for (let i = 0; i < 40; i++) {
+  // 1.3.7 (19-11): a veces el ingreso se abre en OTRA pestaña o ventana y quedaba abierta de más. Si vuelve al portal
+  // por ahí, se cierra esa y se sigue en la nuestra; si sale bien, también se cierran las de ML que abrió el ingreso.
+  const antes = new Set((await chrome.tabs.query({})).map(t => t.id))
+  const nuevas = async () => (await chrome.tabs.query({})).filter(t => !antes.has(t.id) && t.id !== tabId)
+  let ok = false
+  for (let i = 0; i < 40 && !ok; i++) {
     await new Promise(r => setTimeout(r, 1000))
     avance()
     const t = await chrome.tabs.get(tabId).catch(() => null)
     if (!t) return false
-    const u = t.url || ''
-    if (u.startsWith(PORTAL) && !/\/ingresar/.test(u) && t.status === 'complete') {
-      await new Promise(r => setTimeout(r, 1500))
-      return true
+    const enPortal = x => (x.url || '').startsWith(PORTAL) && !/\/ingresar/.test(x.url || '') && x.status === 'complete'
+    if (enPortal(t)) ok = true
+    else {
+      const otra = (await nuevas()).find(enPortal)
+      if (otra) {
+        await chrome.tabs.update(tabId, { url: `${PORTAL}/vendedor/orden` })
+        await esperarCarga(tabId)
+        ok = true
+      }
     }
   }
-  return false   // ML pidió clave o código: queda para hacerlo a mano
+  if (!ok) return false   // ML pidió clave o código: queda para hacerlo a mano (las ventanas quedan para eso)
+  await new Promise(r => setTimeout(r, 1500))
+  for (const x of await nuevas()) {
+    // Solo las que abrió nuestra pestaña (nunca una que la persona haya abierto en ese rato).
+    if (x.openerTabId === tabId && /mercadoenvios\.com\.ve|mercadolibre\.com/i.test(x.url || x.pendingUrl || '')) chrome.tabs.remove(x.id).catch(() => {})
+  }
+  return true
 }
 
 async function tabsDelDespertador() {
@@ -307,6 +329,26 @@ async function leerOrdenes(dias) {
     } catch (e) { if (e.message === 'sin_sesion') throw e }
 
     const ordenes = []
+    // 1.3.7: nota del vendedor de CADA orden de la ventana (también incompletas) y las que no se traen, con el motivo.
+    const notas = []
+    const saltadas = []
+    // Campos con «bank» del pago (ruta → nombre del banco). Nunca números: se salta lo que tenga 6+ dígitos seguidos.
+    const bancosDe = obj => {
+      const out = []
+      const ver = (x, ruta, prof) => {
+        if (!x || typeof x !== 'object' || prof > 4 || out.length >= 20) return
+        for (const [k, v] of Object.entries(x)) {
+          const r = ruta ? `${ruta}.${k}` : k
+          if (/bank|banco/i.test(k)) {
+            const val = typeof v === 'string' ? v : v && typeof v === 'object' ? (v.name ?? v.nombre ?? null) : null
+            if (typeof val === 'string' && val.trim() && val.length <= 80 && !/\d{6,}/.test(val)) out.push({ ruta: r.slice(0, 120), valor: val.trim() })
+          }
+          if (v && typeof v === 'object' && !Array.isArray(v)) ver(v, r, prof + 1)
+        }
+      }
+      ver(obj, '', 0)
+      return out
+    }
     for (let off = 0; off < 1000; off += 50) {
       const res = await json(`/api/v1/seller/orders/?limit=50&offset=${off}&order_by=date_created&direction=desc`)
       const rs = res?.data?.results ?? []
@@ -318,9 +360,12 @@ async function leerOrdenes(dias) {
         const m = mk ? p[mk] : null
         const comprobante = m?.voucher_url || null
         const guia = p.urlguide || null
-        if (!comprobante && !guia) continue            // incompletas: sin pago ni guía todavía
         const venta = (guia && (guia.match(/\/(\d{10,})\//) || [])[1]) || (/^\d{10,}$/.test(String(o._id)) ? String(o._id) : null)
-        if (!venta) continue
+        const nota = o.note == null ? '' : String(typeof o.note === 'object' ? (o.note.text ?? o.note.note ?? '') : o.note).trim()
+        notas.push({ orden: corto(o._id, 60), venta, nota: nota ? nota.slice(0, 1000) : null })
+        const saltar = motivo => saltadas.push({ orden: corto(o._id, 60), venta, motivo, estado: corto(o.status, 30), fecha: corto(o.date_created, 40) })
+        if (!comprobante && !guia) { saltar('sin_pago_ni_guia'); continue }   // incompletas: sin pago ni guía todavía
+        if (!venta) { saltar('sin_numero_venta'); continue }
         // Método y opción de envío pueden venir como id: se traducen con la agencia.
         const ag = p.shipping_agency
         let met = p.shipping_method
@@ -349,12 +394,13 @@ async function leerOrdenes(dias) {
             envio_opcion: corto(nombre(opt), 60),
             carrier: corto(ag?.name ?? null, 30),
             guia: p.guide ? corto(p.guide, 40) : null,
+            bancos: m ? bancosDe(m) : [],
           },
         })
       }
       if (new Date(rs[rs.length - 1].date_created).getTime() < desde) break
     }
-    return { ok: true, cuenta, ordenes }
+    return { ok: true, cuenta, ordenes, notas, saltadas }
   } catch (e) {
     return { ok: false, error: e.message }
   }

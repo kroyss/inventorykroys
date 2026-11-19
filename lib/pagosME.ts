@@ -265,3 +265,11 @@ export async function verificarCuenta(db: Pool, perfil: string, cuentaPortal: st
     [perfil, cuentaPortal, conexion, estado])
   return { estado, nickname, cuenta: cuentaPortal, coincidencias, revisadas: nums.length }
 }
+
+/** 1.3.7 (19-11): banco que RECIBE el pago, entre los campos con «bank» que manda la extensión (ruta → nombre). Solo
+ *  por la ruta (del vendedor / receptor / destino): por el nombre no se puede, comprador y vendedor pueden usar el mismo
+ *  banco. null si ninguna ruta lo dice (los datos quedan en me_pagos.bancos_me para afinar la regla después). */
+export function bancoReceptor(bancos: { ruta: string; valor: string }[]): string | null {
+  const b = bancos.find(x => /seller|receiv|recep|destin|recipient|benefic|vendedor|payee|to_bank|target/i.test(x.ruta))
+  return b?.valor.trim().slice(0, 80) || null
+}

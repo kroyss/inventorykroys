@@ -50,6 +50,10 @@ export default function Privacidad() {
             <li>De cada orden pagada de los últimos 7 días: número de venta, fecha, montos, método de pago, bancos,
               referencia, comprobante de pago (imagen o PDF), tipo de envío, transportista y la guía en PDF (que trae
               los datos de envío del comprador).</li>
+            <li>De cada orden de los últimos 7 días que todavía no tiene pago o guía: solo su número, estado y fecha,
+              para avisarte que falta.</li>
+            <li>Las notas que escribes en el portal en cada orden, para verlas junto a la venta.</li>
+            <li>Tus publicaciones del portal con su peso y transportistas (para el envío gratis).</li>
             <li>El nombre de tu cuenta de vendedor en MercadoEnvíos, para mostrarlo en pantalla.</li>
           </ul>
           <p>

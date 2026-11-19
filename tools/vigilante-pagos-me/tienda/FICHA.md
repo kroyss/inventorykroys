@@ -81,7 +81,7 @@ Traer los pagos y las guías del portal de vendedor de MercadoEnvíos del propio
 **Uso de datos.** Marcar que recopila:
 - ☑ Información de identificación personal (las guías traen nombre y dirección de envío del comprador)
 - ☑ Información financiera y de pagos (montos, bancos y referencias de los pagos de las órdenes)
-- ☑ Contenido de sitios web (datos de las órdenes leídos del portal)
+- ☑ Contenido de sitios web (datos de las órdenes leídos del portal; desde 1.3.7 también las notas del vendedor en cada orden y el número/estado de las órdenes sin pago o guía)
 - Todo lo demás, sin marcar (salud, autenticación, comunicaciones personales, ubicación, historial web, actividad del usuario).
 
 **Certificar las tres casillas:**
