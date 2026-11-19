@@ -64,7 +64,9 @@ export const unirNotas = (notas: NotaML[]) => notas.map(n => n.texto.trim()).fil
 
 /** Guarda la copia de las notas en la conversación (si existe). */
 export async function copiarNotas(db: Pool, venta: string, notas: NotaML[]) {
-  await db.query(`UPDATE ml_conversaciones SET notas = $2, notas_at = NOW() WHERE pack_id::text = $1`, [venta, unirNotas(notas)])
+  // 19-11: por número (usa el índice); antes pack_id::text recorría toda la tabla. Si no es un número, no toca nada.
+  await db.query(`UPDATE ml_conversaciones SET notas = $2, notas_at = NOW()
+                  WHERE pack_id = (CASE WHEN $1::text ~ '^[0-9]{1,18}$' THEN $1::text::bigint END)`, [venta, unirNotas(notas)])
 }
 
 /** A qué cuenta conectada pertenece una venta: primero por su conversación, si no
@@ -153,16 +155,27 @@ export async function refrescarNotasVentas(db: Pool, numeros: string[], edadMin 
      WHERE GREATEST(o.notas_at, c.notas_at) IS NULL OR GREATEST(o.notas_at, c.notas_at) < NOW() - make_interval(mins => $2)
      LIMIT 60`, [validos, edadMin])
   const tiene: Record<string, boolean> = {}
+  // 19-11 (rapidez): de ML se lee de a 6 como antes, pero se guarda TODO junto al final (antes 2-3 consultas por venta,
+  // ~240 por lista, y la de conversaciones comparaba pack_id como texto: recorría toda la tabla cada vez).
+  const leidas: { numero: string; texto: string | null }[] = []
   const uno = async (r: { numero: string; conexion_id: number }) => {
     const { notas, error } = await leerNotas(db, r.conexion_id, r.numero)
     if (error) return
-    const texto = unirNotas(notas)
-    await copiarNotas(db, r.numero, notas)
-    await db.query(`UPDATE ml_ordenes SET notas = $2, notas_at = NOW() WHERE id = $1::bigint OR pack_id = $1::bigint`, [r.numero, texto])
-    tiene[r.numero] = !!texto
+    leidas.push({ numero: r.numero, texto: unirNotas(notas) })
   }
   for (let i = 0; i < rows.length; i += 6) {
     await Promise.all(rows.slice(i, i + 6).map(r => uno(r).catch(e => console.error('[notas ML]', r.numero, e instanceof Error ? e.message : e))))
   }
+  if (!leidas.length) return tiene
+  const nums = leidas.map(l => l.numero), textos = leidas.map(l => l.texto)
+  try {
+    await db.query(`UPDATE ml_conversaciones c SET notas = v.texto, notas_at = NOW()
+                    FROM unnest($1::text[], $2::text[]) AS v(numero, texto) WHERE c.pack_id = v.numero::bigint`, [nums, textos])
+    await db.query(`UPDATE ml_ordenes o SET notas = v.texto, notas_at = NOW()
+                    FROM unnest($1::text[], $2::text[]) AS v(numero, texto) WHERE o.id = v.numero::bigint`, [nums, textos])
+    await db.query(`UPDATE ml_ordenes o SET notas = v.texto, notas_at = NOW()
+                    FROM unnest($1::text[], $2::text[]) AS v(numero, texto) WHERE o.pack_id = v.numero::bigint`, [nums, textos])
+    for (const l of leidas) tiene[l.numero] = !!l.texto
+  } catch (e) { console.error('[notas ML] guardar', e instanceof Error ? e.message : e) }
   return tiene
 }
