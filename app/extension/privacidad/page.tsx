@@ -47,14 +47,10 @@ export default function Privacidad() {
           </ul>
           <p>Lo que lee del portal y envía a tu cuenta del sistema:</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li>De cada orden pagada de los últimos 7 días: número de venta, fecha, montos, método de pago, bancos,
-              referencia, comprobante de pago (imagen o PDF), tipo de envío, transportista y la guía en PDF (que trae
-              los datos de envío del comprador).</li>
-            <li>De cada orden de los últimos 7 días que todavía no tiene pago o guía: solo su número, estado y fecha,
-              para avisarte que falta.</li>
-            <li>Las notas que escribes en el portal en cada orden, para verlas junto a la venta.</li>
-            <li>Tus publicaciones del portal con su peso y transportistas (para el envío gratis).</li>
-            <li>El nombre de tu cuenta de vendedor en MercadoEnvíos, para mostrarlo en pantalla.</li>
+            <li><b>Tus órdenes de los últimos 7 días:</b> datos del pago (montos, bancos, referencia y comprobante), envío
+              y guía, y las notas que escribes en cada orden.</li>
+            <li><b>Tus publicaciones del portal:</b> peso y transportistas.</li>
+            <li><b>El nombre de tu cuenta</b> de vendedor en MercadoEnvíos.</li>
           </ul>
           <p>
             Todo se envía por conexión cifrada (HTTPS) únicamente a <b>app.elcomerciantedigital.com</b>, a la empresa
