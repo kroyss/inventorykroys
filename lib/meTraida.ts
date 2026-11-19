@@ -16,7 +16,10 @@ const LATIDO_MIN = 3
 
 export interface CuentaTraida { perfil: string; nombre: string; hecho: boolean; ok: boolean; error: string | null; nuevas: number; vistas: number; pesos: boolean | null
   /** Sin terminar, con su Chrome dando señal, y la traída ya lleva LENTA_MIN: probablemente trabada. */
-  lenta?: boolean }
+  lenta?: boolean
+  /** 1.3.9 (mig. 190): cómo va mientras trabaja. Las versiones anteriores no lo mandan. */
+  avance?: AvanceCuenta | null }
+export interface AvanceCuenta { fase: 'leyendo' | 'bajando' | 'pesos'; hechas: number; total: number | null; faltan_s: number | null; modo: 'completa' | 'corta' | null }
 export interface EstadoTraida {
   id: number; pedido_at: string; pesos: boolean; automatico: boolean
   /** Corriendo: hay perfiles que todavía no respondieron y la PC está conectada. */
@@ -33,7 +36,7 @@ type Resultado = { ok?: boolean; error?: string | null; cuenta?: string | null; 
 /** La última traída y cómo va. null = nunca se pidió ninguna. */
 export async function estadoTraida(db: Pick<Pool, 'query'>): Promise<EstadoTraida | null> {
   const [{ rows: [p] }, { rows: latidos }] = await Promise.all([
-    db.query(`SELECT id::int, pedido_at, pesos, resultados, pedido_por IS NULL AS automatico,
+    db.query(`SELECT id::int, pedido_at, pesos, resultados, avance, pedido_por IS NULL AS automatico,
                      pedido_at > NOW() - make_interval(mins => $1) AS vigente,
                      pedido_at < NOW() - make_interval(mins => $2) AS tarda
               FROM me_pedidos ORDER BY id DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN, LENTA_MIN]),
@@ -50,13 +53,23 @@ export async function estadoTraida(db: Pick<Pool, 'query'>): Promise<EstadoTraid
   // Con despertador, los Chrome se abren solo al traer: la señal de vida es la del despertador.
   const conectada = despertador ? !!despertador.conectado : perfiles.some(l => l.conectado)
   const faltan = perfiles.filter(l => !res[l.perfil])
-  const pendiente = !!p.vigente && (perfiles.length ? faltan.length > 0 : Object.keys(res).length === 0)
+  // Avance que manda la 1.3.9 (se descarta si quedó viejo: la extensión se cerró a mitad).
+  const av = (p.avance ?? {}) as Record<string, AvanceCuenta & { at?: string }>
+  const avanceVivo = (perfil: string) => { const x = av[perfil]; return !!x?.at && Date.now() - new Date(x.at).getTime() < 3 * 60_000 }
+  const avanceDe = (perfil: string): AvanceCuenta | null => {
+    if (!avanceVivo(perfil)) return null
+    const x = av[perfil]
+    return { fase: x.fase, hechas: x.hechas ?? 0, total: x.total ?? null, faltan_s: x.faltan_s ?? null, modo: x.modo ?? null }
+  }
+  // 1.3.9: una cuenta que sigue mandando avance está trabajando aunque la traída pase de TRAIDA_EN_CURSO_MIN (línea
+  // lenta): el botón no se libera hasta que termine o deje de dar señal.
+  const pendiente = (!!p.vigente || faltan.some(l => avanceVivo(l.perfil))) && (perfiles.length ? faltan.length > 0 : Object.keys(res).length === 0)
   const nombre = (perfil: string, r?: Resultado) => r?.cuenta ?? perfiles.find(l => l.perfil === perfil)?.cuenta ?? perfil
   const cuentas: CuentaTraida[] = [
     ...Object.entries(res).map(([perfil, r]) => ({ perfil, nombre: nombre(perfil, r), hecho: true, ok: r.ok !== false, error: r.error ?? null,
       nuevas: r.nuevas ?? 0, vistas: r.vistas ?? 0, pesos: r.pesos ?? null })),
     ...faltan.map(l => ({ perfil: l.perfil as string, nombre: nombre(l.perfil), hecho: false, ok: false, error: null, nuevas: 0, vistas: 0, pesos: null,
-      lenta: !!p.tarda && !!l.conectado })),
+      lenta: !!p.tarda && !!l.conectado && !avanceVivo(l.perfil), avance: avanceDe(l.perfil) })),
   ]
   const fin = Object.values(res).map(r => r.at ?? '').filter(Boolean).sort().pop() ?? null
   return {

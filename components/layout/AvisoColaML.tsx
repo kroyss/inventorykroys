@@ -11,7 +11,7 @@
 import { comun } from '@/lib/comun'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/ui/Link'
-import { AYUDA_TRABADA, type EstadoTraida } from '@/lib/meTraida'
+import { AYUDA_TRABADA, type AvanceCuenta, type EstadoTraida } from '@/lib/meTraida'
 
 interface Lote { id: number; tipo: string; titulo: string; estado: string; total: number; ok: number; sin_cambio: number
   saltadas: number; errores: number; pendientes: number }
@@ -140,6 +140,16 @@ export default function AvisoColaML() {
 
 const ERROR_CUENTA: Record<string, string> = { sin_sesion: 'sin sesión de MercadoEnvíos en la PC' }
 
+/** «leyendo órdenes 40 de ~120 · faltan ~30 s» (extensión 1.3.9). */
+function textoAvance(a: AvanceCuenta) {
+  const que = a.fase === 'leyendo' ? (a.modo === 'corta' ? 'leyendo órdenes nuevas' : 'leyendo órdenes')
+    : a.fase === 'bajando' ? 'bajando guías y pagos' : 'leyendo pesos'
+  const cuantas = a.total ? `${a.hechas} de ${a.fase === 'leyendo' ? '~' : ''}${a.total}` : a.hechas ? `${a.hechas}` : ''
+  const falta = a.faltan_s == null ? '' : a.faltan_s < 60 ? ` · faltan ~${Math.max(5, Math.round(a.faltan_s / 5) * 5)} s`
+    : ` · faltan ~${Math.round(a.faltan_s / 60)} min`
+  return `${que}${cuantas ? ` ${cuantas}` : '…'}${falta}`
+}
+
 /** La traída de MercadoEnvíos en el aviso: cada cuenta con sus órdenes y si llegaron los pesos. */
 function TraidaME({ t }: { t: EstadoTraida }) {
   const hora = new Date(t.pedido_at).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })
@@ -162,7 +172,8 @@ function TraidaME({ t }: { t: EstadoTraida }) {
         {t.cuentas.map(c => (
           <li key={c.perfil} className="flex flex-wrap gap-x-1.5">
             <b className="text-neutral-800 truncate max-w-[10rem]">{c.nombre}</b>
-            {!c.hecho ? (c.lenta && corre ? <span className="text-amber-700">⟳ tarda más de lo normal: {AYUDA_TRABADA}</span>
+            {!c.hecho && c.avance && corre ? <span className="text-neutral-500">⟳ {textoAvance(c.avance)}</span>
+              : !c.hecho ? (c.lenta && corre ?<span className="text-amber-700">⟳ tarda más de lo normal: {AYUDA_TRABADA}</span>
                 : <span className={corre ? 'text-neutral-400' : 'text-red-700'}>{corre ? '⟳ trabajando…' : `no respondió: ${AYUDA_TRABADA}`}</span>)
               : !c.ok ? <span className="text-red-700">⚠ {ERROR_CUENTA[c.error ?? ''] ?? c.error ?? 'error'}</span>
               : <span>✓ {c.vistas} órdenes{c.nuevas ? ` · ${c.nuevas} nuevas` : ''}</span>}
