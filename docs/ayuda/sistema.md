@@ -916,10 +916,11 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
 
 - **Inicio:** cómo va tu negocio (rehecho el 19-11-2026). Sin título: arriba la tasa en una línea (VE: **Oficial ·
   Paralelo · Diferencial** —cuánto más cara está la paralela— **· Exceso · Descuento ML** y la fecha; en CO, la fecha) y
-  los atajos **+ Nueva venta** / **+ Nueva compra**. Luego **Pendientes**: solo lo que tiene algo, por urgencia (Por
-  confirmar, Sin stock, Reposición, Stock bajo, Ventas en borrador, **Se están cayendo** —venden la mitad o menos que
-  en los 4 meses anteriores—, **Para remate** —tienes stock y casi no se venden—, Compras en camino); cada tarjeta lleva a
-  su lista y lo que está en 0 sale en una línea gris «Al día: …». Si no hay nada: «Nada pendiente hoy». Después el bono
+  los atajos **+ Nueva venta** / **+ Nueva compra**. Luego **Pendientes**: botones chicos con el número, solo los que
+  tienen algo, por urgencia (Por confirmar, Sin stock, **Reponer**, Stock bajo, **Borradores**, **En caída** —se están
+  cayendo: venden la mitad o menos que en los 4 meses anteriores—, **Remate** —tienes stock y casi no se venden—, **En
+  camino** —compras—; al pasar el mouse dice qué es cada uno); cada uno lleva a su lista y lo que está en 0 sale en una
+  línea gris «Al día: …». Si no hay nada: «Nada pendiente hoy». Después el bono
   (si lo tienes) y el panel **Cómo va tu negocio**, con los botones **Hoy / Mes / Trim. / Año** o fechas, que **mandan
   sobre todo lo de abajo** (no sobre los pendientes), siempre contra el período anterior (Hoy = ayer a esta hora; Mes =
   el mes pasado hasta el mismo día; Año = el año pasado hasta el mismo día; fechas = los mismos días justo antes): la
@@ -927,12 +928,17 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   sobre el costo de la mercancía), y al lado **Ventas**, **Ventas concretadas** y **Ticket promedio**, cada una con su
   ▲▼. El gráfico: **barras azules = ventas**, **línea naranja = ganancia** y **línea gris = ventas del período
   anterior**; al pasar el dedo o el mouse, el detalle de ese día (ventas, ganancia, anterior, costos y ventas
-  concretadas). Abajo: **Más vendidos** (top 5 con barra y cuánto subió o bajó; «Ver todos los productos» abre Reportes
-  → Ventas → Por producto con esas fechas), **Por cuenta de MercadoLibre** (ventas y «antes N»), **Atención en
-  MercadoLibre** (preguntas, tiempo de respuesta, cuántas respondió la IA, ventas por pregunta) y **Calificaciones** en
-  una línea (las negativas y contradictorias se marcan solo si hay; lleva a Reputación). Ganancia y costos solo con el
-  permiso de costos. Un empleado sin ese permiso pero con Reportes ve abajo, del mes, los más vendidos (en unidades),
-  atención, calificaciones y «Se están cayendo». La palabra «Spread» ahora es **Diferencial** en todo el sistema.
+  concretadas). Abajo, en dos columnas: a la izquierda **Más vendidos** (top 5 con barra y cuánto subió o bajó; «Ver
+  todos los productos» abre Reportes → Ventas → Por producto con esas fechas); a la derecha **Por cuenta de
+  MercadoLibre** (ventas y «antes N»), **Atención en MercadoLibre** (preguntas, tiempo de respuesta, cuántas respondió la
+  IA, ventas por pregunta) y **Calificaciones** en una línea (las negativas y contradictorias se marcan solo si hay;
+  lleva a Reputación). Ganancia y costos solo con el permiso de costos.
+  **Inicio sin el permiso de costos** (empleado): la tasa (VE: Oficial · Paralelo · Diferencial) y **+ Nueva venta**;
+  **Pendientes** igual que arriba con lo suyo (Por confirmar, Borradores, Por despachar —lleva a Despachos—, y con
+  compras por etapas: Por finalizar, Compra en camino, Importación en camino con sus cajas); el bono (si lo ve); **Ventas
+  del mes** (cuántas van sumadas día a día, en azul, con el ▲▼ contra el mes pasado a la fecha y en gris cómo iban los
+  meses anteriores ese mismo día); y con Reportes, abajo y del mes, los más vendidos (en unidades), atención,
+  calificaciones y «Se están cayendo». La palabra «Spread» ahora es **Diferencial** en todo el sistema.
 - **Primeros pasos con tu inventario** (arriba en el Inicio, para quien ve Productos, mientras falten pasos): una lista
   con tu avance que **se marca sola** a medida que lo haces, con un botón para ir a cada pantalla y **¿Cómo?** con la
   explicación corta. Los pasos:
@@ -1386,7 +1392,7 @@ mi información, es seguro, comparten mis datos, mi contraseña la ven.
 Junto al título de cada sección hay una **ⓘ**: al tocarla se abre (o se cierra) un resumen corto de cómo funciona esa
 pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuario ese permiso. Lo que dice cada una:
 
-- **Inicio:** **Pendientes** = solo lo que tiene algo (lo demás, «Al día»). El período (Hoy/Mes/Trim./Año/fechas) cambia
+- **Inicio:** **Pendientes** = solo lo que tiene algo (lo demás, «Al día»); En caída = se están cayendo. El período (Hoy/Mes/Trim./Año/fechas) cambia
   todo lo de abajo, contra el período anterior. **Te quedó** = ganancia; gráfico: barras = ventas, naranja = ganancia,
   gris = ventas del período anterior. **Diferencial** = cuánto más cara está la tasa paralela que la oficial.
 - **Ventas:** **Por confirmar** = ventas de MercadoLibre que faltan registrar (verificas el pago y «Registrar venta»

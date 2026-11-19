@@ -24,7 +24,7 @@ function Cambio({ ahora, antes, menosEsMejor = false }: { ahora: number | null; 
   if (ahora == null || antes == null) return null
   if (!antes) return ahora ? <span className="text-neutral-400">antes 0</span> : null
   const c = cambio(ahora, antes)!
-  if (c === 0) return <span className="text-neutral-500">igual que antes</span>
+  if (c === 0) return <span className="text-neutral-500">igual</span>
   const bueno = menosEsMejor ? c < 0 : c > 0
   return <span className={bueno ? 'text-emerald-600' : 'text-red-600'}>{c > 0 ? '▲' : '▼'} {Math.abs(c)}%</span>
 }
@@ -35,9 +35,9 @@ function Tarjeta({ titulo, valor, ahora, antes, menosEsMejor, detalle, conNumero
   conNumero?: boolean
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-      <div className="text-xs font-medium text-neutral-500">{titulo}</div>
-      <div className="num mt-0.5 text-xl font-semibold tracking-tight text-neutral-900">{valor}</div>
+    <div className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 shadow-sm">
+      <div className="truncate text-xs font-medium text-neutral-500">{titulo}</div>
+      <div className="num mt-0.5 truncate text-lg font-semibold tracking-tight text-neutral-900">{valor}</div>
       {(ahora !== undefined || detalle) && (
         <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs">
           {ahora !== undefined && (conNumero && ahora != null && antes != null
@@ -111,7 +111,7 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
 
   return (
     <div className="space-y-6">
-      {(d.top || (d.cuentas && d.cuentas.length > 0) || caen != null) && (
+      {(d.top || (d.cuentas && d.cuentas.length > 0) || caen != null || a || c) && (
         <div className="grid gap-4 lg:grid-cols-2">
           {d.top && (
             <Seccion titulo="Más vendidos" ayuda={`Unidades del período, ${contra}.`}>
@@ -177,40 +177,40 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
                 <span className="shrink-0 text-xs font-medium text-sky-700 group-hover:underline">Ver en Stock →</span>
               </Link>
             )}
+            {a && (
+              <Seccion titulo="Atención en MercadoLibre" ayuda={`Preguntas que te hicieron, cuántas respondiste y qué tan rápido (la mitad se respondió en menos de ese tiempo), ${contra}.`}>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Tarjeta titulo="Preguntas" valor={n(a.actual.preguntas)} ahora={a.actual.preguntas} antes={a.anterior.preguntas}
+                    detalle={a.actual.preguntas ? `${Math.round(a.actual.respondidas / a.actual.preguntas * 100)}% respondidas` : undefined} />
+                  <Tarjeta titulo="Tiempo de respuesta" valor={textoMinutos(a.actual.mediana)} ahora={a.actual.mediana} antes={a.anterior.mediana} menosEsMejor
+                    detalle={`${n(a.actual.rapidas)} en menos de 1 hora`} />
+                  <Tarjeta titulo="Respondió la IA" valor={n(a.actual.porIA)} ahora={a.actual.porIA} antes={a.anterior.porIA} />
+                  <Tarjeta titulo="Ventas por pregunta" valor={a.actual.preguntas ? (a.actual.ventas / a.actual.preguntas).toLocaleString('es-VE', { maximumFractionDigits: 2 }) : '—'}
+                    detalle={`${n(a.actual.ventas)} ventas de ML`} />
+                </div>
+              </Seccion>
+            )}
+
+            {/* 19-11: las calificaciones en una sola línea (casi siempre «8 · 0 · 0 · 0»); lo malo se pinta solo si hay. */}
+            {c && (
+              <Link href="/reputacion" title={`Calificaciones recibidas en MercadoLibre, ${contra}. Contradictorias: dijo una cosa y tú otra (se corrigen en Reputación).`}
+                className="group flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm shadow-sm transition hover:border-neutral-300 hover:shadow-md">
+                <span className="font-semibold text-neutral-700">Calificaciones</span>
+                <span className="num text-neutral-700"><b className="font-semibold text-neutral-900">{n(c.positivas)}</b> positivas</span>
+                <span className="num text-neutral-500"><b className="font-semibold text-neutral-700">{n(c.neutrales)}</b> neutrales</span>
+                <span className={`num ${c.negativas ? 'font-medium text-red-700' : 'text-neutral-500'}`}>
+                  {c.negativas > 0 && <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" />}
+                  <b className={`font-semibold ${c.negativas ? '' : 'text-neutral-700'}`}>{n(c.negativas)}</b> negativas
+                  {c.negativas > 0 && c.antes_negativas != null && <span className="ml-1 text-xs font-normal text-neutral-500">(antes {n(c.antes_negativas)})</span>}</span>
+                {c.contradictorias > 0 && <span className="num font-medium text-amber-800">
+                  <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-500" /><b>{n(c.contradictorias)}</b> contradictorias</span>}
+                <span className="ml-auto text-xs font-medium text-sky-700 group-hover:underline">Reputación →</span>
+              </Link>
+            )}
           </div>
         </div>
       )}
 
-      {a && (
-        <Seccion titulo="Atención en MercadoLibre" ayuda={`Preguntas que te hicieron, cuántas respondiste y qué tan rápido, ${contra}.`}>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Tarjeta titulo="Preguntas recibidas" valor={n(a.actual.preguntas)} ahora={a.actual.preguntas} antes={a.anterior.preguntas}
-              detalle={a.actual.preguntas ? `${Math.round(a.actual.respondidas / a.actual.preguntas * 100)}% respondidas` : undefined} />
-            <Tarjeta titulo="Tiempo de respuesta (mitad)" valor={textoMinutos(a.actual.mediana)} ahora={a.actual.mediana} antes={a.anterior.mediana} menosEsMejor
-              detalle={`${n(a.actual.rapidas)} en menos de 1 hora`} />
-            <Tarjeta titulo="Respondió sola la IA" valor={n(a.actual.porIA)} ahora={a.actual.porIA} antes={a.anterior.porIA} />
-            <Tarjeta titulo="Ventas por pregunta" valor={a.actual.preguntas ? (a.actual.ventas / a.actual.preguntas).toLocaleString('es-VE', { maximumFractionDigits: 2 }) : '—'}
-              detalle={`${n(a.actual.ventas)} ventas de ML`} />
-          </div>
-        </Seccion>
-      )}
-
-      {/* 19-11: las calificaciones en una sola línea (casi siempre «8 · 0 · 0 · 0»); lo malo se pinta solo si hay. */}
-      {c && (
-        <Link href="/reputacion" title={`Calificaciones recibidas en MercadoLibre, ${contra}. Contradictorias: dijo una cosa y tú otra (se corrigen en Reputación).`}
-          className="group flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm shadow-sm transition hover:border-neutral-300 hover:shadow-md">
-          <span className="font-semibold text-neutral-700">Calificaciones</span>
-          <span className="num text-neutral-700"><b className="font-semibold text-neutral-900">{n(c.positivas)}</b> positivas</span>
-          <span className="num text-neutral-500"><b className="font-semibold text-neutral-700">{n(c.neutrales)}</b> neutrales</span>
-          <span className={`num ${c.negativas ? 'font-medium text-red-700' : 'text-neutral-500'}`}>
-            {c.negativas > 0 && <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" />}
-            <b className={`font-semibold ${c.negativas ? '' : 'text-neutral-700'}`}>{n(c.negativas)}</b> negativas
-            {c.negativas > 0 && c.antes_negativas != null && <span className="ml-1 text-xs font-normal text-neutral-500">(antes {n(c.antes_negativas)})</span>}</span>
-          {c.contradictorias > 0 && <span className="num font-medium text-amber-800">
-            <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-500" /><b>{n(c.contradictorias)}</b> contradictorias</span>}
-          <span className="ml-auto text-xs font-medium text-sky-700 group-hover:underline">Reputación →</span>
-        </Link>
-      )}
     </div>
   )
 }

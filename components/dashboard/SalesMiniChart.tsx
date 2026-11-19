@@ -20,8 +20,10 @@ interface Data {
   refs: RefMonth[]
 }
 
-const CURRENT_COLOR = '#16a34a'                              // mes actual (verde)
-const REF_COLORS = ['rgba(245,158,11,0.55)', 'rgba(99,102,241,0.55)'] // 2 meses atrás (ámbar) → mes anterior (índigo), atenuados
+// 19-11 (guía dataviz): el mes actual en el azul de «Ventas» del Inicio; los meses de referencia en grises sólidos (el
+// mes anterior más oscuro), sin punteados. refs viene de más viejo a más nuevo: el último es el mes anterior.
+const CURRENT_COLOR = '#2a78d6'
+const REF_COLORS = ['#d4d4cf', '#a3a39e']
 
 export default function SalesMiniChart() {
   const [data, setData] = useState<Data | null>(null)
@@ -39,7 +41,7 @@ export default function SalesMiniChart() {
       label: data.current_month,
       data: data.points.map(p => p.cumulative),
       borderColor: CURRENT_COLOR,
-      backgroundColor: 'rgba(22,163,74,0.12)',
+      backgroundColor: 'rgba(42,120,214,0.08)',
       fill: true,
       tension: 0.3,
       pointRadius: 0,
@@ -51,7 +53,6 @@ export default function SalesMiniChart() {
       label: r.label,
       data: r.cumulative,
       borderColor: REF_COLORS[i] ?? '#d1d5db',
-      borderDash: [4, 4],
       borderWidth: 1.5,
       pointRadius: 0,
       pointHoverRadius: 0,
@@ -66,60 +67,74 @@ export default function SalesMiniChart() {
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
-      legend: { display: false },
+      legend: { display: false },   // leyenda en HTML, debajo
       tooltip: {
+        backgroundColor: 'rgba(23,23,23,0.94)', padding: 10, cornerRadius: 8, boxWidth: 8, boxHeight: 8, boxPadding: 4, usePointStyle: true,
+        titleFont: { size: 12, weight: 'bold' }, bodyFont: { size: 12 },
         callbacks: {
           title: (items) => `Día ${items[0].label}`,
-          label: (item) => {
-            if (item.parsed.y == null) return ''
-            return `${item.dataset.label}: ${item.parsed.y}`
-          },
+          label: (item) => item.parsed.y == null ? '' : ` ${item.dataset.label}: ${item.parsed.y} ventas`,
         },
       },
     },
     scales: {
       x: {
+        border: { display: false },
         grid: { display: false },
-        ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8, font: { size: 10 }, color: '#9ca3af' },
+        ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8, font: { size: 11 }, color: '#8a8a85' },
       },
       y: {
         beginAtZero: true,
-        grid: { color: '#f3f4f6' },
-        ticks: { precision: 0, font: { size: 10 }, color: '#9ca3af' },
+        border: { display: false },
+        grid: { color: 'rgba(0,0,0,0.05)' },
+        ticks: { precision: 0, maxTicksLimit: 5, font: { size: 11 }, color: '#8a8a85', padding: 8 },
       },
     },
   }
 
+  // El mes anterior a esta misma fecha (último de refs) para el ▲▼ de la cifra.
+  const anterior = data.refs[data.refs.length - 1]
+  const pct = anterior && anterior.at_today > 0 ? Math.round(((data.total - anterior.at_today) / anterior.at_today) * 1000) / 10 : null
+
   return (
-    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4">
-      <div className="flex items-baseline justify-between mb-2">
-        <h2 className="text-sm font-semibold text-neutral-700">
-          Ventas del mes · {data.current_month}
-        </h2>
-        <div className="text-sm">
-          <span className="font-bold text-green-600">{data.total}</span>
-          <span className="text-neutral-400 text-xs"> ventas</span>
+    <section className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-neutral-100 px-4 py-3 sm:px-5">
+        <div>
+          <h2 className="font-semibold text-neutral-900">Ventas del mes</h2>
+          <p className="text-xs text-neutral-500 first-letter:uppercase">{data.current_month} · cuántas van sumadas día a día</p>
+        </div>
+        <div className="text-right">
+          <div className="flex items-center justify-end gap-1.5">
+            <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: CURRENT_COLOR }} />
+            <span className="num text-3xl font-semibold tracking-tight text-neutral-900">{data.total.toLocaleString('es-VE')}</span>
+            <span className="text-sm text-neutral-500">ventas</span>
+          </div>
+          {pct != null && (
+            <div className="text-xs">
+              <span className={`num font-medium ${pct >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toLocaleString('de-DE')}%</span>
+              <span className="text-neutral-500"> que el mes pasado a la fecha</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div style={{ height: 150 }}>
-        <Line data={{ labels, datasets }} options={options} />
-      </div>
-
-      {/* Referencia de meses pasados */}
-      {data.refs.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[11px] text-neutral-500">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-0.5 bg-green-500" /> {data.current_month} (actual)
+      <div className="px-3 pb-3 pt-3 sm:px-4">
+        <div className="relative h-52" role="img" aria-label={`Ventas acumuladas del mes: ${data.total}`}>
+          <Line data={{ labels, datasets }} options={options} />
+        </div>
+        {/* Leyenda: el mes actual y cómo iban los anteriores a esta misma fecha */}
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-neutral-600">
+          <span className="flex items-center gap-1.5">
+            <span className="h-0.5 w-4 rounded-full" style={{ background: CURRENT_COLOR }} />Este mes
           </span>
           {data.refs.map((r, i) => (
-            <span key={r.label} className="flex items-center gap-1">
-              <span className="inline-block w-3 border-t-2 border-dashed" style={{ borderColor: REF_COLORS[i] ?? '#d1d5db' }} />
-              {r.label}: día {data.today} iba en {r.at_today} · cerró {r.total}
+            <span key={r.label} className="flex items-center gap-1.5">
+              <span className="h-0.5 w-4 rounded-full" style={{ background: REF_COLORS[i] ?? '#d4d4cf' }} />
+              <span className="first-letter:uppercase">{r.label}</span>: el día {data.today} iba en <b className="num font-medium text-neutral-800">{r.at_today}</b> · cerró en <b className="num font-medium text-neutral-800">{r.total}</b>
             </span>
           ))}
         </div>
-      )}
-    </div>
+      </div>
+    </section>
   )
 }

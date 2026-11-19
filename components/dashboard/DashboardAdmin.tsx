@@ -15,6 +15,7 @@ import RateBar from './RateBar'
 import { DateField } from '@/components/ui/DateField'
 import AvisoStockVerificar from './AvisoStockVerificar'
 import BloquesInicio from './BloquesInicio'
+import Pendientes, { type Pendiente } from './Pendientes'
 import { usePorConfirmar, pendientesPorConfirmar } from '@/components/ventas/PorConfirmar'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, BarController, LineController, Tooltip, Filler)
@@ -204,21 +205,17 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
   const ant = chart?.anterior
   const contra = CONTRA[period]
 
-  // ── Pendientes: solo lo que tiene algo, por urgencia. Lo que está en 0 va en una línea gris. ──
-  type Pend = { label: string; n: number | null; tono: 'problema' | 'atencion' | 'info'; href: string; ayuda: string }
-  const pendientes: Pend[] = [
+  // ── Pendientes (19-11): nombres cortos, por urgencia; el detalle va en el title. ──
+  const pendientes: Pendiente[] = [
     ...(porConfirmar ? [{ label: 'Por confirmar', n: pc.datos ? pendientesPorConfirmar(pc.datos) : null, tono: 'atencion' as const, href: '/ventas?vista=confirmar', ayuda: 'Ventas de MercadoLibre que todavía no registraste' }] : []),
     { label: 'Sin stock', n: summary.no_stock, tono: 'problema', href: '/inventario?estado=SIN_STOCK', ayuda: 'Productos activos en 0' },
-    ...(analisisStock ? [{ label: 'Reposición', n: summary.reposicion_count, tono: 'atencion' as const, href: '/inventario/reponer?sub=reposicion', ayuda: 'Lo que tienes no alcanza para lo que tarda en llegar' }] : []),
+    ...(analisisStock ? [{ label: 'Reponer', n: summary.reposicion_count, tono: 'atencion' as const, href: '/inventario/reponer?sub=reposicion', ayuda: 'Lo que tienes no alcanza para lo que tarda en llegar' }] : []),
     { label: 'Stock bajo', n: summary.low_stock_alerts, tono: 'atencion', href: '/inventario?estado=BAJO', ayuda: 'Por debajo del mínimo' },
-    { label: 'Ventas en borrador', n: summary.pending_sales, tono: 'atencion', href: '/ventas?estado=BORRADOR', ayuda: 'Ventas sin terminar de cargar' },
-    ...(conCayendo ? [{ label: 'Se están cayendo', n: caen, tono: 'atencion' as const, href: '/inventario/reponer?sub=declive', ayuda: 'Venden la mitad o menos que en los 4 meses anteriores' }] : []),
-    ...(analisisStock ? [{ label: 'Para remate', n: summary.remate_count, tono: 'atencion' as const, href: '/inventario/reponer?sub=remate', ayuda: 'Tienes stock y casi no se venden' }] : []),
-    ...(etapas ? [{ label: 'Compras en camino', n: summary.in_transit, tono: 'info' as const, href: '/reportes?tab=transito', ayuda: 'Compras e importaciones que todavía no llegan' }] : []),
+    { label: 'Borradores', n: summary.pending_sales, tono: 'atencion', href: '/ventas?estado=BORRADOR', ayuda: 'Ventas sin terminar de cargar' },
+    ...(conCayendo ? [{ label: 'En caída', n: caen, tono: 'atencion' as const, href: '/inventario/reponer?sub=declive', ayuda: 'Se están cayendo: venden la mitad o menos que en los 4 meses anteriores' }] : []),
+    ...(analisisStock ? [{ label: 'Remate', n: summary.remate_count, tono: 'atencion' as const, href: '/inventario/reponer?sub=remate', ayuda: 'Para remate: tienes stock y casi no se venden' }] : []),
+    ...(etapas ? [{ label: 'En camino', n: summary.in_transit, tono: 'info' as const, href: '/reportes?tab=transito', ayuda: 'Compras e importaciones que todavía no llegan' }] : []),
   ]
-  const conAlgo = pendientes.filter(p => (p.n ?? 0) > 0)
-  const enCero = pendientes.filter(p => p.n === 0)
-  const cargandoPend = pendientes.some(p => p.n == null)
 
   const fechaHoy = new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -257,36 +254,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
       <AvisoStockVerificar n={summary.por_verificar ?? 0} />
 
       {/* Pendientes (no dependen del período) */}
-      <section aria-labelledby="pend-t" className="space-y-2">
-        <h2 id="pend-t" className="text-sm font-semibold text-neutral-700">Pendientes</h2>
-        {conAlgo.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {conAlgo.map(p => (
-              <Link key={p.label} href={p.href} title={p.ayuda}
-                className="group flex min-h-[4.25rem] flex-col justify-between rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 shadow-sm transition hover:-translate-y-px hover:border-neutral-300 hover:shadow-md">
-                <span className="flex items-center justify-between gap-2 text-xs font-medium text-neutral-600">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${p.tono === 'problema' ? 'bg-red-500' : p.tono === 'atencion' ? 'bg-amber-500' : 'bg-neutral-400'}`} />
-                    <span className="truncate">{p.label}</span>
-                  </span>
-                  <span aria-hidden className="text-neutral-300 transition-colors group-hover:text-neutral-500">→</span>
-                </span>
-                <span className="num text-2xl font-semibold tracking-tight text-neutral-900">{p.n}</span>
-              </Link>
-            ))}
-          </div>
-        ) : !cargandoPend ? (
-          <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5 text-sm text-emerald-900">
-            <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white">✓</span>
-            Nada pendiente hoy.
-          </p>
-        ) : null}
-        {conAlgo.length > 0 && enCero.length > 0 && (
-          <p className="text-xs text-neutral-500">
-            <span aria-hidden className="mr-1 text-emerald-600">✓</span>Al día: {enCero.map(p => p.label.toLowerCase()).join(' · ')}
-          </p>
-        )}
-      </section>
+      <Pendientes items={pendientes} />
 
       {country === 'VE' && bonos && <BonusPipeline detalle />}
 

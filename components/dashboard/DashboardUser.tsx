@@ -5,7 +5,8 @@ import type { Country } from '@/lib/types'
 import BonusPipeline from './BonusPipeline'
 import BloquesInicio from './BloquesInicio'
 import SalesMiniChart from './SalesMiniChart'
-import { parseLocalDate } from '@/lib/tz'
+import RateBar from './RateBar'
+import Pendientes, { type Pendiente } from './Pendientes'
 import AvisoStockVerificar from './AvisoStockVerificar'
 import { usePorConfirmar, pendientesPorConfirmar } from '@/components/ventas/PorConfirmar'
 
@@ -32,31 +33,20 @@ interface ReceptionCounts {
   por_finalizar: number
 }
 
-interface Rate {
-  official_rate: number
-  parallel_rate: number
-  spread_percentage: number
-  rate_date: string | null
-}
-
-const fmt = (n: number) =>
-  Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
-
 export default function DashboardUser({ country, bonos, importaciones, verificarPagos = true, etapas = true, porConfirmar = false, despachos = false, reportes = false, cayendo = false }: {
   reportes?: boolean         // 14-11: con permiso Reportes (sin costos) ve abajo lo que no muestra plata, del mes
   cayendo?: boolean          // y Reportes → Stock disponible
-  despachos?: boolean        // módulo y permiso de Despachos: "Por descargar" lleva ahí (las guías por generar)
+  despachos?: boolean        // módulo y permiso de Despachos: "Por despachar" lleva ahí (las guías por generar)
   country: Country; bonos: boolean; importaciones: boolean
-  porConfirmar?: boolean     // cuentas de ML conectadas: tarjeta "Por confirmar" (lo normal) antes de "Nueva venta"
+  porConfirmar?: boolean     // cuentas de ML conectadas: pendiente "Por confirmar"
   verificarPagos?: boolean   // módulo verificar_pagos: sin él (Inventario simple) no hay "Pago verificado" ni "Por descargar"
   etapas?: boolean           // módulo compras_etapas: sin él no hay recepciones en camino
 }) {
   const pc = usePorConfirmar(porConfirmar)
-  const pendientesPC = pendientesPorConfirmar(pc.datos)
   const [summary, setSummary] = useState<Summary | null>(null)
-  const [saleCounts, setSaleCounts] = useState<SaleStateCounts>({ borrador: 0, verificado: 0, procesada: 0 })
-  const [recv, setRecv] = useState<ReceptionCounts>({ local: 0, imports: 0, imports_boxes: 0, por_finalizar: 0 })
-  const [rate, setRate] = useState<Rate | null>(null)
+  // null = cargando (así no sale «Nada pendiente» un instante antes de que lleguen los números)
+  const [saleCounts, setSaleCounts] = useState<SaleStateCounts | null>(null)
+  const [recv, setRecv] = useState<ReceptionCounts | null>(null)
 
   useEffect(() => {
     fetch('/api/dashboard/summary').then(r => r.json()).then(setSummary)
@@ -64,139 +54,60 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
     // Conteos por estado vienen del endpoint paginado de ventas (campo counts)
     fetch('/api/sales?pageSize=1').then(r => r.json()).then(res => {
       const c = res?.counts
-      if (c) setSaleCounts({
-        borrador:   c.BORRADOR ?? 0,
-        verificado: c.PAGO_VERIFICADO ?? 0,
-        procesada:  c.PROCESADA ?? 0,
-      })
-    })
+      setSaleCounts({ borrador: c?.BORRADOR ?? 0, verificado: c?.PAGO_VERIFICADO ?? 0, procesada: c?.PROCESADA ?? 0 })
+    }).catch(() => setSaleCounts({ borrador: 0, verificado: 0, procesada: 0 }))
 
-    fetch('/api/dashboard/reception-counts').then(r => r.json()).then(c => {
-      if (c && typeof c.local === 'number') {
-        setRecv({
-          local:         c.local,
-          imports:       c.imports,
-          imports_boxes: c.imports_boxes,
-          por_finalizar: c.por_finalizar,
-        })
-      }
-    })
-
-    if (country === 'VE') {
-      fetch('/api/rates/latest').then(r => r.json()).then(setRate)
-    }
-  }, [country])
+    if (etapas) fetch('/api/dashboard/reception-counts').then(r => r.json()).then(c => {
+      setRecv(c && typeof c.local === 'number'
+        ? { local: c.local, imports: c.imports, imports_boxes: c.imports_boxes, por_finalizar: c.por_finalizar }
+        : { local: 0, imports: 0, imports_boxes: 0, por_finalizar: 0 })
+    }).catch(() => setRecv({ local: 0, imports: 0, imports_boxes: 0, por_finalizar: 0 }))
+  }, [etapas])
 
   if (!summary) return <div className="p-8 text-neutral-500">Cargando…</div>
 
+  // 19-11 (el dueño: «al usuario normal también mejorarle cómo luce»): mismo Inicio que el completo, sin plata.
+  // Lo procesado sigue en Despachos (ahí se generan las guías); sin Despachos, en Ventas.
+  const nombreProcesadas = country === 'VE' && (verificarPagos || despachos) ? 'Por despachar' : !verificarPagos ? 'Procesadas' : 'Por descargar'
+  const pendientes: Pendiente[] = [
+    ...(porConfirmar ? [{ label: 'Por confirmar', n: pc.datos ? pendientesPorConfirmar(pc.datos) : null, tono: 'atencion' as const, href: '/ventas?vista=confirmar', ayuda: 'Ventas de MercadoLibre que todavía no registraste' }] : []),
+    { label: 'Borradores', n: saleCounts?.borrador ?? null, tono: 'atencion', href: '/ventas?estado=BORRADOR', ayuda: 'Ventas sin terminar de cargar' },
+    { label: nombreProcesadas, n: saleCounts?.procesada ?? null, tono: 'atencion', href: despachos ? '/despachos' : '/ventas?estado=PROCESADA', ayuda: despachos ? 'Ventas procesadas: falta generar la guía en Despachos' : 'Ventas procesadas' },
+    // Cada pendiente de recepciones filtra por los MISMOS estados que cuenta /api/dashboard/reception-counts.
+    ...(etapas ? [
+      { label: 'Por finalizar', n: recv?.por_finalizar ?? null, tono: 'atencion' as const, href: '/compras?tab=local&estado=RECIBIDA,PARCIAL', ayuda: 'Compras recibidas que falta cerrar (locales e importaciones)' },
+      { label: 'Compra en camino', n: recv?.local ?? null, tono: 'info' as const, href: '/compras?tab=local&estado=EN_CAMINO', ayuda: 'Compras locales en camino' },
+      ...(importaciones ? [{ label: recv && recv.imports_boxes > 0 ? `Importación en camino · ${recv.imports_boxes} cajas` : 'Importación en camino', n: recv?.imports ?? null, tono: 'info' as const, href: '/compras?tab=import&estado=EN_CAMINO', ayuda: 'Importaciones en camino' }] : []),
+    ] : []),
+  ]
+  const fechaHoy = new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <h1 className="sr-only">Inicio</h1>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 text-sm">
+          {country === 'VE'
+            ? <RateBar descuento={false} exceso={false} />
+            : <span className="inline-block text-neutral-500 first-letter:uppercase">{fechaHoy}</span>}
+        </div>
+        <Link href="/ventas?new=1" className="btn-primary text-sm whitespace-nowrap">+ Nueva venta</Link>
+      </div>
+
       <AvisoStockVerificar n={(summary as { por_verificar?: number }).por_verificar ?? 0} />
-      {/* ───────── Ventas ───────── */}
-      <Panel title="Ventas">
-        {/* Todas iguales (borde gris): "Nueva venta" se distingue por el + verde y "Por confirmar" por su número ámbar. */}
-        <div className={`grid grid-cols-2 gap-3 ${porConfirmar ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
-          {porConfirmar && (
-            <StatCard label="Por confirmar" value={pc.datos ? pendientesPC : '·'}
-              accent="text-amber-600" href="/ventas?vista=confirmar" />
-          )}
-          <StatCard label="Nueva venta" value="+" accent="text-green-600" href="/ventas?new=1" />
-          <StatCard label="Borrador"        value={saleCounts.borrador}
-            accent={saleCounts.borrador   > 0 ? 'text-amber-600' : undefined}
-            href="/ventas?estado=BORRADOR" />
-          {/* Lo procesado sigue en Despachos (ahí se generan las guías); sin Despachos, en Ventas. */}
-          <StatCard label={country === 'VE' && (verificarPagos || despachos) ? 'Por despachar' : !verificarPagos ? 'Procesadas' : 'Por descargar'} value={saleCounts.procesada}
-            accent={saleCounts.procesada  > 0 ? 'text-green-600' : undefined}
-            href={despachos ? '/despachos' : '/ventas?estado=PROCESADA'} />
-        </div>
-        {country === 'VE' && bonos && (
-          <div className="mt-4">
-            <BonusPipeline />
-          </div>
-        )}
-      </Panel>
 
-      {/* ───────── Recepciones (solo con compras por etapas) ───────── */}
-      {etapas && <Panel title="Recepciones">
-        <div className={`grid grid-cols-1 gap-3 ${importaciones ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-          {/* Cada card filtra por los MISMOS estados que cuenta (ver
-              /api/dashboard/reception-counts), para que la lista de destino
-              muestre exactamente las órdenes del número. */}
-          <StatCard label="Local en camino"  value={recv.local}
-            accent={recv.local   > 0 ? 'text-neutral-900' : undefined}
-            href="/compras?tab=local&estado=EN_CAMINO" />
-          {importaciones && <StatCard label={`Import en camino${recv.imports_boxes > 0 ? ` · ${recv.imports_boxes} cajas` : ''}`} value={recv.imports}
-            accent={recv.imports > 0 ? 'text-neutral-900' : undefined}
-            href="/compras?tab=import&estado=EN_CAMINO" />}
-          {/* "Por finalizar" suma locales + importaciones: abre en locales y el
-              mismo filtro queda aplicado al cambiar de pestaña. */}
-          <StatCard label="Por finalizar"    value={recv.por_finalizar}
-            accent={recv.por_finalizar > 0 ? 'text-amber-600' : undefined}
-            href="/compras?tab=local&estado=RECIBIDA,PARCIAL" />
-        </div>
-      </Panel>}
+      <Pendientes items={pendientes} />
 
-      {/* ───────── Gráfico ventas del mes ───────── */}
+      {country === 'VE' && bonos && <BonusPipeline />}
+
       <SalesMiniChart />
-
-      {/* ───────── Tasas (VE) ───────── */}
-      {country === 'VE' && rate && (
-        <Panel title="Tasas de Cambio">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <RateCard label="Oficial BCV" value={fmt(rate.official_rate)}    sub="Bs/$"   accent="text-neutral-900" />
-            <RateCard label="Paralelo"    value={fmt(rate.parallel_rate)}    sub="Bs/$"   accent="text-amber-600" />
-            <RateCard label="Diferencial" value={`${rate.spread_percentage}%`} sub="spread" accent="text-amber-600" />
-          </div>
-          {rate.rate_date && (
-            <div className="text-right text-xs text-neutral-400 mt-3">
-              Actualizado: {parseLocalDate(rate.rate_date).toLocaleDateString('es-VE')}
-            </div>
-          )}
-        </Panel>
-      )}
 
       {reportes && (
         <div className="space-y-2">
-          <p className="text-xs text-neutral-500">Este mes</p>
+          <p className="text-xs font-medium text-neutral-500">Este mes</p>
           <BloquesInicio period="month" reportes cayendo={cayendo} />
         </div>
       )}
-    </div>
-  )
-}
-
-// ─── helpers ───
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4">
-      <h2 className="text-sm font-semibold text-neutral-700 mb-3">
-        {title}
-      </h2>
-      {children}
-    </section>
-  )
-}
-
-function StatCard({ label, value, accent, href }: {
-  label: string; value: number | string; accent?: string; href?: string
-}) {
-  const inner = (
-    <div className="rounded-xl border border-neutral-200 bg-white p-3 text-center hover:border-neutral-400 hover:shadow-sm transition">
-      <div className="text-xs text-neutral-500">{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${accent ?? 'text-neutral-900'}`}>{value}</div>
-    </div>
-  )
-  return href ? <Link href={href}>{inner}</Link> : inner
-}
-
-function RateCard({ label, value, sub, accent }: {
-  label: string; value: string; sub: string; accent?: string
-}) {
-  return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-3 text-center">
-      <div className="text-xs text-neutral-500">{label}</div>
-      <div className={`text-xl font-bold mt-1 ${accent ?? 'text-neutral-900'}`}>{value}</div>
-      <div className="text-[11px] text-neutral-400 mt-0.5">{sub}</div>
     </div>
   )
 }
