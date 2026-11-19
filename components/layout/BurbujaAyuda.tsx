@@ -10,6 +10,9 @@ import { nombrePantalla, sugerenciasDe, type Sugerencia } from '@/lib/ayudaSuger
 //   · Soporte: texto + hasta 3 capturas → bandeja única del dueño (Plataforma → Soporte) y su Telegram. Las
 //     respuestas llegan aquí (punto rojo) y por Telegram si el usuario lo conectó.
 // ?soporte=ID en la URL (link del Telegram) abre ese caso.
+// 19-11 (el dueño, casi no se usaba): el ícono sale solo en Aprendizaje (y sus manuales), salvo que la persona active
+// «Ayuda en todo el sistema» ahí (users.ayuda_flotante, mig. 187). Una respuesta de Soporte sin leer lo muestra igual.
+export const EVENTO_AYUDA_FLOTANTE = 'ayuda-flotante'
 
 const MAX_ADJUNTOS = 3
 const MAX_MB = 5
@@ -49,6 +52,13 @@ export default function BurbujaAyuda() {
   const [archivos, setArchivos] = useState<File[]>([])
   const [enviando, setEnviando] = useState(false)
   const [videos, setVideos] = useState<Video[]>([])
+  const [flotante, setFlotante] = useState(false)
+  useEffect(() => {
+    comun<{ ayudaFlotante?: boolean }>('aprendizaje').then(d => { if (d) setFlotante(!!d.ayudaFlotante) }).catch(() => {})
+    const cambio = (e: Event) => setFlotante(!!(e as CustomEvent<boolean>).detail)
+    window.addEventListener(EVENTO_AYUDA_FLOTANTE, cambio)
+    return () => window.removeEventListener(EVENTO_AYUDA_FLOTANTE, cambio)
+  }, [])
   const fin = useRef<HTMLDivElement>(null)
 
   const cargarCasos = useCallback(async (fresco = true) => {
@@ -181,6 +191,9 @@ export default function BurbujaAyuda() {
       </div>
     </div>
   )
+
+  const visible = flotante || abierta || nuevos > 0 || ruta.startsWith('/aprendizaje') || !!params.get('soporte')
+  if (!visible) return null
 
   return (
     <>

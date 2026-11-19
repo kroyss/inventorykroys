@@ -21,7 +21,7 @@ export async function GET() {
     const [videos, agendar, sinCuentas, { rows: [u] }] = await Promise.all([videosDeUsuario(userId, llevaInventario(session.user), tieneModulo(session.user, 'pagos_me')), linkAgendar(),
       session.user.empresaId && tieneModulo(session.user, 'preguntas') ? sinCuentasML(session).catch(() => false) : false,
       // Días desde que el usuario empezó: el botón de la barra se achica al 5º (AprendizajeNav).
-      dbGlobal().query(`SELECT FLOOR(EXTRACT(EPOCH FROM NOW() - created_at) / 86400)::int AS dias FROM users WHERE id = $1`, [userId])])
+      dbGlobal().query(`SELECT FLOOR(EXTRACT(EPOCH FROM NOW() - created_at) / 86400)::int AS dias, ayuda_flotante FROM users WHERE id = $1`, [userId])])
     // Exento: la organización de la plataforma (SolucionesMC) ya está capacitada. Ve Aprendizaje como
     // completado (libro gris, sin ventana de bienvenida) aunque su avance real no lo esté.
     const exento = session.user.organizacionId === ORGANIZACION_PLATAFORMA
@@ -29,7 +29,9 @@ export async function GET() {
     const demo = session.user.empresaId ? await esDemoEmpresa(session.user.empresaId, session.user.country) : false
     // inventario: si la empresa lo lleva (si no, al terminar se le ofrece activarlo).
     return NextResponse.json({ videos, agendar, sinCuentas, esAdmin: puede(session.user, 'ml_cuentas'), exento, demo,
-      inventario: llevaInventario(session.user), dias: u?.dias ?? 0 },
+      inventario: llevaInventario(session.user), dias: u?.dias ?? 0,
+      // 19-11 (mig. 187): ícono de Ayuda en todas las pantallas (si no, solo en Aprendizaje).
+      ayudaFlotante: !!u?.ayuda_flotante },
       { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     return apiError(err)

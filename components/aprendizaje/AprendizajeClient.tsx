@@ -1,5 +1,6 @@
 'use client'
 import { olvidar } from '@/lib/comun'
+import { EVENTO_AYUDA_FLOTANTE } from '@/components/layout/BurbujaAyuda'
 import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/ui'
 import Link from '@/components/ui/Link'
@@ -78,7 +79,7 @@ function Manuales({ inventario, automatizaciones }: { inventario: boolean; autom
 
 export default function AprendizajeClient({ manualInventario = false, manualAutomatizaciones = false }: { manualInventario?: boolean; manualAutomatizaciones?: boolean }) {
   // 19-11 (el dueño): Aprendizaje queda solo con los Manuales; los videos viven dentro de su capítulo del manual.
-  const [d, setD] = useState<{ agendar: string | null; conectar: boolean; inventario: boolean } | null>(null)
+  const [d, setD] = useState<{ agendar: string | null; conectar: boolean; inventario: boolean; ayudaFlotante: boolean } | null>(null)
 
   useEffect(() => {
     // Enlaces viejos a /aprendizaje?video=ID: abren ese video dentro del manual.
@@ -89,7 +90,7 @@ export default function AprendizajeClient({ manualInventario = false, manualAuto
       .then(r => (r.ok ? r.json() : null))
       .then(x => {
         if (!vivo || !x) return
-        setD({ agendar: x.agendar ?? null, conectar: !!x.sinCuentas && !!x.esAdmin, inventario: !!x.inventario || !!x.exento })
+        setD({ agendar: x.agendar ?? null, conectar: !!x.sinCuentas && !!x.esAdmin, inventario: !!x.inventario || !!x.exento, ayudaFlotante: !!x.ayudaFlotante })
       })
       .catch(() => {})
     return () => { vivo = false }
@@ -99,6 +100,7 @@ export default function AprendizajeClient({ manualInventario = false, manualAuto
     <div className="space-y-5">
       <PageHeader title="Aprendizaje" subtitle="Manuales para sacarle todo el provecho al sistema: cada pantalla explicada, con capturas, buscador y videos de apoyo" />
       <Manuales inventario={manualInventario} automatizaciones={manualAutomatizaciones} />
+      {d && <AyudaEnTodo activa={d.ayudaFlotante} onCambio={v => setD(x => x && { ...x, ayudaFlotante: v })} />}
 
       {d?.conectar && <PrimerosPasos agendar={d.agendar} manual={manualAutomatizaciones} />}
       {!d?.conectar && !manualInventario && !manualAutomatizaciones && d && <PrimerosPasos agendar={d.agendar} manual={false} />}
@@ -240,6 +242,40 @@ export function Reproductor({ video, onAvance }: {
 }
 
 /** Los primeros pasos, en orden (lo primero que ve un cliente nuevo). Sin videos todavía, es la guía. */
+/** 19-11 (mig. 187): el ícono de Ayuda (preguntar con el manual + Soporte) sale aquí; con esto, en todas las pantallas. */
+function AyudaEnTodo({ activa, onCambio }: { activa: boolean; onCambio: (v: boolean) => void }) {
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const cambiar = async () => {
+    const v = !activa
+    setGuardando(true); setError(null); onCambio(v)
+    const r = await fetch('/api/aprendizaje/ayuda', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activa: v }) }).catch(() => null)
+    setGuardando(false)
+    if (!r?.ok) { onCambio(!v); setError((await r?.json().catch(() => null))?.error ?? 'No se pudo guardar. Intenta de nuevo.'); return }
+    olvidar('aprendizaje')
+    window.dispatchEvent(new CustomEvent(EVENTO_AYUDA_FLOTANTE, { detail: v }))
+  }
+  return (
+    <section aria-label="Ayuda" className="flex items-center gap-4 rounded-xl border border-neutral-200 bg-white px-5 py-4 shadow-sm">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-neutral-900 text-lime-400" aria-hidden>
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-neutral-900">Ayuda en todo el sistema</p>
+        <p className="text-sm text-neutral-500">
+          El botón de Ayuda (abajo a la derecha: preguntas con el manual y Soporte) está siempre aquí en Aprendizaje.
+          {activa ? ' Ahora también sale en todas las pantallas.' : ' Actívalo para tenerlo también en todas las pantallas.'}
+        </p>
+        {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      </div>
+      <button type="button" role="switch" aria-checked={activa} aria-label="Ayuda en todo el sistema" onClick={cambiar} disabled={guardando}
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-60 ${activa ? 'bg-lime-500' : 'bg-neutral-300'}`}>
+        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${activa ? 'translate-x-5' : 'translate-x-0.5'}`} />
+      </button>
+    </section>
+  )
+}
+
 function PrimerosPasos({ agendar, manual }: { agendar: string | null; manual: boolean }) {
   const pasos: { titulo: string; texto: string; link?: { href: string; label: string; externo?: boolean } }[] = [
     { titulo: 'Aprende primero', texto: manual

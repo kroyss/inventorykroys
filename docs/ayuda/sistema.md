@@ -1327,8 +1327,10 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
 
 *Cómo lo pregunta la gente:* hablar con alguien, ayuda, soporte, contacto, horario, Telegram del soporte, la burbuja, el botón de ayuda, mis casos.
 
-**Botón de Ayuda**: un globo de mensaje abajo a la derecha, en todas las pantallas (al pasar el cursor dice «Ayuda»;
-en el celular, encima del menú de abajo):
+**Botón de Ayuda**: un globo de mensaje abajo a la derecha (al pasar el cursor dice «Ayuda»; en el celular, encima del
+menú de abajo). Sale en **Aprendizaje** y sus manuales; para tenerlo en **todas las pantallas**, activa **Ayuda en todo el
+sistema** en Aprendizaje (cada persona decide; empieza apagado). Si Soporte te respondió, el botón aparece igual con su
+punto rojo, estés donde estés:
 - **Preguntar:** preguntas frecuentes de la pantalla donde estás (con su respuesta, al instante) y una caja para
   preguntar lo que quieras: responde un asistente con este manual y, si hay un video que lo explica, te deja el
   enlace. **No gasta tus créditos de IA.** Puede equivocarse: con 👍 / 👎 nos dices si te sirvió. Hay un máximo de
