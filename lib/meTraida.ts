@@ -15,6 +15,8 @@ export const AYUDA_TRABADA = 'si sigue así, cierra y abre el Chrome de esa cuen
 const LATIDO_MIN = 3
 
 export interface CuentaTraida { perfil: string; nombre: string; hecho: boolean; ok: boolean; error: string | null; nuevas: number; vistas: number; pesos: boolean | null
+  /** 1.3.9+: cuánto tardó esa cuenta y cómo leyó (completa = 7 días; corta = lo nuevo y las pendientes). */
+  segundos?: number | null; modo?: string | null
   /** Sin terminar, con su Chrome dando señal, y la traída ya lleva LENTA_MIN: probablemente trabada. */
   lenta?: boolean
   /** 1.3.9 (mig. 190): cómo va mientras trabaja. Las versiones anteriores no lo mandan. */
@@ -31,7 +33,7 @@ export interface EstadoTraida {
   con_error: boolean
 }
 
-type Resultado = { ok?: boolean; error?: string | null; cuenta?: string | null; nuevas?: number; vistas?: number; at?: string; pesos?: boolean | null }
+type Resultado = { ok?: boolean; error?: string | null; cuenta?: string | null; nuevas?: number; vistas?: number; at?: string; pesos?: boolean | null; segundos?: number | null; modo?: string | null }
 
 /** La última traída y cómo va. null = nunca se pidió ninguna. */
 export async function estadoTraida(db: Pick<Pool, 'query'>): Promise<EstadoTraida | null> {
@@ -67,7 +69,7 @@ export async function estadoTraida(db: Pick<Pool, 'query'>): Promise<EstadoTraid
   const nombre = (perfil: string, r?: Resultado) => r?.cuenta ?? perfiles.find(l => l.perfil === perfil)?.cuenta ?? perfil
   const cuentas: CuentaTraida[] = [
     ...Object.entries(res).map(([perfil, r]) => ({ perfil, nombre: nombre(perfil, r), hecho: true, ok: r.ok !== false, error: r.error ?? null,
-      nuevas: r.nuevas ?? 0, vistas: r.vistas ?? 0, pesos: r.pesos ?? null })),
+      nuevas: r.nuevas ?? 0, vistas: r.vistas ?? 0, pesos: r.pesos ?? null, segundos: r.segundos ?? null, modo: r.modo ?? null })),
     ...faltan.map(l => ({ perfil: l.perfil as string, nombre: nombre(l.perfil), hecho: false, ok: false, error: null, nuevas: 0, vistas: 0, pesos: null,
       lenta: !!p.tarda && !!l.conectado && !avanceVivo(l.perfil), avance: avanceDe(l.perfil) })),
   ]

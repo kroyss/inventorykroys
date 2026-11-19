@@ -140,6 +140,13 @@ export default function AvisoColaML() {
 
 const ERROR_CUENTA: Record<string, string> = { sin_sesion: 'sin sesión de MercadoEnvíos en la PC' }
 
+/** 75 → «1 min 15 s»; 40 → «40 s». */
+function duracion(s: number) {
+  if (s < 60) return `${s} s`
+  const m = Math.floor(s / 60), r = s % 60
+  return r ? `${m} min ${r} s` : `${m} min`
+}
+
 /** «leyendo órdenes 40 de ~120 · faltan ~30 s» (extensión 1.3.9). */
 function textoAvance(a: AvanceCuenta) {
   const que = a.fase === 'leyendo' ? (a.modo === 'corta' ? 'leyendo órdenes nuevas' : 'leyendo órdenes')
@@ -156,6 +163,8 @@ function TraidaME({ t }: { t: EstadoTraida }) {
   const hora = new Date(t.pedido_at).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })
   const corre = t.en_curso || t.esperando_pc
   const hechas = t.cuentas.filter(c => c.hecho).length
+  // 19-11 (el dueño: en la traída corta solo decía «trabajando» casi un minuto, sin números): cuánto lleva, siempre.
+  const lleva = Math.max(0, Math.round((Date.now() - new Date(t.pedido_at).getTime()) / 1000))
   return (
     <div className="space-y-1">
       <div className="font-medium text-neutral-900">
@@ -173,11 +182,11 @@ function TraidaME({ t }: { t: EstadoTraida }) {
         {t.cuentas.map(c => (
           <li key={c.perfil} className="flex flex-wrap gap-x-1.5">
             <b className="text-neutral-800 truncate max-w-[10rem]">{c.nombre}</b>
-            {!c.hecho && c.avance && corre ? <span className="text-neutral-500">⟳ {textoAvance(c.avance)}</span>
+            {!c.hecho && c.avance && corre ? <span className="text-neutral-500">⟳ {textoAvance(c.avance)} · lleva {duracion(lleva)}</span>
               : !c.hecho ? (c.lenta && corre ?<span className="text-amber-700">⟳ tarda más de lo normal: {AYUDA_TRABADA}</span>
-                : <span className={corre ? 'text-neutral-400' : 'text-red-700'}>{corre ? '⟳ trabajando…' : `no respondió: ${AYUDA_TRABADA}`}</span>)
+                : <span className={corre ? 'text-neutral-400' : 'text-red-700'}>{corre ? `⟳ trabajando… · lleva ${duracion(lleva)}` : `no respondió: ${AYUDA_TRABADA}`}</span>)
               : !c.ok ? <span className="text-red-700">⚠ {ERROR_CUENTA[c.error ?? ''] ?? c.error ?? 'error'}</span>
-              : <span>✓ {c.vistas} órdenes{c.nuevas ? ` · ${c.nuevas} nuevas` : ''}</span>}
+              : <span>✓ {c.modo === 'corta' ? `${c.nuevas ? `${c.nuevas} nuevas` : 'nada nuevo'}` : `${c.vistas} órdenes${c.nuevas ? ` · ${c.nuevas} nuevas` : ''}`}{c.segundos != null ? ` · en ${duracion(c.segundos)}` : ''}</span>}
             {c.hecho && c.ok && c.pesos === true && <span className="text-emerald-700">· pesos ✓</span>}
             {c.hecho && c.ok && c.pesos === false && <span className="text-red-700">· ⚠ no se pudieron leer los pesos</span>}
           </li>
