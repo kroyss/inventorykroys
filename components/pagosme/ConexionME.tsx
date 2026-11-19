@@ -9,7 +9,7 @@ import EstadoVigilante, { type DatosVigilante } from './EstadoVigilante'
 export const DESCARGA_PROGRAMA = '/descargas/InstalarPagosME.exe?v=1.3.7'
 
 export default function VigilanteConConexion({ d, isAdmin, desdeML, onCambio, abiertoInicial = false }: {
-  d: DatosVigilante & { vigilante: { clave?: boolean } }
+  d: DatosVigilante & { vigilante: { clave?: boolean }; avanzado?: boolean }
   /** Puede configurar (permiso pagos_me_config): sin él, solo la línea de estado. */
   isAdmin: boolean
   desdeML: boolean
@@ -21,6 +21,8 @@ export default function VigilanteConConexion({ d, isAdmin, desdeML, onCambio, ab
   const [codigo, setCodigo] = useState<{ codigo: string; vence_at: string } | null>(null)
   const [clave, setClave] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
+  // 19-11: después de «Desconectar PCs» el panel queda mostrando cómo volver a conectar (antes solo decía «PCs desconectadas»).
+  const [reconectar, setReconectar] = useState(false)
 
   const conectar = async () => {
     setMsg(null)
@@ -29,9 +31,10 @@ export default function VigilanteConConexion({ d, isAdmin, desdeML, onCambio, ab
     if (r.ok) setCodigo(x); else setMsg({ ok: false, t: x.error ?? 'Error' })
   }
   const desconectar = async () => {
-    if (!confirm('Se desconectan TODAS las PCs: dejan de traer pagos hasta que las conectes de nuevo con un código. ¿Seguir?')) return
+    if (!confirm('Se desconectan TODAS las PCs y dejan de traer pagos y guías.\n\nPara volver a conectarlas: «Conectar una PC» te da un código; '
+      + 'en cada PC instalas de nuevo el programa con ese código y lo escribes en el Asistente de envíos de cada perfil de Chrome.\n\n¿Seguir?')) return
     const r = await fetch('/api/pagos-me/conexion', { method: 'DELETE' })
-    if (r.ok) { setMsg({ ok: true, t: 'PCs desconectadas.' }); setCodigo(null); onCambio() } else setMsg({ ok: false, t: 'No se pudo desconectar' })
+    if (r.ok) { setMsg(null); setCodigo(null); setReconectar(true); onCambio(); conectar() } else setMsg({ ok: false, t: 'No se pudo desconectar' })
   }
   const generarClave = async () => {
     if (d.vigilante.clave && !confirm('Se genera una clave nueva y la anterior deja de funcionar. ¿Seguir?')) return
@@ -40,6 +43,10 @@ export default function VigilanteConConexion({ d, isAdmin, desdeML, onCambio, ab
     if (r.ok) { setClave(x.clave); onCambio() } else setMsg({ ok: false, t: x.error ?? 'Error' })
   }
   const perfiles = d.vigilante.latidos.filter(l => l.perfil !== 'DESPERTADOR')
+  // Sin ninguna PC dando señal (nunca se conectó, o se desconectaron): los pasos para conectar, con el botón a la vista.
+  const sinPC = d.vigilante.latidos.length === 0
+  // Al desconectar, o con el panel abierto y ninguna PC (la bienvenida de Pagos ME tiene la suya).
+  const guia = isAdmin && agregar === null && (reconectar || (sinPC && abierto))
 
   return (
     <EstadoVigilante d={d} conexion={isAdmin ? { abierto, onToggle: () => setAbierto(v => !v) } : null}
@@ -53,7 +60,9 @@ export default function VigilanteConConexion({ d, isAdmin, desdeML, onCambio, ab
             <a href={DESCARGA_PROGRAMA} className="underline text-neutral-500 hover:text-neutral-800">Descargar programa</a>
             <a href="/extension" target="_blank" className="underline text-neutral-500 hover:text-neutral-800">Extensión de Chrome</a>
             <button onClick={conectar} className="underline text-neutral-500 hover:text-neutral-800">Conectar una PC</button>
-            {!desdeML && (
+            {/* 19-11: la clave larga (instalación a mano, de antes de los códigos) solo para el dueño de la plataforma: a un
+                cliente no le sirve y generarla desconecta todas sus PCs. */}
+            {!desdeML && d.avanzado && (
               <button onClick={generarClave} className="underline text-neutral-400 hover:text-neutral-800" title="Para la instalación a mano (avanzado)">
                 {d.vigilante.clave ? 'Clave larga' : 'Generar clave'}
               </button>
@@ -64,12 +73,15 @@ export default function VigilanteConConexion({ d, isAdmin, desdeML, onCambio, ab
           </div>
         )}
         {msg && <p className={`mt-2 ${msg.ok ? 'text-emerald-700' : 'text-red-700'}`}>{msg.t}</p>}
+        {guia && (
+          <ConectarPC desconectadas={reconectar} codigo={codigo} onCodigo={conectar} onCerrar={() => { setReconectar(false); setCodigo(null) }} />
+        )}
         {agregar !== null && (
           <AgregarCuenta cuenta={agregar} codigo={codigo} onOtroCodigo={conectar}
             desconectada={!!agregar && (d.cuentasML ?? []).some(c => c.nickname === agregar && c.estado !== 'activa')}
             onCerrar={() => { setAgregar(null); setCodigo(null) }} />
         )}
-        {codigo && agregar === null && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
+        {codigo && agregar === null && !guia && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
         {clave && (
           <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900">
             Clave del vigilante (se muestra solo esta vez; cópiala en la extensión de cada perfil):
@@ -135,6 +147,56 @@ function AgregarCuenta({ cuenta, codigo, desconectada, onOtroCodigo, onCerrar }:
             «conectado».
             <span className={sub}>No cierres sesión de MercadoEnvíos en ningún perfil. Si se vence, al traer queda abierta esa ventana para
               que vuelvas a entrar.</span></span></li>
+      </ol>
+    </div>
+  )
+}
+
+/** 19-11 (el dueño: «si alguien desconecta no tendría cómo conectar»): los pasos para conectar la PC, con el código
+ *  ahí mismo. Sale al desconectar y cuando la empresa no tiene ninguna PC dando señal. */
+function ConectarPC({ desconectadas, codigo, onCodigo, onCerrar }: {
+  desconectadas: boolean; codigo: { codigo: string; vence_at: string } | null; onCodigo: () => void; onCerrar: () => void
+}) {
+  const paso = 'flex gap-3 items-start'
+  const num = 'shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-semibold flex items-center justify-center'
+  const sub = 'block text-xs text-neutral-500 mt-0.5'
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 space-y-3 text-sm text-neutral-700">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-neutral-900">{desconectadas ? 'PCs desconectadas · así las conectas de nuevo' : 'Conectar la PC de las guías'}</p>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            {desconectadas ? 'Ninguna PC trae pagos ni guías hasta que la conectes con un código nuevo.'
+              : 'El programa y el Asistente de envíos de Chrome se conectan con un mismo código.'}
+          </p>
+        </div>
+        {desconectadas && <button onClick={onCerrar} className="text-emerald-700 text-xs shrink-0">Cerrar ✕</button>}
+      </div>
+      <ol className="space-y-2.5">
+        <li className={paso}><span className={num}>1</span>
+          <span>Tu código de conexión:
+            {codigo ? (
+              <span className="mt-1.5 flex flex-wrap items-center gap-3">
+                <code className="select-all rounded bg-white px-2 py-1 font-mono text-xl font-semibold tracking-widest ring-1 ring-emerald-200">{codigo.codigo}</code>
+                <button onClick={() => navigator.clipboard.writeText(codigo.codigo)} className="btn-secondary text-xs">Copiar</button>
+                <span className="text-xs text-neutral-500">
+                  Vale hasta las {new Date(codigo.vence_at).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })}.{' '}
+                  <button onClick={onCodigo} className="underline">Otro código</button>
+                </span>
+              </span>
+            ) : <span className="mt-1.5 block"><button onClick={onCodigo} className="btn-primary text-xs">Conectar una PC</button></span>}</span></li>
+        <li className={paso}><span className={num}>2</span>
+          <span>En la PC de las guías, <a href={DESCARGA_PROGRAMA} className="font-medium text-emerald-700 underline">descarga el programa</a> y
+            ábrelo. Cuando pida el código, escribe el de arriba.
+            <span className={sub}>{desconectadas ? 'Aunque ya estuviera instalado, hay que instalarlo de nuevo: el que tenía quedó con la conexión vieja.'
+              : 'Si ya estaba instalado, instálalo encima: no se pierde nada.'}</span></span></li>
+        <li className={paso}><span className={num}>3</span>
+          <span>En <b>cada perfil de Chrome</b> (uno por cuenta de MercadoEnvíos): toca la <b>pieza de rompecabezas</b> → <b>Asistente de envíos</b> →
+            escribe el mismo código → <b>Conectar</b>. Debe decir <b>«Conectado al sistema»</b>.
+            <span className={sub}>¿No tiene el Asistente? Agrégalo desde <a href="/extension" target="_blank" className="underline">app.elcomerciantedigital.com/extension</a>.
+              El código vale para todos los perfiles mientras no venza; si venció, pide otro.</span></span></li>
+        <li className={paso}><span className={num}>4</span>
+          <span>Listo: toca <b>Traer pagos y guías</b>. Arriba cada cuenta pasa a «conectado».</span></li>
       </ol>
     </div>
   )

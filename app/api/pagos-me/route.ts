@@ -4,6 +4,7 @@ import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME } from '@/
 import { esDemo } from '@/lib/demo'
 import { tieneModulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
+import { esDuenoPlataforma } from '@/lib/empresa'
 import { asegurarPagosDemo, entregarDemo } from '@/lib/demoDatos'
 
 /**
@@ -99,6 +100,8 @@ export async function GET(req: NextRequest) {
       vigilante: { clave: !!clave?.creado_at || !!clave?.con_codigo, latidos, pedido: pedido ?? null },
       cuentasML,
       desdeML: s.desdeML,
+      // 19-11: «Generar clave» (clave larga, instalación a mano) solo para el dueño de la plataforma.
+      avanzado: esDuenoPlataforma(s.session.user),
       conInventario: tieneModulo(s.session.user, 'inventario'),
     })
   } catch (err) {
