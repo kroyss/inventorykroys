@@ -3,6 +3,7 @@ import { signIn } from 'next-auth/react'
 import { useEffect, useState, FormEvent } from 'react'
 import { TELEGRAM_SOPORTE } from '@/lib/cuenta'
 import type { Marca } from '@/lib/marca'
+import { eventoPixel, iniciarPixel } from '@/lib/metaPixel'
 
 // Prueba gratis de 15 días (26-10, app/registro/page.tsx → POST /api/registro). Mismo formato que la entrada:
 // panel negro de marca a la izquierda y el formulario a la derecha. Al crear la cuenta entra sola y va al inicio,
@@ -32,6 +33,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
     try { const h = document.referrer ? new URL(document.referrer).hostname : ''; ref = h && h !== location.hostname ? h.replace(/^(www|l|lm|m)\./, '') : '' } catch {}
     const origen = q.get('utm_source') || (q.has('fbclid') ? 'facebook' : '') || ref
     fetch('/api/registro/visita', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origen }), keepalive: true }).catch(() => {})
+    iniciarPixel()   // 19-11: píxel de Meta solo en esta página (lib/metaPixel.ts)
   }, [])
 
   async function enviar(e: FormEvent<HTMLFormElement>) {
@@ -42,6 +44,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
     const r = await fetch('/api/registro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo crear la cuenta. Intenta de nuevo.'); setLoading(false); return }
+    await eventoPixel('CompleteRegistration')   // Meta aprende quién se registra (sin datos personales)
     const s = await signIn('credentials', { username: datos.usuario.trim().toLowerCase(), password: datos.clave, redirect: false })
     // Navegación completa (como la entrada): la sesión nueva se lee desde el servidor.
     window.location.assign(s?.ok ? '/' : '/login')
