@@ -924,10 +924,10 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
 
 > Este espacio se prende por empresa (plan Completo). Si no lo ves, tu empresa trabaja «todo desde MercadoLibre».
 
-- **Inicio:** cómo va tu negocio (rehecho el 19-11-2026). Sin título. En la primera línea, a la derecha, la tasa en
-  una **píldora chica** (VE): **Bs oficial / paralelo · diferencial %** (diferencial = cuánto más cara está la paralela;
+- **Inicio:** cómo va tu negocio (rehecho el 19-11-2026). Sin título. En la primera línea, a la derecha y fijos, los atajos
+  **+ Nueva venta** / **+ Nueva compra** y debajo la tasa en una **píldora chica** (VE): **Bs oficial / paralelo · diferencial %** (diferencial = cuánto más cara está la paralela;
   al pasar el mouse, el detalle con exceso y fecha; quien entra a Ajustes la toca y va ahí) y, con Descuento ML, otra
-  píldora **Desc. ML %**; al lado los atajos **+ Nueva venta** / **+ Nueva compra**. A la izquierda, **Pendientes**
+  píldora **Desc. ML %**. A la izquierda, **Pendientes** (bajan a una segunda fila si hay muchos)
   (sin título): botones chicos con el número, solo los que
   tienen algo, por urgencia (Por confirmar, Sin stock, **Reponer**, Stock bajo, **Borradores**, **En caída** —se están
   cayendo: venden la mitad o menos que en los 4 meses anteriores—, **Remate** —tienes stock y casi no se venden—, **En

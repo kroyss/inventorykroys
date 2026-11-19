@@ -223,15 +223,14 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
     <div className="space-y-5">
       <h1 className="sr-only">Inicio</h1>
 
-      {/* 19-11 (el dueño): la primera línea es «lo que hay que hacer»: los pendientes a la izquierda; a la derecha la
-          tasa en una píldora chica (VE) y los atajos. En el celular, atajos y tasa arriba. */}
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+      {/* 19-11 (el dueño): la primera línea es «lo que hay que hacer»: los pendientes a la izquierda (crecen hacia abajo
+          según cuántos haya); a la derecha, FIJOS, Nueva venta / Nueva compra y debajo la tasa (VE). En el celular, arriba. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 sm:flex-nowrap">
         <div className="order-2 min-w-0 basis-full sm:order-1 sm:flex-1 sm:basis-auto">
           <Pendientes items={pendientes} titulo={false} />
         </div>
-        <div className="order-1 flex w-full flex-wrap items-center justify-between gap-2 sm:order-2 sm:w-auto sm:justify-end">
-          {country === 'VE' && <RateBar puedeActualizar={puedeTasas} descuento={descuento} exceso={categorias} ajustes={ajustes} />}
-          <div className="flex items-center gap-2">
+        <div className="order-1 flex w-full flex-wrap items-center justify-between gap-2 sm:order-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end sm:justify-start">
+          <div className="flex items-center gap-2 sm:order-1">
             <Link href="/ventas?new=1" className="btn-primary text-sm whitespace-nowrap">+ Nueva venta</Link>
             {!importaciones ? (
               <Link href="/compras?new=1" className="btn-secondary text-sm whitespace-nowrap">+ Nueva compra</Link>
@@ -250,6 +249,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
               )}
             </div>}
           </div>
+          {country === 'VE' && <div className="sm:order-2"><RateBar puedeActualizar={puedeTasas} descuento={descuento} exceso={categorias} ajustes={ajustes} /></div>}
         </div>
       </div>
 

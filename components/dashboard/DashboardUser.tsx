@@ -84,13 +84,13 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
   return (
     <div className="space-y-5">
       <h1 className="sr-only">Inicio</h1>
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 sm:flex-nowrap">
         <div className="order-2 min-w-0 basis-full sm:order-1 sm:flex-1 sm:basis-auto">
           <Pendientes items={pendientes} titulo={false} />
         </div>
-        <div className="order-1 flex w-full flex-wrap items-center justify-between gap-2 sm:order-2 sm:w-auto sm:justify-end">
-          {country === 'VE' && <RateBar descuento={false} exceso={false} />}
-          <Link href="/ventas?new=1" className="btn-primary text-sm whitespace-nowrap">+ Nueva venta</Link>
+        <div className="order-1 flex w-full flex-wrap items-center justify-between gap-2 sm:order-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end sm:justify-start">
+          <Link href="/ventas?new=1" className="btn-primary text-sm whitespace-nowrap sm:order-1">+ Nueva venta</Link>
+          {country === 'VE' && <div className="sm:order-2"><RateBar descuento={false} exceso={false} /></div>}
         </div>
       </div>
 
