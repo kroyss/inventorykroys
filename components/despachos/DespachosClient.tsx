@@ -589,9 +589,9 @@ function Dropzone({ onFiles, busy, compact, agregaALote }: {
 // ── Qué se imprime en la etiqueta (sin inventario) ─────────────────────────
 type Formato = 'a4' | 'termica'
 const CLAVE_FORMATO = 'despachos_formato'
-const FORMATOS: { id: Formato; texto: string; corto: string; ayuda: string }[] = [
-  { id: 'a4', texto: 'Hoja A4', corto: '4 por hoja', ayuda: '4 guías por hoja A4 · impresora común. Se recuerda en este equipo.' },
-  { id: 'termica', texto: 'Térmica 10×15', corto: '1 por etiqueta', ayuda: '1 guía por etiqueta de 100 × 150 mm · impresora de etiquetas. Se recuerda en este equipo.' },
+const FORMATOS: { id: Formato; texto: string; ayuda: string }[] = [
+  { id: 'a4', texto: 'Hoja A4', ayuda: '4 guías por hoja A4 · impresora común. Se recuerda en este equipo.' },
+  { id: 'termica', texto: 'Térmica 10×15', ayuda: '1 guía por etiqueta de 100 × 150 mm · impresora de etiquetas. Se recuerda en este equipo.' },
 ]
 
 type Impresion = { sin_titulo: boolean; sin_nota: boolean }
@@ -685,22 +685,19 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, formato, o
 
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={onRevalidar} className="btn-secondary text-xs" title={desdeML ? 'Volver a buscar las ventas y las notas en MercadoLibre' : 'Volver a cruzar con las ventas (p.ej. después de cargar una venta que faltaba)'}>↻ Revalidar</button>
-          <button onClick={onDescartar} className="btn-secondary text-xs">Descartar</button>
-          <div className="flex flex-col items-center">
-            <div role="radiogroup" aria-label="Formato del PDF" className="inline-flex overflow-hidden rounded-lg border border-neutral-300 bg-white text-xs shadow-sm">
+          <button onClick={onRevalidar} className="btn-secondary h-9 py-0" title={desdeML ? 'Volver a buscar las ventas y las notas en MercadoLibre' : 'Volver a cruzar con las ventas (p.ej. después de cargar una venta que faltaba)'}>↻ Revalidar</button>
+          <button onClick={onDescartar} className="btn-secondary h-9 py-0">Descartar</button>
+          <div role="radiogroup" aria-label="Formato del PDF" className="inline-flex h-9 overflow-hidden rounded-lg border border-neutral-300 bg-white text-sm shadow-sm">
               {FORMATOS.map(f => (
                 <button key={f.id} type="button" role="radio" aria-checked={formato === f.id} disabled={generando}
                   onClick={() => onFormato(f.id)} title={f.ayuda}
-                  className={`px-3 py-1.5 font-medium transition-colors disabled:opacity-60 ${f.id === 'termica' ? 'border-l border-neutral-300' : ''} ${
+                  className={`px-3.5 font-medium whitespace-nowrap transition-colors disabled:opacity-60 ${f.id === 'termica' ? 'border-l border-neutral-300' : ''} ${
                     formato === f.id ? 'bg-neutral-900 text-white' : 'text-neutral-600 hover:bg-neutral-50'}`}>
                   {f.texto}
                 </button>
               ))}
-            </div>
-            <span className="mt-0.5 text-[11px] text-neutral-500">{FORMATOS.find(f => f.id === formato)!.corto}</span>
           </div>
-          <button onClick={onGenerar} disabled={generando || lote.imprimibles === 0} className="btn-primary text-sm">
+          <button onClick={onGenerar} disabled={generando || lote.imprimibles === 0} className="btn-primary h-9 py-0">
             {generando ? 'Generando y verificando…' : `Generar PDF (${lote.imprimibles})`}
           </button>
         </div>
