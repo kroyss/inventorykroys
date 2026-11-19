@@ -19,7 +19,14 @@ let trabajando = false
 // (Chrome abierto, latido al día, pero sin tomar pedidos nuevos). Ahora cada paso anota avance; si pasan
 // SIN_AVANCE_MS sin ninguno, la traída se da por fallida (el sistema la reintenta) y queda libre. No es un tope
 // total: con conexión lenta pero avanzando (subiendo órdenes una a una) sigue el tiempo que haga falta.
-const SIN_AVANCE_MS = 4 * 60 * 1000
+// 1.3.8: 4 → 8 min. La lectura de órdenes (dentro de la página) no puede anotar avance y ahora tiene su propio tope de
+// LECTURA_MAX_MS con reintentos por página: el vigía es solo el último recurso.
+const SIN_AVANCE_MS = 8 * 60 * 1000
+/** 1.3.8 (19-11, el portal tardaba 5–30 s por página con cuentas grandes y a veces no contestaba nunca): topes que se
+ *  pasan a las funciones que corren DENTRO de la página (no ven estas constantes). */
+const PAGINA_MS = 45 * 1000          // una consulta al portal que no contesta en esto se corta y se reintenta
+const INTENTOS_PAGINA = 3            // por consulta
+const LECTURA_MAX_MS = 5 * 60 * 1000 // lectura de órdenes: pasado esto se sube lo leído (las más nuevas primero)
 let ultimoAvance = 0
 let turno = 0
 const avance = () => { ultimoAvance = Date.now() }
@@ -87,7 +94,7 @@ async function procesarConVigia(cfg, pedido, pesos) {
   clearInterval(vigia)
   if (r === 'colgada' && turno === mio) {
     turno++   // el procesar colgado queda huérfano
-    await api(cfg, 'fin', { pedido, ok: false, error: 'El portal de MercadoEnvíos no respondió (4 min sin avance)' }).catch(() => {})
+    await api(cfg, 'fin', { pedido, ok: false, error: 'El portal de MercadoEnvíos no respondió (8 min sin avance)' }).catch(() => {})
     await anotar('El portal de MercadoEnvíos no respondió: se soltó la traída y queda libre para la siguiente.')
     for (const t of await tabsDelDespertador()) cerrarVentana(t)
     trabajando = false
@@ -118,17 +125,13 @@ async function procesar(cfg, pedido, pesos = false, mio = turno) {
     }
 
     avance()
-    let [{ result: leido }] = await chrome.scripting.executeScript({
-      target: { tabId }, world: 'MAIN', func: leerOrdenes, args: [DIAS],
-    })
+    let leido = await ejecutar(tabId, leerOrdenes, ARGS_LEER)
     avance()
     // Sesión vencida (MercadoEnvíos la cierra a diario): se entra solo con "Ingresar con mi cuenta
     // de Mercado Libre", que pasa directo si este Chrome tiene la sesión de ML. Nunca escribe claves:
     // si ML pide clave o código, queda como sin sesión y la ventana abierta para hacerlo a mano.
     if (leido?.error === 'sin_sesion' && await reingresar(tabId)) {
-      [{ result: leido }] = await chrome.scripting.executeScript({
-        target: { tabId }, world: 'MAIN', func: leerOrdenes, args: [DIAS],
-      })
+      leido = await ejecutar(tabId, leerOrdenes, ARGS_LEER)
     }
     if (!vigente()) return
     if (!leido?.ok) throw new Error(leido?.error || 'No se pudo leer el portal')
@@ -147,9 +150,7 @@ async function procesar(cfg, pedido, pesos = false, mio = turno) {
       if (!o) continue
       if (!vigente()) return
       avance()
-      const [{ result: archivos }] = await chrome.scripting.executeScript({
-        target: { tabId }, world: 'MAIN', func: bajarArchivos, args: [o.guia_url, o.comprobante_url],
-      })
+      const archivos = await ejecutar(tabId, bajarArchivos, [o.guia_url, o.comprobante_url, PAGINA_MS])
       await api(cfg, 'orden', {
         cuenta: leido.cuenta || cfg.perfil,
         orden: o.orden,
@@ -165,7 +166,7 @@ async function procesar(cfg, pedido, pesos = false, mio = turno) {
     if (pesos && vigente()) {
       avance()
       try {
-        const [{ result: prod }] = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', func: leerProductos })
+        const prod = await ejecutar(tabId, leerProductos, [PAGINA_MS])
         if (prod?.ok) await api(cfg, 'productos', { cuenta: leido.cuenta || cfg.perfil, completo: prod.completo, items: prod.items })
       } catch (e) { await anotar(`No se pudieron leer los pesos: ${e.message}`) }
     }
@@ -177,7 +178,8 @@ async function procesar(cfg, pedido, pesos = false, mio = turno) {
     if (!vigente()) return
     await api(cfg, 'fin', { pedido, ok: true, cuenta: leido.cuenta || cfg.perfil, vistas, nuevas, saltadas: leido.saltadas ?? [] })
     const nSalt = leido.saltadas?.length ?? 0
-    await anotar(`Listo: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.${nSalt ? ` ${nSalt} sin pago o sin guía todavía.` : ''}`)
+    await anotar(`Listo: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.${nSalt ? ` ${nSalt} sin pago o sin guía todavía.` : ''}`
+      + (leido.parcial ? ' El portal estaba lento: se leyeron solo las más recientes.' : ''))
   } catch (e) {
     if (!vigente()) return
     const error = String(e.message || e).slice(0, 280)
@@ -211,7 +213,7 @@ async function verificarCuenta() {
       creada = true
       await esperarCarga(tab.id)
     }
-    const [{ result: leido }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: leerOrdenes, args: [DIAS] })
+    const leido = await ejecutar(tab.id, leerOrdenes, ARGS_LEER)
     if (!leido?.ok) return { estado: leido?.error === 'sin_sesion' ? 'sin_sesion' : 'error', error: leido?.error }
     const v = await api(cfg, 'verificar', { cuenta: leido.cuenta || null, ventas: leido.ordenes.map(o => o.venta) })
     const res = { ...v, at: new Date().toLocaleString('es-VE') }
@@ -295,6 +297,25 @@ function cerrarVentana(tab) {
   chrome.windows.remove(tab.windowId).catch(() => {})
 }
 
+const ARGS_LEER = [DIAS, PAGINA_MS, INTENTOS_PAGINA, LECTURA_MAX_MS]
+
+/** 1.3.8: corre una función dentro de la página. Si la página se recargó a mitad («Frame with ID 0 was removed», el
+ *  portal se recarga solo cuando sus datos tardan), espera que cargue y prueba una vez más. */
+async function ejecutar(tabId, func, args = []) {
+  for (let i = 0; ; i++) {
+    try {
+      const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', func, args })
+      return result
+    } catch (e) {
+      const msg = String(e?.message || e)
+      if (i >= 1 || !/frame|document|navigat|context/i.test(msg)) throw e
+      avance()
+      await anotar('La página de MercadoEnvíos se recargó a mitad de la lectura: reintentando…')
+      await esperarCarga(tabId)
+    }
+  }
+}
+
 function esperarCarga(tabId) {
   return new Promise(resolve => {
     const listo = () => { chrome.tabs.onUpdated.removeListener(oir); setTimeout(resolve, 2000) }
@@ -307,12 +328,29 @@ function esperarCarga(tabId) {
 // ── Se ejecutan DENTRO de la página del portal (misma sesión, mismo origen) ──
 // Tienen que ser autosuficientes: no ven nada de este archivo.
 
-async function leerOrdenes(dias) {
+async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000) {
+  const inicio = Date.now()
+  const espera = ms => new Promise(r => setTimeout(r, ms))
+  // 1.3.8: cada consulta con tope de tiempo y reintentos (el portal a veces tarda 5–30 s o da 502/503/504 «Gateway
+  // Timeout»). Sin sesión no se reintenta.
   const json = async url => {
-    const r = await fetch(url, { credentials: 'include' })
-    if (r.status === 401 || r.status === 403) throw new Error('sin_sesion')
-    if (!r.ok) throw new Error(`El portal respondió ${r.status}`)
-    return r.json()
+    let ultimo = null
+    for (let i = 0; i < intentos; i++) {
+      if (i) await espera(3000 * i)
+      const c = new AbortController()
+      const t = setTimeout(() => c.abort(), paginaMs)
+      try {
+        const r = await fetch(url, { credentials: 'include', signal: c.signal })
+        if (r.status === 401 || r.status === 403) throw new Error('sin_sesion')
+        if (r.status >= 500 || r.status === 429) { ultimo = `El portal respondió ${r.status}`; continue }
+        if (!r.ok) throw new Error(`El portal respondió ${r.status}`)
+        return await r.json()
+      } catch (e) {
+        if (e.message === 'sin_sesion' || /^El portal respondió/.test(e.message)) throw e
+        ultimo = e.name === 'AbortError' ? `El portal de MercadoEnvíos no respondió en ${Math.round(paginaMs / 1000)} s` : e.message
+      } finally { clearTimeout(t) }
+    }
+    throw new Error(`${ultimo} (${intentos} intentos)`)
   }
   const num = v => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))
   const nombre = x => (x == null ? null : typeof x === 'object' ? (x.name ?? x.nombre ?? null) : String(x))
@@ -349,8 +387,19 @@ async function leerOrdenes(dias) {
       ver(obj, '', 0)
       return out
     }
+    let parcial = false
     for (let off = 0; off < 1000; off += 50) {
-      const res = await json(`/api/v1/seller/orders/?limit=50&offset=${off}&order_by=date_created&direction=desc`)
+      // 1.3.8: con el portal lento, pasado maxMs se sube lo ya leído (son las más nuevas); el resto, en la próxima.
+      if (off > 0 && Date.now() - inicio > maxMs) { parcial = true; break }
+      let res
+      try {
+        res = await json(`/api/v1/seller/orders/?limit=50&offset=${off}&order_by=date_created&direction=desc`)
+      } catch (e) {
+        // La primera página es obligatoria; si falla una de las siguientes, se sube lo leído.
+        if (off === 0 || e.message === 'sin_sesion') throw e
+        parcial = true
+        break
+      }
       const rs = res?.data?.results ?? []
       if (rs.length === 0) break
       for (const o of rs) {
@@ -400,19 +449,27 @@ async function leerOrdenes(dias) {
       }
       if (new Date(rs[rs.length - 1].date_created).getTime() < desde) break
     }
-    return { ok: true, cuenta, ordenes, notas, saltadas }
+    return { ok: true, cuenta, ordenes, notas, saltadas, parcial }
   } catch (e) {
     return { ok: false, error: e.message }
   }
 }
 
 // Publicaciones activas del portal con su peso y transportistas (pantalla Productos del portal).
-async function leerProductos() {
+async function leerProductos(paginaMs = 45000) {
   try {
     const items = []
     let total = 0
+    const inicio = Date.now()
     for (let off = 0; off < 5000; off += 50) {
-      const r = await fetch(`/api/v1/seller/products/search/?limit=50&offset=${off}&order_by=date_created&direction=desc&status=active`, { credentials: 'include' })
+      // 1.3.8: tope por página y total (3 min): los pesos son opcionales, no deben trabar la traída.
+      if (Date.now() - inicio > 180000) break
+      const c = new AbortController()
+      const t = setTimeout(() => c.abort(), paginaMs)
+      let r
+      try { r = await fetch(`/api/v1/seller/products/search/?limit=50&offset=${off}&order_by=date_created&direction=desc&status=active`, { credentials: 'include', signal: c.signal }) }
+      catch (e) { throw new Error(e.name === 'AbortError' ? 'El portal no respondió' : e.message) }
+      finally { clearTimeout(t) }
       if (!r.ok) throw new Error(`El portal respondió ${r.status}`)
       const d = (await r.json())?.data ?? {}
       const rs = d.items ?? []
@@ -435,10 +492,21 @@ async function leerProductos() {
   }
 }
 
-async function bajarArchivos(guiaUrl, comprobanteUrl) {
+async function bajarArchivos(guiaUrl, comprobanteUrl, tope = 45000) {
+  // 1.3.8: con tope de tiempo y un reintento; si no baja, la orden se sube igual sin ese archivo (como antes con !ok).
+  const traer = async url => {
+    for (let i = 0; i < 2; i++) {
+      const c = new AbortController()
+      const t = setTimeout(() => c.abort(), tope)
+      try { const r = await fetch(url, { credentials: 'include', signal: c.signal }); if (r.ok) return r; if (r.status < 500) return null }
+      catch { /* sin respuesta: reintenta */ }
+      finally { clearTimeout(t) }
+    }
+    return null
+  }
   const b64 = async url => {
-    const r = await fetch(url, { credentials: 'include' })
-    if (!r.ok) return null
+    const r = await traer(url)
+    if (!r) return null
     const blob = await r.blob()
     if (blob.size > 5 * 1024 * 1024) return null
     const data = await new Promise(res => { const f = new FileReader(); f.onload = () => res(f.result); f.readAsDataURL(blob) })
