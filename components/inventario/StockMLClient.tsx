@@ -235,8 +235,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   return (
     <div className="space-y-4 pb-20">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      <EncabezadoInfo info={<><li>Cada producto con todas sus publicaciones: lo que MercadoLibre ofrece contra lo que tienes en inventario.</li><li>Arriba, lo que hay que hacer: <b className="font-medium text-neutral-800">Vende de más</b> (ML ofrece más de lo que tienes: urgente), <b className="font-medium text-neutral-800">Tienes y no vendes</b> y <b className="font-medium text-neutral-800">Por ajustar</b>.</li><li>Poner en ML cambia tus publicaciones; <b className="font-medium text-neutral-800">Corregir stock</b> cambia tu inventario (queda como ajuste).</li><li><b className="font-medium text-neutral-800">🔗 N vínculos</b> en cada producto: ves y corriges sus publicaciones en un panel, sin salir de aquí. <b className="font-medium text-neutral-800">Se acabó</b> está en <b className="font-medium text-neutral-800">⋯</b>.</li><li>Más de 10 publicaciones a la vez van por la cola: el avance sale abajo a la derecha y queda en <b className="font-medium text-neutral-800">Historial de tareas</b>.</li><li>Publicación por publicación también lo ves en <b className="font-medium text-neutral-800">Mis publicaciones</b>: la etiqueta «Stock distinto» con su botón Igualar.</li><li><b className="font-medium text-neutral-800">«⚠ Desde N u. pierde envío gratis»</b>: comprando esa cantidad el paquete pesa más y no llega al mínimo (revisado hasta 20, con la promo). <b className="font-medium text-neutral-800">Crear pack</b> arma un «Pack xN» con envío gratis. «✓ Envío gratis aunque lleve…» = puedes subir el stock sin miedo.</li></>} title="Stock en MercadoLibre"
-        subtitle="Cada producto con todas sus publicaciones: pon en ML lo que hay y reactiva las pausadas en todas tus cuentas de una vez"
+      <EncabezadoInfo info={<><li>Cada producto con todas sus publicaciones: lo que MercadoLibre ofrece contra lo que tienes en inventario.</li><li>Arriba, lo que hay que hacer: <b className="font-medium text-neutral-800">Vende de más</b> (ML ofrece más de lo que tienes: urgente), <b className="font-medium text-neutral-800">Tienes y no vendes</b> y <b className="font-medium text-neutral-800">Por ajustar</b>.</li><li>Poner en ML cambia tus publicaciones; <b className="font-medium text-neutral-800">Corregir stock</b> cambia tu inventario (queda como ajuste).</li><li><b className="font-medium text-neutral-800">🔗 N vínculos</b> en cada producto: ves y corriges sus publicaciones en un panel, sin salir de aquí. <b className="font-medium text-neutral-800">Ver cambios</b> y <b className="font-medium text-neutral-800">Se acabó</b> están en el <b className="font-medium text-neutral-800">⋯</b> del producto; <b className="font-medium text-neutral-800">Pausar</b>, «trae N u.» y «No sincronizar», en el <b className="font-medium text-neutral-800">⋯</b> de cada publicación.</li><li><b className="font-medium text-neutral-800">Vende de más</b>: si alguien compra no vas a poder cumplir; «Arreglar» o «Aplicar en ML» los baja a lo que hay. <b className="font-medium text-neutral-800">Tienes y no vendes</b>: «Arreglar» pone stock y reactiva las pausadas por falta de stock (las pausadas a mano no). <b className="font-medium text-neutral-800">Por ajustar</b>: no es urgente; te muestra la lista antes. <b className="font-medium text-neutral-800">Para decidir</b>: el sistema no lo resuelve solo y cada producto dice por qué.</li><li>En el celular cada producto sale resumido: tócalo para ver sus publicaciones.</li><li>Más de 10 publicaciones a la vez van por la cola: el avance sale abajo a la derecha y queda en <b className="font-medium text-neutral-800">Historial de tareas</b>.</li><li>Publicación por publicación también lo ves en <b className="font-medium text-neutral-800">Mis publicaciones</b>: la etiqueta «Stock distinto» con su botón Igualar.</li><li><b className="font-medium text-neutral-800">«⚠ Desde N u. pierde envío gratis»</b>: comprando esa cantidad el paquete pesa más y no llega al mínimo (revisado hasta 20, con la promo). <b className="font-medium text-neutral-800">Crear pack</b> arma un «Pack xN» con envío gratis. La etiqueta de envío sale solo si avisa algo (Solo Tealca, Cobro a destino).</li></>} title="Stock en MercadoLibre"
+        subtitle={<span className="hidden sm:inline">Cada producto con todas sus publicaciones: pon en ML lo que hay y reactiva las pausadas en todas tus cuentas de una vez</span>}
         actions={<>
           <Link href="/inventario" className="btn-secondary text-sm whitespace-nowrap">← Inventario</Link>
           <button type="button" onClick={() => setHistorial({ product_id: null, nombre: null })} className="btn-secondary text-sm whitespace-nowrap"
@@ -263,8 +263,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
       )}
       {!alDia && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
-          Tu inventario no está marcado como al día: las sugerencias salen de lo que dice el inventario, revísalas antes de aplicar.
-          En lote solo se arregla «Vende de más» (bajar es seguro).
+          Inventario sin marcar «al día»: revisa las sugerencias antes de aplicar (en lote solo «Vende de más»).
           <button type="button" onClick={() => setVerAjustes(true)} className="ml-1 font-medium underline">Ajustes</button>
         </p>
       )}
@@ -331,30 +330,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
         </div>
       )}
       {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
-      {filtro === 'vende' && n.vende > 0 && (
-        <p className="rounded-lg border border-neutral-200 border-l-4 border-l-red-400 bg-white px-3 py-2 text-xs text-neutral-700">
-          <b>MercadoLibre ofrece unidades que no tienes.</b> Si alguien compra, no vas a poder cumplir (reclamo y baja de reputación).
-          {puedeCambiar ? ' «Arreglar» (arriba) o «Aplicar en ML» en cada uno: los que están en 0 quedan en 0 en ML y dejan de venderse.' : ' Avísale a quien maneja el stock.'}
-        </p>
-      )}
-      {filtro === 'sinpub' && n.sinpub > 0 && (
-        <p className="rounded-lg border border-neutral-200 border-l-4 border-l-sky-400 bg-white px-3 py-2 text-xs text-neutral-700">
-          <b>Tienes unidades y en MercadoLibre no se ofrece ninguna</b>: sus publicaciones están pausadas o en 0.
-          {puedeCambiar ? ' «Arreglar» las pone con stock y reactiva las pausadas por falta de stock. Las pausadas a mano no se reactivan solas: actívalas en la fila si fue sin querer, o déjalas si fue a propósito.' : ' Avísale a quien maneja el stock.'}
-        </p>
-      )}
-      {filtro === 'ajustar' && n.ajustar > 0 && (
-        <p className="rounded-lg border border-neutral-200 border-l-4 border-l-amber-400 bg-white px-3 py-2 text-xs text-neutral-700">
-          <b>ML muestra cantidades distintas a las sugeridas</b> (o hay pausadas por falta de stock que se pueden reactivar). No es urgente:
-          {puedeCambiar ? ' «Arreglar» te muestra la lista antes de cambiar nada.' : ' avísale a quien maneja el stock.'}
-        </p>
-      )}
-      {filtro === 'decidir' && n.decidir > 0 && (
-        <p className="rounded-lg border border-neutral-200 border-l-4 border-l-neutral-400 bg-white px-3 py-2 text-xs text-neutral-700">
-          <b>El sistema no lo resuelve solo:</b> cada producto dice por qué. Quedan pocas (eliges a qué cuenta va cada unidad), al reactivar
-          quedaría sin envío gratis, o el título parece un pack («trae N u.» o «Es suelta»).
-        </p>
-      )}
+      {/* 20-11 (el dueño: «pesado»): la explicación de cada tarjeta ya está en la tarjeta y en ⓘ; sin recuadro aparte. */}
       {cola && (
         <div className={`rounded-lg border px-3 py-2 text-sm ${cola.terminado ? (cola.errores ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800') : 'border-sky-200 bg-sky-50 text-sky-900'}`}>
           {cola.terminado
@@ -367,7 +343,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           {cola.terminado && <button type="button" className="ml-3 underline" onClick={() => setCola(null)}>Ocultar</button>}
         </div>
       )}
-      {resultados.size > 0 && !trabajando && (
+      {/* 20-11: un solo aviso de resultado (si hay cola, manda la cola). */}
+      {resultados.size > 0 && !trabajando && !cola && (
         <div className={`rounded border px-3 py-2 text-sm ${errores ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
           ✓ {okCount} publicación{okCount === 1 ? '' : 'es'} al día{errores ? ` · ${errores} con problema (mira el detalle en rojo)` : ''}
           <button className="ml-3 underline" onClick={() => setResultados(new Map())}>Ocultar</button>
@@ -636,13 +613,23 @@ function Producto({ f, puedeCambiar, marcable, marcado, resultados, verCombos, e
     </>
   )
   const cambioAsig = asignables.some(p => Number(valor(p)) !== p.ml_disponible)
+  // 20-11 (el dueño, A+): en el celular el producto sale RESUMIDO (una línea con sus publicaciones y Aplicar en ML a la
+  // vista); al tocar «Ver» se abre. En pantallas grandes siempre abierto (las clases max-sm: no aplican).
+  const [abierto, setAbierto] = useState(false)
+  const conML = f.pubs.filter(p => p.ml_disponible != null)
+  const enML = conML.reduce((s, p) => s + (p.ml_disponible ?? 0), 0)
+  const quedara = conML.reduce((s, p) => s + (p.sin_sincronizar || p.objetivo == null ? (p.ml_disponible ?? 0) : p.objetivo), 0)
+  const resProd = f.pubs.map(p => resultados.get(clave(p))).filter((x): x is Res => !!x)
+  const fallas = resProd.filter(x => !x.ok).length
+  useEffect(() => { if (fallas > 0) setAbierto(true) }, [fallas])
+  const plegar = abierto ? '' : 'max-sm:hidden'
   return (
     <section className={`rounded-xl border bg-white shadow-sm ${marcado ? 'border-lime-400 ring-1 ring-lime-300' : 'border-neutral-200'}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-neutral-100 px-4 py-2.5">
         {puedeCambiar && <input type="checkbox" checked={marcado} disabled={!marcable} onChange={onMarcar}
           title={marcable ? 'Marcar (para hacer varios a la vez)' : 'Nada que cambiar'} className="h-4 w-4" />}
         <FotoProducto id={f.product_id} nombre={f.name} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 max-sm:basis-[calc(100%-6.5rem)]">
           <div>
             <span className="font-mono text-xs text-neutral-400">{f.code}</span> <span className="font-medium text-neutral-900">{f.name}</span>
             <EtiquetaGrupo f={f} />
@@ -650,7 +637,7 @@ function Producto({ f, puedeCambiar, marcable, marcado, resultados, verCombos, e
           </div>
           {/* 19-11 (el dueño): las acciones del producto como botones iguales en una fila (antes, enlaces sueltos que se
               cortaban). Lo que casi no se usa («Se acabó») va en ⋯. */}
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <div className={`mt-1.5 flex flex-wrap items-center gap-1.5 ${plegar}`}>
             {onVinculos && (
               <button type="button" onClick={onVinculos} className={`${CHIP} ${f.pubs.length ? '' : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'}`}
                 title="Ver y corregir con qué publicaciones está vinculado este producto, sin salir de aquí">
@@ -660,23 +647,27 @@ function Producto({ f, puedeCambiar, marcable, marcado, resultados, verCombos, e
               <button type="button" onClick={() => setCorrigiendo('')} className={CHIP}
                 title="Si contaste y el inventario está mal: se guarda como ajuste de inventario">Corregir stock</button>
             )}
-            <button type="button" onClick={onHistorial} className={CHIP}
-              title="Quién cambió el stock o el estado de sus publicaciones en MercadoLibre">Ver cambios</button>
-            {puedeCambiar && conStockML && !f.sin_fisico && (
-              <span className="relative">
-                <button type="button" onClick={() => setMenu(m => !m)} aria-expanded={menu} aria-label="Más acciones" className={CHIP}>⋯</button>
-                {menu && <>
-                  <span className="fixed inset-0 z-10" aria-hidden="true" onClick={() => setMenu(false)} />
-                  <span className="absolute left-0 top-full z-20 mt-1 block w-64 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg">
+            {/* 20-11 (el dueño: «pesado»): un solo ⋯ del producto con lo ocasional: Ver cambios y Se acabó. */}
+            <span className="relative">
+              <button type="button" onClick={() => setMenu(m => !m)} aria-expanded={menu} aria-label="Más acciones del producto" className={CHIP}>⋯</button>
+              {menu && <>
+                <span className="fixed inset-0 z-10" aria-hidden="true" onClick={() => setMenu(false)} />
+                <span className="absolute left-0 top-full z-20 mt-1 block w-64 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg">
+                  <button type="button" className="block w-full rounded-md px-2.5 py-2 text-left text-xs text-neutral-700 hover:bg-neutral-100"
+                    onClick={() => { setMenu(false); onHistorial() }}>
+                    <b className="block font-medium">Ver cambios</b>
+                    <span className="text-neutral-500">Quién cambió el stock o el estado de sus publicaciones en MercadoLibre</span>
+                  </button>
+                  {puedeCambiar && conStockML && !f.sin_fisico && (
                     <button type="button" disabled={marcando} className="block w-full rounded-md px-2.5 py-2 text-left text-xs text-neutral-700 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
                       onClick={async () => { setMenu(false); setMarcando(true); await onSinFisico(true); setMarcando(false) }}>
                       <b className="block font-medium">Se acabó</b>
                       <span className="text-neutral-500">No está en bodega aunque el sistema diga que hay: todas sus publicaciones a 0 en ML</span>
                     </button>
-                  </span>
-                </>}
-              </span>
-            )}
+                  )}
+                </span>
+              </>}
+            </span>
             {marcando && <span className="text-xs text-neutral-500">Un momento…</span>}
           </div>
           {f.sin_fisico && (
@@ -691,7 +682,7 @@ function Producto({ f, puedeCambiar, marcable, marcado, resultados, verCombos, e
           )}
         </div>
         {/* 19-11: Disponible manda (es lo que se reparte en ML); stock y sin registrar, chicos debajo. El peso solo si falta. */}
-        <div className="text-right text-xs text-neutral-500">
+        <div className="text-xs text-neutral-500 max-sm:flex-1 sm:text-right">
           {corrigiendo == null ? (
             <>
               <div><span className="mr-1">Disponible</span><b className="text-lg leading-none text-neutral-900 tabular-nums">{f.disponible}</b></div>
@@ -719,9 +710,20 @@ function Producto({ f, puedeCambiar, marcable, marcado, resultados, verCombos, e
             onClick={async () => { setAplicando(true); await onAplicar(); setAplicando(false) }}>
             {aplicando ? 'Aplicando…' : 'Aplicar en ML'}</button>
         )}
+        {/* Celular: resumen de sus publicaciones + abrir/cerrar. */}
+        <button type="button" onClick={() => setAbierto(a => !a)} aria-expanded={abierto}
+          className="flex w-full items-center justify-between gap-2 rounded-lg bg-neutral-50 px-2.5 py-1.5 text-left text-xs text-neutral-600 sm:hidden">
+          <span className="min-w-0 truncate tabular-nums">
+            {f.pubs.length} publicaci{f.pubs.length === 1 ? 'ón' : 'ones'}{conML.length > 0 && <> · ML {enML}{quedara !== enML && <> → <b className="text-lime-700">{quedara}</b></>}</>}
+            {resProd.length > 0 && (fallas
+              ? <span className="ml-1 font-medium text-red-700">· {fallas} con problema</span>
+              : <span className="ml-1 font-medium text-emerald-700">· ✓ listo</span>)}
+          </span>
+          <span className="shrink-0 font-medium text-neutral-800">{abierto ? 'Ocultar ▴' : 'Ver ▾'}</span>
+        </button>
       </div>
       {f.en_reserva && (
-        <div className="space-y-2 border-b border-l-4 border-b-neutral-100 border-l-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-800">
+        <div className={`${plegar} space-y-2 border-b border-l-4 border-b-neutral-100 border-l-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-800`}>
           {/* 16-11 (el dueño: «no sé qué hacer ahí»): arranca con una sugerencia válida, dicha en claro, y un botón listo. */}
           <p>
             {f.excede
@@ -753,7 +755,7 @@ function Producto({ f, puedeCambiar, marcable, marcado, resultados, verCombos, e
         </div>
       )}
       {editando && !f.en_reserva && puedeCambiar && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-l-4 border-b-neutral-100 border-l-sky-300 bg-sky-50/40 px-4 py-2.5 text-sm">
+        <div className={`${plegar} flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-l-4 border-b-neutral-100 border-l-sky-300 bg-sky-50/40 px-4 py-2.5 text-sm`}>
           <b className="text-neutral-800">A mano:</b>
           {avisosAMano}
           <span className="ml-auto flex items-center gap-3">
@@ -763,7 +765,7 @@ function Producto({ f, puedeCambiar, marcable, marcado, resultados, verCombos, e
           </span>
         </div>
       )}
-      <ul className="divide-y divide-neutral-100">
+      <ul className={`divide-y divide-neutral-100 ${plegar}`}>
         {f.pubs.map(p => <FilaPub key={p.codigo_id} p={p} res={resultados.get(clave(p))} puedeCambiar={puedeCambiar} reserva={f.en_reserva}
           abrirOpciones={verCombos} onEstado={(e, m) => onEstado(p, e, m)}
           atenuada={(!!resaltar && p.estado !== resaltar) || (!!cuenta && p.cuenta !== cuenta)}
@@ -800,7 +802,8 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
   const [cambiandoEstado, setCambiandoEstado] = useState(false)
   const estadoML = async (e: 'paused' | 'active', m = '') => { setCambiandoEstado(true); const ok = await onEstado(e, m); setCambiandoEstado(false); if (ok) setPausando(null) }
   const cambia = p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar)
-  const envio = p.envio ? ENVIO[p.envio] : null
+  // 20-11: la etiqueta de envío solo si avisa algo («Zoom y Tealca» es lo normal; «Sin peso» ya sale en el producto).
+  const envio = p.envio && p.envio !== 'ambas' && p.envio !== 'sin_peso' ? ENVIO[p.envio] : null
   return (
     <li className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2 text-sm ${p.sin_sincronizar || atenuada ? 'opacity-50' : ''}`}>
       <div className="min-w-[12rem] flex-1">
@@ -863,11 +866,9 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
           <span>⚠ Desde {p.envio_cantidad.pierde[0]} u. pierde envío gratis{p.envio_cantidad.promo ? ' (con la promo)' : ''}</span>
           {pack && <button type="button" onClick={pack} className="font-medium text-sky-700 underline hover:text-sky-900">Crear pack</button>}
         </span>
-      ) : (p.objetivo ?? 0) > (p.ml_disponible ?? 0) && (
-        <span className="w-full text-[11px] text-emerald-700" title="Revisado cantidad por cantidad con el peso y el precio de hoy (con la promo si tiene)">
-          ✓ Envío gratis aunque lleve {(p.objetivo ?? 0) > 20 ? '20 o más' : `hasta ${p.envio_cantidad.hasta}`} u.</span>
-      ))}
-      {puedeCambiar && p.estado === 'active' && !p.sin_sincronizar && pausando == null && (
+      ) : null)}
+      {/* 20-11: Pausar va dentro del ⋯ de la publicación (Activar sigue a la vista: es lo que se busca en una pausada). */}
+      {puedeCambiar && verOpciones && p.estado === 'active' && !p.sin_sincronizar && pausando == null && (
         <button type="button" onClick={() => setPausando('')} className={CHIP}
           title="Deja de venderse en MercadoLibre (la publicación entera). «Poner en ML lo que hay» no la reactiva hasta que alguien la active">Pausar</button>
       )}
@@ -893,8 +894,9 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
         </span>
       )}
       {puedeCambiar && !abrirOpciones && (
-        <button type="button" onClick={() => setOpciones(o => !o)} aria-expanded={opciones} className={CHIP}>
-          {opciones ? 'Menos opciones' : '⋯ Más opciones'}</button>
+        <button type="button" onClick={() => setOpciones(o => !o)} aria-expanded={opciones} className={CHIP}
+          aria-label="Más opciones de la publicación" title="Pausar, «trae N u.» (pack o combo) y No sincronizar">
+          {opciones ? 'Cerrar ▴' : '⋯'}</button>
       )}
       {verOpciones && (
         <label className="flex items-center gap-1 text-xs text-neutral-500" title="Cuántas unidades del producto trae esta publicación (pack o combo). Lo pones tú; 1 = suelto">
