@@ -66,7 +66,7 @@ function AdjustFields({ form, setForm, currentQty }: {
   const input = 'w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800'
   return (
     <>
-      <div className={`grid gap-3 ${isAdjust ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
+      <div className={`grid gap-3 ${isAdjust ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'}`}>
         <div>
           <label className="block text-xs font-medium text-neutral-500 mb-1">Tipo</label>
           <select
@@ -103,7 +103,7 @@ function AdjustFields({ form, setForm, currentQty }: {
             />
           </div>
         )}
-        <div>
+        <div className={isAdjust ? '' : 'col-span-2 sm:col-span-1'}>
           <label className="block text-xs font-medium text-neutral-500 mb-1">Notas</label>
           <input
             value={form.notes}
@@ -466,7 +466,7 @@ export default function InventarioClient({ initialItems, acceso, country, etique
                   <FotoProducto id={item.product_id} nombre={item.name} tam="md" />
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-xs text-neutral-400">{item.code}</div>
-                    <div className="font-medium leading-snug text-neutral-900">{item.name}</div>
+                    <div className="text-sm font-medium leading-snug text-neutral-900">{item.name}</div>
                     {item.stock_por_verificar && (
                       <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-800">
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />por verificar
@@ -481,7 +481,7 @@ export default function InventarioClient({ initialItems, acceso, country, etique
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
                   <span>Precio: <span className="font-medium text-neutral-800">{priceLabel(item.sale_price || item.final_price_usd)}</span></span>
                   {isVE && <span>ML: <span className="font-medium text-neutral-800">${fmt(mlPriceVE(item))}</span></span>}
-                  {isAdmin && <span>Mín/Máx: <span className="font-medium text-neutral-800 num">{item.min_stock || <i className="text-neutral-400">{item.min_stock_rec}</i>}/{item.max_stock || <i className="text-neutral-400">{item.max_stock_rec}</i>}</span></span>}
+                  {isAdmin && <span>Mín/Máx: <span className="font-medium text-neutral-800 num">{item.min_stock || <i className="text-neutral-400">{item.min_stock_rec || '—'}</i>}/{item.max_stock || <i className="text-neutral-400">{item.max_stock_rec || '—'}</i>}</span></span>}
                   {isAdmin && <span>Ventas 6m: <span className="font-medium text-neutral-800">{item.ventas_6m}</span></span>}
                 </div>
                 <div className="mt-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -779,7 +779,7 @@ export default function InventarioClient({ initialItems, acceso, country, etique
                             <th className="px-2 py-2 text-left text-xs font-medium text-neutral-400">Tipo</th>
                             <th className="px-2 py-2 text-right text-xs font-medium text-neutral-400">Cant.</th>
                             <th className="px-2 py-2 text-right text-xs font-medium text-neutral-400">Total</th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-neutral-400">Nota</th>
+                            <th className="hidden sm:table-cell px-2 py-2 text-left text-xs font-medium text-neutral-400">Nota</th>
                             <th className="hidden sm:table-cell px-2 py-2 text-left text-xs font-medium text-neutral-400">Usuario</th>
                           </tr>
                         </thead>
@@ -788,7 +788,11 @@ export default function InventarioClient({ initialItems, acceso, country, etique
                             .slice((movPage - 1) * MOV_PAGE_SIZE, movPage * MOV_PAGE_SIZE)
                             .map(m => (
                             <tr key={m.id} className="border-b border-neutral-50">
-                              <td className="px-2 py-1.5 text-xs text-neutral-400 whitespace-nowrap">{fmtDate(m.created_at)}</td>
+                              <td className="px-2 py-1.5 text-xs text-neutral-400">
+                                <span className="block whitespace-nowrap">{fmtDate(m.created_at)}</span>
+                                {/* Celular (20-11): la nota y el usuario van debajo de la fecha. */}
+                                <span className="block text-neutral-500 sm:hidden">{m.notes ?? m.reference ?? '—'}{m.username ? <span className="text-neutral-400"> · {m.username}</span> : null}</span>
+                              </td>
                               <td className="px-2 py-1.5">
                                 <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-medium ${
                                   m.movement_type === 'IN'  ? 'bg-green-50 text-green-700' :
@@ -804,10 +808,7 @@ export default function InventarioClient({ initialItems, acceso, country, etique
                                 {m.movement_type === 'IN' ? '+' : m.movement_type === 'OUT' ? '−' : '='}{Math.abs(m.quantity)}
                               </td>
                               <td className="px-2 py-1.5 text-right font-bold text-neutral-700">{m.running_total}</td>
-                              <td className="px-2 py-1.5 text-xs text-neutral-500 min-w-[7rem] max-w-[10rem]">
-                                <span className="block truncate" title={m.notes ?? m.reference ?? ''}>{m.notes ?? m.reference ?? '—'}</span>
-                                <span className="block truncate text-neutral-400 sm:hidden">{m.username}</span>
-                              </td>
+                              <td className="hidden sm:table-cell px-2 py-1.5 text-xs text-neutral-500 max-w-[10rem] truncate" title={m.notes ?? m.reference ?? ''}>{m.notes ?? m.reference ?? '—'}</td>
                               <td className="hidden sm:table-cell px-2 py-1.5 text-xs text-neutral-400">{m.username}</td>
                             </tr>
                           ))}

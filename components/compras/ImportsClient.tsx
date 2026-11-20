@@ -1143,7 +1143,7 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                     <tr>
                       <th className="px-2 sm:px-3 py-2 text-left">Producto</th>
                       <th className="px-2 sm:px-3 py-2 text-right">Cant.</th>
-                      {verCostos && <th className="px-2 sm:px-3 py-2 text-right">$/u</th>}
+                      {verCostos && <th className="hidden sm:table-cell px-3 py-2 text-right">$/u</th>}
                       {verCostos && <th className="px-2 sm:px-3 py-2 text-right">Total</th>}
                       <th className="px-2 sm:px-3 py-2 text-right">Recibido</th>
                     </tr>
@@ -1151,14 +1151,14 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                   <tbody>
                     {selected.items.map(i => (
                       <tr key={i.id} className="border-t">
-                        <td className="px-2 sm:px-3 py-2 min-w-[9rem]">
+                        <td className="px-2 sm:px-3 py-2">
                           <div className="flex items-center gap-2"><FotoProducto id={i.product_id} nombre={i.product_name} tam="xs" /><span>
                           <span className="block sm:inline font-mono text-xs text-neutral-400 sm:mr-2">{i.product_code}</span>
                           {i.product_name}
                           </span></div>
                         </td>
                         <td className="px-2 sm:px-3 py-2 text-right">{i.quantity}</td>
-                        {verCostos && <td className="px-2 sm:px-3 py-2 text-right whitespace-nowrap">${fmt(i.unit_cost_usd)}</td>}
+                        {verCostos && <td className="hidden sm:table-cell px-3 py-2 text-right whitespace-nowrap">${fmt(i.unit_cost_usd)}</td>}
                         {verCostos && <td className="px-2 sm:px-3 py-2 text-right whitespace-nowrap">${fmt(i.total_cost_usd)}</td>}
                         <td className="px-2 sm:px-3 py-2 text-right">
                           {/* Una FINALIZADA está recibida al 100%, aunque el dato venga 0 (legacy/vía completa) */}

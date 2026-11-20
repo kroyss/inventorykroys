@@ -972,7 +972,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 <tr>
                   <th className="px-2 sm:px-4 py-2 text-left">Producto</th>
                   <th className="px-2 sm:px-4 py-2 text-right">Cant.</th>
-                  {verCostos && <th className="px-2 sm:px-4 py-2 text-right">C/U</th>}
+                  {verCostos && <th className="hidden sm:table-cell px-4 py-2 text-right">C/U</th>}
                   {verCostos && <th className="px-2 sm:px-4 py-2 text-right">Total</th>}
                   <th className="px-2 sm:px-4 py-2 text-right">Recibido</th>
                 </tr>
@@ -980,14 +980,14 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
               <tbody>
                 {selected.items.map((item, idx) => (
                   <tr key={idx} className="border-t hover:bg-neutral-50">
-                    <td className="px-2 sm:px-4 py-2 min-w-[9rem]">
+                    <td className="px-2 sm:px-4 py-2">
                       <div className="flex items-center gap-2"><FotoProducto id={item.product_id} nombre={item.product_name} tam="xs" /><span>
                       <span className="block sm:inline text-neutral-500 font-mono text-xs sm:mr-2">{item.product_code}</span>
                       {item.product_name}
                       </span></div>
                     </td>
                     <td className="px-2 sm:px-4 py-2 text-right">{item.quantity}</td>
-                    {verCostos && <td className="px-2 sm:px-4 py-2 text-right whitespace-nowrap">${fmt(item.unit_cost_usd)}</td>}
+                    {verCostos && <td className="hidden sm:table-cell px-4 py-2 text-right whitespace-nowrap">${fmt(item.unit_cost_usd)}</td>}
                     {verCostos && <td className="px-2 sm:px-4 py-2 text-right font-semibold whitespace-nowrap">${fmt(item.total_cost_usd)}</td>}
                     <td className="px-2 sm:px-4 py-2 text-right">
                       {(() => {
@@ -1006,7 +1006,8 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 ))}
                 {verCostos && (
                   <tr className="border-t bg-neutral-50 font-semibold">
-                    <td colSpan={3} className="px-2 sm:px-4 py-2 text-right text-neutral-600">Total:</td>
+                    <td colSpan={2} className="px-2 sm:px-4 py-2 text-right text-neutral-600">Total:</td>
+                    <td className="hidden sm:table-cell" />
                     <td className="px-2 sm:px-4 py-2 text-right whitespace-nowrap">${fmt(selected.total_usd)}</td>
                     <td />
                   </tr>

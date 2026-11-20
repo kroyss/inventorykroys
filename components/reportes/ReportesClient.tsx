@@ -182,7 +182,7 @@ function SalesReport({ data, search, setSearch, statusF, setStatusF, despachaVE 
   }, [data.sales, statusF, search])
 
   const cols: Column<any>[] = [
-    { key: 'ml_order_number', label: 'Orden', render: s => <span className="font-mono text-xs">{s.ml_order_number}</span>, sortValue: s => s.ml_order_number },
+    { key: 'ml_order_number', label: 'Orden', render: s => <span className="font-mono text-xs whitespace-nowrap">{s.ml_order_number}</span>, sortValue: s => s.ml_order_number },
     { key: 'created_at', label: 'Fecha', render: s => <span className="text-xs">{new Date(s.created_at).toLocaleDateString('es-VE')}</span>, sortValue: s => new Date(s.created_at).getTime() },
     { key: 'customer_name', label: 'Cliente', render: s => s.customer_name || '—', sortValue: s => s.customer_name ?? '' },
     { key: 'status', label: 'Estado', render: s => <StatusBadge status={s.status} label={(despachaVE && ESTADOS_VENTA_VE[s.status]) || undefined} />, sortValue: s => s.status },
@@ -229,7 +229,7 @@ function PurchasesReport({ data, search, setSearch, tipo, setTipo, importaciones
   }, [data.purchases, tipo, search])
 
   const cols: Column<any>[] = [
-    { key: 'order_number', label: 'Orden', render: o => <span className="font-mono text-xs">{o.order_number}</span>, sortValue: o => o.order_number },
+    { key: 'order_number', label: 'Orden', render: o => <span className="font-mono text-xs whitespace-nowrap">{o.order_number}</span>, sortValue: o => o.order_number },
     { key: 'order_type', label: 'Tipo', render: o => <span className="text-xs">{o.order_type}</span>, sortValue: o => o.order_type },
     { key: 'supplier_name', label: 'Proveedor', sortValue: o => o.supplier_name ?? '' },
     { key: 'status', label: 'Estado', render: o => <span className="px-2 py-0.5 bg-neutral-100 rounded text-xs">{o.status}</span>, sortValue: o => o.status },
@@ -266,8 +266,8 @@ function InventoryReport({ data, search, setSearch }: any) {
   }, [data.items, search])
 
   const cols: Column<any>[] = [
-    { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs">{p.code}</span>, sortValue: p => p.code },
-    { key: 'name', label: 'Producto', render: p => <span className="flex items-center gap-2.5"><FotoProducto id={p.id} nombre={p.name} tam="xs" /><span>{p.name}</span></span>, sortValue: p => p.name },
+    { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs whitespace-nowrap">{p.code}</span>, sortValue: p => p.code },
+    { key: 'name', label: 'Producto', render: p => <span className="flex min-w-[10rem] items-center gap-2.5"><FotoProducto id={p.id} nombre={p.name} tam="xs" /><span>{p.name}</span></span>, sortValue: p => p.name },
     { key: 'quantity', label: 'Stock', align: 'right', sortValue: p => p.quantity, total: rs => rs.reduce((a, x) => a + x.quantity, 0) },
     { key: 'total_cost', label: 'Costo', align: 'right', render: p => `$${money(p.total_cost)}`, sortValue: p => p.total_cost },
     { key: 'sale_price', label: 'Precio', align: 'right', render: p => `$${money(p.sale_price)}`, sortValue: p => p.sale_price },
@@ -317,8 +317,8 @@ function CountsReport({ data, search, setSearch }: any) {
   }, [data.items, ref, soloReinc, search])
 
   const cols: Column<any>[] = [
-    { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs">{p.code}</span>, sortValue: p => p.code },
-    { key: 'name', label: 'Producto', render: p => <span className="flex items-center gap-2.5"><FotoProducto id={p.id} nombre={p.name} tam="xs" /><span>{p.name}</span></span>, sortValue: p => p.name },
+    { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs whitespace-nowrap">{p.code}</span>, sortValue: p => p.code },
+    { key: 'name', label: 'Producto', render: p => <span className="flex min-w-[10rem] items-center gap-2.5"><FotoProducto id={p.id} nombre={p.name} tam="xs" /><span>{p.name}</span></span>, sortValue: p => p.name },
     { key: 'delta', label: 'Diferencia', align: 'right', sortValue: p => p.delta,
       render: p => <span className={p.delta < 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>{p.delta > 0 ? '+' : ''}{p.delta}</span>,
       total: rs => rs.reduce((a, x) => a + x.delta, 0) },

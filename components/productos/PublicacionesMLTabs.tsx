@@ -57,8 +57,8 @@ export default function PublicacionesMLTabs({ user, actual }: { user: UsuarioML;
   return (
     <div className="mb-4">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-neutral-200">
-        <span className="pb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">Publicaciones</span>
-        <nav className="-mb-px flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="Publicaciones">
+        <span className="hidden pb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 sm:inline">Publicaciones</span>
+        <nav className="-mb-px flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none]" aria-label="Publicaciones">
           {pestanas.map(x => (
             <Link key={x.k} href={x.href} aria-current={marcada(x.k) ? 'page' : undefined} className={CLASE(marcada(x.k))}>
               {x.t}{x.k === 'stock' && <NumeritoAviso clave="vende_de_mas" className="ml-1.5" />}

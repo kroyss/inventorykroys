@@ -65,11 +65,11 @@ function Resultado({ ganancia, rentab, recargo, u, dinero, quien, compacto }: {
 
 function Row({ label, value, neg, sub }: { label: string; value: string; neg?: boolean; sub?: string }) {
   return (
-    <div className="flex items-baseline justify-between px-1 py-px">
-      <span className="text-neutral-600">
+    <div className="flex items-baseline justify-between gap-2 px-1 py-px">
+      <span className="min-w-0 text-neutral-600">
         {label}{sub && <span className="text-neutral-400 text-[10px] ml-1">{sub}</span>}
       </span>
-      <span className={neg ? 'text-red-500' : 'text-neutral-800'}>{value}</span>
+      <span className={`shrink-0 whitespace-nowrap ${neg ? 'text-red-500' : 'text-neutral-800'}`}>{value}</span>
     </div>
   )
 }

@@ -436,7 +436,7 @@ export function DataTable<T extends Record<string, unknown>>({
               {columns.map(c => (
                 <th key={c.key}
                   onClick={() => toggleSort(c.key)}
-                  className={`px-3 py-2 ${c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left'} ${c.sortValue ? 'cursor-pointer select-none hover:text-neutral-800' : ''}`}>
+                  className={`px-3 py-2 whitespace-nowrap ${c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left'} ${c.sortValue ? 'cursor-pointer select-none hover:text-neutral-800' : ''}`}>
                   {c.label}
                   {sortKey === c.key && <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>}
                 </th>
@@ -450,7 +450,7 @@ export function DataTable<T extends Record<string, unknown>>({
             {shown.map((row, i) => (
               <tr key={i} className={`border-t border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                 {columns.map(c => (
-                  <td key={c.key} className={`px-3 py-2 ${c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left'}`}>
+                  <td key={c.key} className={`px-3 py-2 ${c.align === 'right' ? 'text-right whitespace-nowrap' : c.align === 'center' ? 'text-center whitespace-nowrap' : 'text-left'}`}>
                     {c.render ? c.render(row) : String(row[c.key] ?? '')}
                   </td>
                 ))}

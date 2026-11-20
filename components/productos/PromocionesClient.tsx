@@ -1103,7 +1103,7 @@ function AgregarModal({ minPorCuenta, modal, setModal, filas, campanas, margenA,
               <tbody>
                 {filasPrev.map(x => (
                   <tr key={x.f.id} className={`border-t border-neutral-100 ${x.motivo ? 'opacity-50' : ''} ${x.exceso && !resultados[x.f.id] ? 'bg-red-50' : ''}`}>
-                    <td className="px-2 py-1.5 max-w-[260px] truncate" title={x.f.titulo}>{x.f.titulo}
+                    <td className="px-2 py-1.5 max-w-[40vw] sm:max-w-[260px] truncate" title={x.f.titulo}>{x.f.titulo}
                       {mezcla && <span className="block text-[11px] text-neutral-400">{x.f.cuenta}</span>}</td>
                     <td className="px-2 py-1.5 text-right">{usd(x.f.precio)}</td>
                     <td className="px-2 py-1.5 text-right font-medium">{usd(x.precio)}
