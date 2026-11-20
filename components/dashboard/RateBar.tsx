@@ -63,7 +63,8 @@ export default function RateBar({ puedeActualizar = false, descuento = true, exc
     <span ref={caja} className="relative inline-block"
       onMouseEnter={e => { if (e.nativeEvent instanceof MouseEvent && matchMedia('(hover: hover)').matches) setAbierto(true) }}
       onMouseLeave={() => { if (matchMedia('(hover: hover)').matches) setAbierto(false) }}>
-      <button type="button" onClick={() => setAbierto(v => !v)} aria-expanded={abierto}
+      {/* Con mouse, pasar encima ya lo abre: el clic no lo vuelve a cerrar (se cierra al salir). En el celular, toca y toca. */}
+      <button type="button" onClick={() => setAbierto(v => matchMedia('(hover: hover)').matches ? true : !v)} aria-expanded={abierto}
         aria-label={`Tasas: oficial Bs ${fmt(rate.official_rate)}, paralelo Bs ${fmt(rate.parallel_rate)}, diferencial ${pct(rate.spread_percentage, 1)} %. Toca para ver el detalle`}
         className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-2.5 py-0.5 text-xs text-neutral-500 shadow-sm transition hover:border-neutral-300 hover:text-neutral-700">
         <span className="text-neutral-400">Bs/$</span>
