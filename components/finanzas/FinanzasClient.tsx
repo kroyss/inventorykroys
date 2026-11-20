@@ -152,7 +152,7 @@ export default function FinanzasClient({ inicial = null }: { inicial?: FinanzasI
       {tab === 'movimientos' && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <MonthField value={month} onChange={(v: string) => setMonth(v)} />
               {/* switch país */}
               <div className="flex rounded-lg border border-neutral-200 overflow-hidden text-sm">
@@ -170,7 +170,7 @@ export default function FinanzasClient({ inicial = null }: { inicial?: FinanzasI
           </div>
 
           {/* Resumen del mes */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <KPICard compact label="Ingresos" value={`$${money(ingresos)}`} tone="bueno" />
             <KPICard compact label="Gastos" value={`$${money(gastos)}`} />
             <KPICard compact label="Sobrante" value={`$${money(neto)}`} tone={neto >= 0 ? 'neutro' : 'problema'} />
@@ -251,7 +251,7 @@ export default function FinanzasClient({ inicial = null }: { inicial?: FinanzasI
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Ingresos</div>
               <div className="text-xl font-bold text-green-600">${money(summary.totalIncome)}</div>

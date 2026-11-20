@@ -99,6 +99,9 @@ select:focus-visible, textarea:focus-visible {
   @media (max-width: 767px) {
     .grid > * { min-width: 0; }
   }
+  /* Un enlace o palabra muy larga (ej. un link de ML en un mensaje) se corta en vez de salirse del párrafo.
+     break-word solo actúa cuando la palabra no entra: lo que hoy se ve bien queda igual. */
+  p, li { overflow-wrap: break-word; }
 }
 
 /* iPhone (17-10): Safari hace zoom solo al tocar un cuadro con letra de menos de 16 px y no vuelve a su tamaño

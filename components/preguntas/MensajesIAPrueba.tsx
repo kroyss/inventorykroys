@@ -109,7 +109,7 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
             {c.estado === 'procesando' ? <p className="text-xs text-neutral-500">La IA está escribiendo…</p>
               : c.estado === 'error' ? <p className="text-xs text-red-700">Error de la IA: {c.error}</p> : <>
               <div className="grid gap-2 md:grid-cols-2">
-                <div className="rounded-lg bg-neutral-50 p-2"><p className="text-xs text-neutral-400">Tu equipo</p><p className="whitespace-pre-wrap text-neutral-700">{c.equipo || 'Todavía sin responder'}</p></div>
+                <div className="rounded-lg bg-neutral-50 p-2"><p className="text-xs text-neutral-400">Tu equipo</p><p className="whitespace-pre-wrap text-neutral-700 [overflow-wrap:anywhere]">{c.equipo || 'Todavía sin responder'}</p></div>
                 <div className="rounded-lg bg-sky-50 p-2"><p className="text-xs text-sky-700">IA</p><p className="whitespace-pre-wrap text-neutral-900">{c.respuesta || (c.decision === 'nada' ? 'No hace falta responder' : '—')}</p></div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">

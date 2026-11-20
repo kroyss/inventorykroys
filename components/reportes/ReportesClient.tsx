@@ -354,7 +354,7 @@ function CountsReport({ data, search, setSearch }: any) {
 
       <div className="flex flex-wrap items-center gap-2">
         <select value={ref} onChange={e => setRef(e.target.value)}
-          className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm">
+          className="w-full min-w-0 max-w-full border border-neutral-300 rounded-lg px-3 py-1.5 text-sm sm:w-auto">
           {conteos.map(c => (
             <option key={c.reference} value={c.reference}>
               {c.reference} · {c.fecha} · {c.productos} productos

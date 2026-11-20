@@ -205,7 +205,7 @@ function EnvioGratis({ p }: { p: Pregunta }) {
       </span>
       <AvisoPesos c={conflictoPesos(p.item_pesos, precioUSD(p), tablas)} />
       {hueco && (
-        <span className="text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap text-red-700 bg-red-50 ring-red-200 font-semibold"
+        <span className="max-w-full text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset sm:whitespace-nowrap text-red-700 bg-red-50 ring-red-200 font-semibold"
           title={`${textoHueco(hueco)}. Si pregunta por llevar varios, avísale o baja la promo.`}>
           ⚠ Comprando {hueco.unidades}: sin envío gratis
         </span>
@@ -573,7 +573,7 @@ function TarjetaPendiente({ p, esAdmin, verAvisosInternos, iaLista, plantillas, 
         </div>
       </header>
 
-      <p className="text-base text-neutral-900">{p.texto}</p>
+      <p className="text-base text-neutral-900 [overflow-wrap:anywhere]">{p.texto}</p>
 
       <div className="space-y-2">
         {sug && texto.trim() === sug.texto.trim() && (
@@ -693,9 +693,9 @@ function FilaHistorial({ p }: { p: Pregunta }) {
           { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
         <StatusBadge status={e.status} label={e.label} />
       </div>
-      <p className="text-neutral-900">{p.texto}</p>
+      <p className="text-neutral-900 [overflow-wrap:anywhere]">{p.texto}</p>
       {p.respuesta && (
-        <p className="text-neutral-600 pl-3 border-l-2 border-neutral-200">
+        <p className="text-neutral-600 pl-3 border-l-2 border-neutral-200 [overflow-wrap:anywhere]">
           {p.respuesta}
           <span className="text-xs text-neutral-400"> · {p.por_ia ? <span className="text-sky-700">Respondió la IA{p.por_ia_total ? ' (Modo Total)' : ''}</span>
             : p.por_escape && !p.respondida_por ? <span className="text-violet-700" title={p.escape_motivos ? `La IA se frenó: ${p.escape_motivos}` : undefined}>Frase de escape de la IA</span>

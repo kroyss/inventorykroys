@@ -82,7 +82,7 @@ export default function MensajeAlComprar() {
             </span>
           </div>
           {largo > d.max && <p className="text-xs text-red-700">Con un nombre y un producto normales pasa de {d.max}: ML lo cortaría. Acórtalo.</p>}
-          <p className="text-xs text-neutral-500 whitespace-pre-line"><b>Así le llega:</b>{'\n'}{ejemplo}</p>
+          <p className="text-xs text-neutral-500 whitespace-pre-line [overflow-wrap:anywhere]"><b>Así le llega:</b>{'\n'}{ejemplo}</p>
           <p className="text-xs text-neutral-400">
             Para no tener problemas con MercadoLibre: que sea de <b>la compra</b> (cómo pagar, cómo coordinar el envío), sin promociones ni
             {' '}ofertas de otros productos.

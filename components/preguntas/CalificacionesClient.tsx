@@ -420,7 +420,7 @@ function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Planti
     })
     setMsg(r.ok ? 'Guardado' : 'No se pudo guardar'); if (r.ok) onGuardado()
   }
-  const sel = 'border border-neutral-300 rounded-lg bg-white px-2 py-1.5 text-sm'
+  const sel = 'max-w-full min-w-0 border border-neutral-300 rounded-lg bg-white px-2 py-1.5 text-sm'
   const num = 'w-16 border border-neutral-300 rounded-lg bg-white px-2 py-1.5 text-sm'
   const horas = Array.from({ length: 17 }, (_, i) => i + 6).map(h => <option key={h} value={h}>{horaTxt(h)}</option>)
   const ratings = <><option value="positive">Positiva</option><option value="neutral">Neutral</option><option value="negative">Negativa</option></>

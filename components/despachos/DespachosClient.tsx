@@ -444,7 +444,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false, 
 
       {/* Jornada abierta */}
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-neutral-100">
           <h2 className="text-sm font-semibold text-neutral-800">Lotes impresos de la jornada</h2>
           {data.jornada && data.jornada.lotes.length > 0 && (
             <button onClick={() => cerrarJornada()} disabled={busy === 'cerrar'} className="btn-primary text-sm">
@@ -455,6 +455,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false, 
         {!data.jornada || data.jornada.lotes.length === 0
           ? <EmptyState message="Todavía no se imprimió ningún lote en esta jornada." />
           : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-xs text-neutral-500">
                 <tr><th className="px-4 py-2 text-left">Lote</th><th className="px-4 py-2 text-left">Hora</th>
@@ -479,6 +480,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false, 
                 ))}
               </tbody>
             </table>
+            </div>
           )}
       </section>
 

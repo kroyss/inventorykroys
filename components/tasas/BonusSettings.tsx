@@ -56,7 +56,7 @@ export default function BonusSettings() {
         meta 2 ya se cobró también el bono 1. Es lo que muestra la barra de bonos del dashboard.
       </p>
 
-      <div className="grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-1.5 items-center">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 gap-y-1.5 items-center">
         <div />
         <div className="text-[11px] text-neutral-500">Meta de ventas $</div>
         <div className="text-[11px] text-neutral-500">Bono</div>
@@ -65,10 +65,10 @@ export default function BonusSettings() {
             <span className="text-[11px] text-neutral-500 whitespace-nowrap pr-1">Fase {i + 1}</span>
             <input type="number" step="100" min="1" value={m}
               onChange={e => setMetas(a => setAt(a, i, e.target.value))}
-              className="border rounded px-2 py-1.5 text-sm" />
+              className="w-full min-w-0 border rounded px-2 py-1.5 text-sm" />
             <input type="number" step="10" min="0" value={montos[i]}
               onChange={e => setMontos(a => setAt(a, i, e.target.value))}
-              className="border rounded px-2 py-1.5 text-sm" />
+              className="w-full min-w-0 border rounded px-2 py-1.5 text-sm" />
           </div>
         ))}
       </div>

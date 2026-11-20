@@ -73,10 +73,10 @@ export default function MiCuentaClient({ admin, country, inicial }: { admin: boo
       </div>
 
       {PESTANAS.length > 1 && (
-        <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-neutral-200">
+        <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-neutral-200 [scrollbar-width:none]">
           {PESTANAS.map(([k, t]) => (
             <button key={k} role="tab" aria-selected={pestana === k} onClick={() => ir(k)}
-              className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${pestana === k ? 'border-lime-500 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'}`}>
+              className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${pestana === k ? 'border-lime-500 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'}`}>
               {t}
             </button>
           ))}
