@@ -92,7 +92,9 @@ export async function GET(req: NextRequest) {
         }
       }
     }
-    return NextResponse.json({ filas: rows, contadores: n, umbral, revision: rev, esAdmin: puede(s.session.user, 'automatizaciones_config'), puedeStock: puede(s.session.user, 'reponer_stock'), conInventario, alDia })
+    return NextResponse.json({ filas: rows, contadores: n, umbral, revision: rev, esAdmin: puede(s.session.user, 'automatizaciones_config'), puedeStock: puede(s.session.user, 'reponer_stock'), conInventario, alDia,
+      // 20-11: «Vincular por color» en panel (mismo permiso que /api/vincular-ml).
+      puedeVincular: conInventario && (puede(s.session.user, 'vincular_ml') || (puede(s.session.user, 'ver_productos') && puede(s.session.user, 'importar_ml'))) })
   } catch (err) {
     return apiError(err)
   }

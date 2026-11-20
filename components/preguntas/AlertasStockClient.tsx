@@ -5,6 +5,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { AbrirFicha } from './FichaPublicacion'
 import CambiarStock from './CambiarStock'
 import RepartirStock from './RepartirStock'
+import VincularColores from '@/components/inventario/VincularColores'
 import Link from '@/components/ui/Link'
 import { BotonInfo, PanelInfo } from '@/components/ui/Info'
 import { useAvisos } from '@/components/layout/Avisos'
@@ -36,6 +37,8 @@ export interface Datos {
   revision: { desde: string | null; hasta: string | null; cuentas: number }; esAdmin: boolean; puedeStock: boolean
   /** 17-11 «Mi inventario está al día» (lib/inventarioAlDia.ts): avisa si pones en ML más de lo que hay. */
   alDia?: boolean
+  /** 20-11: puede abrir «Vincular por color» en el panel (si no, el enlace a Stock vs inventario). */
+  puedeVincular?: boolean
 }
 type Vista = 'agotadas' | 'bajas' | 'pausadas'
 
@@ -156,6 +159,8 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
   const [stockDe, setStockDe] = useState<Fila | null>(null)
   // 20-11 (el dueño): «Repartir» abre el panel a la derecha (RepartirStock) en vez de llevar a Stock vs inventario.
   const [repartirDe, setRepartirDe] = useState<Fila | null>(null)
+  // 20-11: «Vincular por color» abre el panel (VincularColores) sin ir a Stock vs inventario.
+  const [coloresDe, setColoresDe] = useState<Fila | null>(null)
   const alternarP = (f: Fila) => setSelP(m => { const x = new Set(m); if (x.has(clave(f))) x.delete(clave(f)); else x.add(clave(f)); return x })
   const reactivar = async (lista: Fila[]) => {
     if (!lista.length) return
@@ -288,9 +293,13 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
             inventario · Vincular por color → (variante de una publicación vinculada entera: no se sabe qué producto es). */}
         {f.entera_variantes ? (
           <p className="text-[11px] whitespace-nowrap">
-            <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.item_id)}`}
-              title="La publicación está vinculada entera y tiene variantes: no se sabe qué producto es esta variante. Ábrela y usa «Dividir por variantes» para vincular cada color con su producto"
-              className={`${CHIP} bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100`}>Vincular por color →</Link>
+            {datos?.puedeVincular ? (
+              <button type="button" onClick={() => setColoresDe(f)}
+                title="La publicación está vinculada entera y tiene colores: no se sabe qué producto es cada uno. Elige el producto de cada color sin salir de aquí"
+                className={`${CHIP} bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100`}>Vincular por color →</button>
+            ) : <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.item_id)}`}
+              title="La publicación está vinculada entera y tiene variantes: no se sabe qué producto es esta variante. Ábrela en Stock vs inventario y usa «Vincular por color»"
+              className={`${CHIP} bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100`}>Vincular por color →</Link>}
           </p>
         ) : f.inventario != null && (() => {
           const conReparto = vista !== 'pausadas' && !!datos?.alDia && f.sugerido != null
@@ -401,6 +410,11 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
         <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar publicación, variante o cuenta…"
           className="w-full sm:w-72 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm" />
       </div>
+
+      {coloresDe && (
+        <VincularColores item={coloresDe.item_id} foco={coloresDe.variante_id} imagen={coloresDe.imagen} conStock={!!datos?.puedeStock}
+          onCerrar={() => setColoresDe(null)} onHecho={() => setVez(n => n + 1)} />
+      )}
 
       {repartirDe && (
         <RepartirStock item={repartirDe.item_id} variante={repartirDe.variante_id} onCerrar={() => setRepartirDe(null)}

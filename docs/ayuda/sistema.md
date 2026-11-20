@@ -1146,8 +1146,7 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   todo el inventario; al pasar el cursor lo explica) y la que está en 0 porque lo que hay está en otra publicación dice
   «Tienes N · en otra publicación» (al pasar el cursor dice en cuál); sin nada en el inventario, «Sin inventario». Si comprando varias pierde el envío gratis, debajo dice «⚠ desde N u. sin envío
   gratis · pack» (el enlace abre Stock vs inventario con esa publicación, para Crear pack). Si el producto está en varias
-  publicaciones y no hay reparto, dice «Tienes N · [Repartir →]» sin sugerir: abre un **panel a la derecha** (sin salir de Stock) con una línea por publicación (cuenta, MLV, variante, «Hoy en ML: N» y una casilla), el contador «Repartiste X de N» (en ámbar si pasas lo que tienes), «Repartir parejo entre las N» y Guardar en MercadoLibre (reactiva las pausadas si se deja marcado). Arriba de la lista, un aviso sugiere marcar el inventario «al día» para que esas filas pasen a «Poner X». La variante de una publicación **vinculada entera** dice «[Vincular por color →]» (abre Dividir por
-  variantes; no se sabe qué producto es: sin inventario ni sugerido). Cada variante sale con su propia foto. Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
+  publicaciones y no hay reparto, dice «Tienes N · [Repartir →]» sin sugerir: abre un **panel a la derecha** (sin salir de Stock) con una línea por publicación (cuenta, MLV, variante, «Hoy en ML: N» y una casilla), el contador «Repartiste X de N» (en ámbar si pasas lo que tienes), «Repartir parejo entre las N» y Guardar en MercadoLibre (reactiva las pausadas si se deja marcado). Arriba de la lista, un aviso sugiere marcar el inventario «al día» para que esas filas pasen a «Poner X». La variante de una publicación **vinculada entera** dice «[Vincular por color →]» (no se sabe qué producto es: sin inventario ni sugerido): abre el **panel Vincular por color** a la derecha, sin salir de Stock (ver Stock vs inventario). Cada variante sale con su propia foto. Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
   (en «Para decidir» salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
   variantes, descripción) sin ir a MercadoLibre.
   **Compartida con COD-…**: la misma publicación vinculada a varios productos (modelos que elige el comprador, p. ej. un
@@ -1155,9 +1154,12 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   «Quedan pocas» o no se sincroniza, esa publicación no se toca sola.
   **Vinculada entera con variantes** (vínculos viejos: el inventario va por variante): el sistema no sabe qué variante es
   cada producto, así que **solo baja**: si todos sus productos están en 0, «Quedará: 0 en todas las variantes» (cuenta en
-  Vende de más y se arregla con Aplicar en ML); si alguno tiene stock, «no se toca sola». **Dividir por variantes** (en la
-  fila, con permiso de vincular) abre cada variante con su foto para elegir su producto (sugiere por nombre; «otro
-  producto…» busca); al guardar se vincula cada variante y se quita el vínculo entero.
+  Vende de más y se arregla con Aplicar en ML); si alguno tiene stock, no se toca sola. El botón **«Vincular por color →»** (en la
+  columna Quedará, con permiso de vincular; antes «Dividir por variantes») abre un **panel a la derecha** en dos pasos:
+  1) cada color con su foto y «Hoy en ML», el producto sugerido por el nombre (✓), los productos vinculados como botones y
+  «otro producto…» para buscar → **Vincular** (se vincula cada color y se quita el vínculo entero); 2) con permiso de
+  cambiar stock, cada color con «Tienes N · poner N» y una casilla → **Guardar en MercadoLibre** o **Listo, después**.
+  El mismo panel se abre desde Automatizaciones → Stock.
   **Quedan pocas** (el disponible es igual o menor a la reserva): el sistema no reparte solo. Si ML ofrece más de lo que
   hay, sale «Hay 2 y MercadoLibre ofrece 3. Con «Aplicar en ML» queda así: PIKEKE 1 → 1 · SOLUCIONES_MC 2 → 1» (baja
   primero las pausadas y después la que más muestra). **Cambiar a mano** deja poner cuántas muestra cada cuenta y se guarda
@@ -1455,6 +1457,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   días; se revisa sola cada hora y con ↻ Actualizar (arriba) como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
   «⚠ desde N u. sin envío gratis · pack»: comprando varias pierde el envío gratis (el pack se arma en Stock vs inventario).
   «Repartir»: el producto está en varias publicaciones; abre un panel a la derecha con cada una y lo que repartiste de tu inventario.
+  «Vincular por color»: publicación vinculada entera con colores; abre un panel a la derecha para elegir el producto de cada color y luego su stock.
 - **Pagos ME:** **Traer pagos y guías** (la PC trae de MercadoEnvíos pagos, guías y ventas nuevas, 1 a 3 min; también
   sola durante el día). Sin inventario se verifica cada pago aquí (uno a uno o con Comprobar con el banco); con
   inventario se verifica en Ventas → Por confirmar y aquí queda la conexión y el historial. Las guías pagadas pasan

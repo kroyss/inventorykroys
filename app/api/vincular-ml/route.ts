@@ -46,6 +46,26 @@ export async function GET(req: NextRequest) {
   try {
     // 17-11: solo la lista de productos (para «Dividir por variantes» en Stock en ML).
     if (req.nextUrl.searchParams.get('productos') === '1') return NextResponse.json({ productos: await productosParaVincular(s.db) })
+    // 20-11 «Vincular por color» (panel): la publicación vinculada entera, sus variantes y los productos vinculados a ella.
+    const colores = req.nextUrl.searchParams.get('colores')
+    if (colores) {
+      const pub = colores.replace(/^[A-Z]{3}/, '')
+      if (!/^\d{5,15}$/.test(pub)) return NextResponse.json({ error: 'Publicación inválida' }, { status: 400 })
+      const [{ rows: [c] }, { rows: vinc }] = await Promise.all([
+        s.db.query(`SELECT item_id, titulo, estado, variantes FROM ml_catalogo WHERE substring(item_id FROM 4) = $1 LIMIT 1`, [pub]),
+        s.db.query(
+          `SELECT p.id, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock, m.ml_account AS cuenta
+           FROM product_ml_codes m JOIN products p ON p.id = m.product_id LEFT JOIN inventory i ON i.product_id = p.id
+           WHERE m.is_active AND m.ml_code = $1 ORDER BY p.code`, [pub]),
+      ])
+      if (!c) return NextResponse.json({ error: 'No encontré la publicación (actualiza las publicaciones)' }, { status: 404 })
+      const vs: { id: number | string; nombre: string | null; disponible: number; foto?: string | null }[] = Array.isArray(c.variantes) ? c.variantes : []
+      return NextResponse.json({
+        item_id: c.item_id, titulo: c.titulo, estado: c.estado, cuenta: vinc[0]?.cuenta ?? null,
+        variantes: vs.map(v => ({ id: String(v.id), nombre: v.nombre, disponible: Number(v.disponible) || 0, foto: v.foto ?? null })),
+        vinculados: vinc.map(v => ({ id: v.id, code: v.code, name: v.name })),
+      })
+    }
     const userId = Number(s.session.user.id)
     const [filas, productos, { rows: [hoy] }, { rows: [c] }] = await Promise.all([
       filasVincular(s.db, puede(s.session.user, 'costos'), userId),
