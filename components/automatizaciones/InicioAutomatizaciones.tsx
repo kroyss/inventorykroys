@@ -1,6 +1,29 @@
 'use client'
 import Link from '@/components/ui/Link'
 import { useAvisos, type Avisos } from '@/components/layout/Avisos'
+import PrimerosPasosAuto from './PrimerosPasosAuto'
+import { useEffect, useState } from 'react'
+import { textoMinutos } from '@/lib/resumenAtencion'
+
+// 20-11 (el dueño): una línea chica en la tarjeta Preguntas con cómo te fue en 7 días (/api/automatizaciones/semana).
+type Semana = { respondidas: number; mediana: number | null; porIA: number }
+function LineaSemana({ s }: { s: { actual: Semana; anterior: Semana } }) {
+  const { actual: a, anterior: b } = s
+  if (!a.respondidas) return null
+  const flecha = a.mediana != null && b.mediana != null && a.mediana !== b.mediana
+    ? (a.mediana < b.mediana
+      ? <span className="text-emerald-600" title={`Más rápido que la semana anterior (${textoMinutos(b.mediana)})`}> ↓</span>
+      : <span className="text-amber-600" title={`Más lento que la semana anterior (${textoMinutos(b.mediana)})`}> ↑</span>)
+    : null
+  const pctIA = Math.round(a.porIA / a.respondidas * 100)
+  return (
+    <p className="mt-2 text-xs text-neutral-500 num" title="Últimos 7 días. Tiempo típico: la mitad de las preguntas se respondió en menos de eso. Detalle en Reportes.">
+      7 días: {a.respondidas.toLocaleString('es-VE')} respondidas
+      {a.mediana != null && <> · tiempo típico {textoMinutos(a.mediana)}{flecha}</>}
+      {pctIA > 0 && <> · {pctIA} % por la IA</>}
+    </p>
+  )
+}
 
 // Íconos de trazo (24x24)
 const ICONOS = {
@@ -31,19 +54,30 @@ function Icono({ de, activa }: { de: keyof typeof ICONOS; activa: boolean }) {
  * Inicio de Automatizaciones: arriba lo que está pendiente HOY (con los mismos numeritos
  * del menú, en vivo), abajo todas las herramientas agrupadas por momento de la venta.
  */
-export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esAdmin = false }: {
+export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esAdmin = false, guia = false }: {
   grupos: { titulo: string; texto: string; items: Herramienta[] }[]
   sinCuentas?: boolean   // la empresa todavía no conectó ninguna cuenta de MercadoLibre
   esAdmin?: boolean
+  guia?: boolean         // 20-11: «Primeros pasos» (quien conecta las cuentas de ML); reemplaza al «Primer paso» de abajo
 }) {
   const avisos = useAvisos()
+  const conPreguntas = !sinCuentas && grupos.some(g => g.items.some(h => h.href === '/preguntas' && h.activa))
+  const [semana, setSemana] = useState<{ actual: Semana; anterior: Semana } | null>(null)
+  useEffect(() => {
+    if (!conPreguntas) return
+    let vivo = true
+    fetch('/api/automatizaciones/semana', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
+      .then(j => { if (vivo && j?.actual) setSemana(j) }).catch(() => {})
+    return () => { vivo = false }
+  }, [conPreguntas])
   const todas = grupos.flatMap(g => g.items).filter(h => h.activa && h.aviso)
   const pendientes = todas.filter(h => avisos[h.aviso!] > 0)
 
   return (
     <div className="space-y-8">
-      {/* ── Pendiente hoy ── */}
-      <section className="space-y-3">
+      {guia && <PrimerosPasosAuto />}
+      {/* ── Pendiente hoy ── (sin cuentas y con la guía, la guía ya pide conectar) */}
+      {!(sinCuentas && guia) && <section className="space-y-3">
         <h2 className="text-sm font-semibold text-neutral-700">{sinCuentas ? 'Primer paso' : 'Pendiente ahora'}</h2>
         {sinCuentas ? (
           <div className="bg-lime-50 border border-lime-300 rounded-xl px-5 py-4 flex flex-wrap items-center justify-between gap-3">
@@ -78,7 +112,7 @@ export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esA
             })}
           </div>
         )}
-      </section>
+      </section>}
 
       {/* ── Herramientas ── */}
       {grupos.map(g => (
@@ -104,6 +138,7 @@ export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esA
                       {h.activa && <span className="ml-auto text-sm text-neutral-300 group-hover:text-neutral-700">→</span>}
                     </div>
                     <p className={`text-sm mt-1 ${h.activa ? 'text-neutral-600' : 'text-neutral-400'}`}>{h.texto}</p>
+                    {h.activa && h.href === '/preguntas' && semana && <LineaSemana s={semana} />}
                   </div>
                 </div>
               )
