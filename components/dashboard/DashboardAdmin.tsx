@@ -11,12 +11,10 @@ import Link from '@/components/ui/Link'
 import type { Country } from '@/lib/types'
 import { Cargando, chipCls } from '@/components/ui'
 import BonusPipeline from './BonusPipeline'
-import RateBar from './RateBar'
 import { DateField } from '@/components/ui/DateField'
 import AvisoStockVerificar from './AvisoStockVerificar'
 import BloquesInicio from './BloquesInicio'
-import Pendientes, { type Pendiente } from './Pendientes'
-import { usePorConfirmar, pendientesPorConfirmar } from '@/components/ventas/PorConfirmar'
+import AccionesInicio, { type AccionesInicioConfig } from './AccionesInicio'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, BarController, LineController, Tooltip, Filler)
 
@@ -175,18 +173,12 @@ function Delta({ ahora, antes, fmt = (n: number) => n.toLocaleString('es-VE'), c
 }
 const fmtMonto = (n: number) => `$${money0(n)}`
 
-export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, reportes = false, ajustes = false, despachos = false, inicial }: {
-  despachos?: boolean        // 20-11: módulo y permiso de Despachos → chip «Por despachar» (como el del empleado)
+export default function DashboardAdmin({ country, bonos, reportes = false, acciones, inicial }: {
   inicial?: { summary: Summary | null; chart: ChartData | null }   // 12-11: lo que ya vino en el HTML (lib/inicial.ts)
-  country: Country; bonos: boolean; puedeTasas: boolean
-  ajustes?: boolean        // 19-11: puede entrar a Ajustes (la píldora de la tasa lleva ahí)
-  reportes?: boolean       // permiso Reportes: «Ver todos» de Más vendidos y «Se están cayendo» (14-11, el Resumen vive aquí)
-  porConfirmar?: boolean   // cuentas de ML conectadas: pendiente «Por confirmar»
-  etapas?: boolean   // módulo compras_etapas (sin él no hay compras en tránsito)
-  categorias?: boolean   // módulo precios_categorias (sin él no se muestra el exceso)
-  descuento: boolean; importaciones: boolean; analisisStock: boolean   // módulos (lib/modulos.ts)
+  country: Country; bonos: boolean
+  reportes?: boolean       // permiso Reportes: «Ver todos» de Más vendidos (14-11, el Resumen vive aquí)
+  acciones: AccionesInicioConfig   // 20-11: el bloque de arriba, igual para todos (lo arma la página según permisos)
 }) {
-  const pc = usePorConfirmar(porConfirmar)
   const [summary, setSummary] = useState<Summary | null>(inicial?.summary ?? null)
   const [chart,   setChart]   = useState<ChartData | null>(inicial?.chart ?? null)
   // Lo que vino en el HTML no se vuelve a pedir al abrir (sí al cambiar el período).
@@ -194,12 +186,10 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
   const [period,  setPeriod]  = useState<Period | 'custom'>('month')
   const [dateFrom, setDateFrom] = useState(monthStartStr())
   const [dateTo,   setDateTo]   = useState(todayStr())
-  const [compraMenu, setCompraMenu] = useState(false)
   const [metrica, setMetrica] = useState<Metrica>('ventas')
   const [fechasAbiertas, setFechasAbiertas] = useState(false)
   // Mientras llega el período nuevo, el gráfico anterior queda a media luz (no salta ni se vacía).
   const [cargandoGrafico, setCargandoGrafico] = useState(false)
-  const [porDespachar, setPorDespachar] = useState<number | null>(null)
 
   const conSummary = !!inicial?.summary
   useEffect(() => {
@@ -219,16 +209,6 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
       .finally(() => { if (vivo) setCargandoGrafico(false) })
     return () => { vivo = false }
   }, [period, dateFrom, dateTo])
-
-  // «Por despachar» (con Despachos): ventas procesadas a las que les falta la guía; el mismo conteo del empleado.
-  useEffect(() => {
-    if (!despachos) return
-    let vivo = true
-    fetch('/api/sales?pageSize=1').then(r => r.ok ? r.json() : Promise.reject())
-      .then(j => { if (vivo) setPorDespachar(j?.counts?.PROCESADA ?? 0) })
-      .catch(() => { if (vivo) setPorDespachar(0) })
-    return () => { vivo = false }
-  }, [despachos])
 
   // Acumulados: lo que llevas hasta cada día (este período) y lo que llevabas el período anterior a esa misma altura.
   const serie = useMemo(() => {
@@ -329,70 +309,12 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
   const ant = chart?.anterior
   const contra = CONTRA[period]
 
-  // ── Pendientes. 20-11 (el dueño: «como admin casi no les hago clic»): chip = TAREA DEL DÍA que se termina (Por
-  // confirmar, Borradores, Por despachar). Lo que es estado del inventario (sin stock, reponer, stock bajo) o análisis
-  // (en caída, remate) no baja nunca a 0 y tapaba a lo importante: va en UNA línea gris debajo, con un solo enlace a
-  // Inventario → Reponer (o a Inventario si la empresa no tiene Reponer). En camino es dato, va en esa línea. ──
-  const pendientes: Pendiente[] = [
-    ...(porConfirmar ? [{ label: 'Por confirmar', n: pc.datos ? pendientesPorConfirmar(pc.datos) : null, tono: 'atencion' as const, href: '/ventas?vista=confirmar', ayuda: 'Ventas de MercadoLibre que todavía no registraste' }] : []),
-    { label: 'Borradores', n: summary.pending_sales, tono: 'atencion', href: '/ventas?estado=BORRADOR', ayuda: 'Ventas sin terminar de cargar' },
-    ...(despachos ? [{ label: 'Por despachar', n: porDespachar, tono: 'atencion' as const, href: '/despachos', ayuda: 'Ventas procesadas: falta generar la guía en Despachos' }] : []),
-  ]
-  const stockTxt = [
-    summary.no_stock > 0 && `${summary.no_stock.toLocaleString('es-VE')} sin stock`,
-    analisisStock && summary.reposicion_count > 0 && `${summary.reposicion_count.toLocaleString('es-VE')} por reponer`,
-    !analisisStock && summary.low_stock_alerts > 0 && `${summary.low_stock_alerts.toLocaleString('es-VE')} con stock bajo`,
-  ].filter(Boolean) as string[]
-  const enCamino = etapas && summary.in_transit > 0 ? summary.in_transit : 0
-
-
   return (
     <div className="space-y-5">
       <h1 className="sr-only">Inicio</h1>
 
-      {/* 19-11 (el dueño): la primera línea es «lo que hay que hacer»: los pendientes a la izquierda (crecen hacia abajo
-          según cuántos haya); a la derecha, FIJOS, Nueva venta / Nueva compra y debajo la tasa (VE). En el celular, arriba. */}
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 sm:flex-nowrap">
-        <div className="order-2 min-w-0 basis-full sm:order-1 sm:flex-1 sm:basis-auto">
-          <Pendientes items={pendientes} titulo={false} />
-          {(stockTxt.length > 0 || enCamino > 0) && (
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-neutral-500">
-              {stockTxt.length > 0 && <>
-                <span>Inventario: <span className="num">{stockTxt.join(' · ')}</span></span>
-                <Link href={analisisStock ? '/inventario/reponer?sub=reposicion' : '/inventario?estado=SIN_STOCK'}
-                  className="font-medium text-sky-700 hover:underline">{analisisStock ? 'Ver en Reponer →' : 'Ver en Inventario →'}</Link>
-              </>}
-              {enCamino > 0 && <>
-                {stockTxt.length > 0 && <span className="text-neutral-300" aria-hidden>·</span>}
-                <Link href="/reportes?tab=transito" className="hover:text-neutral-800 hover:underline">
-                  <span className="num">{enCamino}</span> compra{enCamino === 1 ? '' : 's'} en camino</Link>
-              </>}
-            </p>
-          )}
-        </div>
-        <div className="order-1 flex w-full flex-wrap items-center justify-between gap-2 sm:order-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end sm:justify-start">
-          <div className="flex items-center gap-2 sm:order-1">
-            <Link href="/ventas?new=1" className="btn-primary text-sm whitespace-nowrap">+ Nueva venta</Link>
-            {!importaciones ? (
-              <Link href="/compras?new=1" className="btn-secondary text-sm whitespace-nowrap">+ Nueva compra</Link>
-            ) : <div className="relative">
-              <button type="button" onClick={() => setCompraMenu(v => !v)} aria-expanded={compraMenu} className="btn-secondary text-sm whitespace-nowrap">
-                + Nueva compra ▾
-              </button>
-              {compraMenu && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setCompraMenu(false)} />
-                  <div className="absolute right-0 mt-1 w-44 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 overflow-hidden">
-                    <Link href="/compras?new=1" className="block px-3 py-2 text-sm hover:bg-neutral-50">Compra local</Link>
-                    <Link href="/compras?tab=import&new=1" className="block px-3 py-2 text-sm hover:bg-neutral-50 border-t border-neutral-100">Importación</Link>
-                  </div>
-                </>
-              )}
-            </div>}
-          </div>
-          {country === 'VE' && <div className="sm:order-2"><RateBar puedeActualizar={puedeTasas} descuento={descuento} exceso={categorias} ajustes={ajustes} /></div>}
-        </div>
-      </div>
+      {/* 20-11: Ventas · Compras · Inventario + tasa, el mismo bloque que ve el empleado (AccionesInicio). */}
+      <AccionesInicio cfg={acciones} stock={summary} />
 
       <AvisoStockVerificar n={summary.por_verificar ?? 0} />
 

@@ -963,15 +963,22 @@ ventana **Recibir mercancía** deja siempre a la vista **Cancelar** y **Confirma
 y al cargar una compra o importación cada producto va en dos líneas (nombre arriba; cantidad, costo y total abajo). Las
 barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan encima del menú inferior. En Inicio, Automatizaciones (Preguntas, Mensajes, Stock, Calificaciones), Mi cuenta, Mi IA, Mi plan y Pagos ME ninguna tarjeta se corre de costado con un nombre largo, y el historial de tasas de Ajustes muestra cada cifra en una sola línea. También en el celular: Finanzas (montos uno debajo del otro), Bonos de Ajustes, Despachos, Conteos de Reportes, Configuración de Calificaciones y los enlaces largos en Preguntas y Mensajes ya no se salen de la pantalla. Mi cuenta → Mi equipo muestra una tarjeta por persona (rol, permisos y botones a la vista).
 
-- **Inicio:** cómo va tu negocio (rehecho el 19-11-2026; gráfico acumulado el 20-11-2026). Sin título. En la primera línea, a la derecha y fijos, los atajos
-  **+ Nueva venta** / **+ Nueva compra** y debajo la tasa en una **píldora chica** (VE): **BCV · Paralelo · Dif. %** (diferencial = cuánto más cara está la paralela;
-  al pasar el mouse, el detalle con exceso y fecha; quien entra a Ajustes la toca y va ahí) y, con Descuento ML, otra
-  píldora **Desc. ML %**. A la izquierda, **Pendientes** (bajan a una segunda fila si hay muchos)
-  (sin título): botones chicos con el número, solo las **tareas del día** que tienen algo (desde el 20-11-2026): **Por
-  confirmar**, **Borradores** y, con Despachos, **Por despachar**; cada uno lleva a su lista y lo que está en 0 sale en una
-  línea gris «Al día: …». Si no hay nada: «Nada pendiente hoy». Debajo, una **línea gris de inventario**: «Inventario: N
-  sin stock · N por reponer · Ver en Reponer →» (sin Reponer: «N con stock bajo · Ver en Inventario →») y «N compras en
-  camino» (lleva a Reportes → En tránsito). En caída y Remate ya no salen en el Inicio: están en Inventario → Reponer. Después el bono
+- **Inicio:** cómo va tu negocio (rehecho el 19-11-2026; gráfico acumulado el 20-11-2026). Sin título. Arriba, **lo de hoy** (desde el 20-11-2026, **igual para el
+  admin y el empleado**: sale lo que tu usuario puede hacer según los módulos de la empresa y sus permisos, no según el
+  rol), en filas por área de trabajo, cada una con sus **tareas** (solo las que tienen algo; se terminan) en un recuadro y
+  su botón al final:
+  - **Ventas:** Por confirmar › Por despachar (con Despachos lleva ahí; sin Despachos, «Procesadas» o «Por descargar») ›
+    Borradores, y **+ Nueva venta** (en el celular «+ Venta»).
+  - **Compras** (con compras por etapas y permiso de Compras): Por finalizar · Compras en camino · Importaciones en camino
+    con sus cajas (punto gris = dato, no tarea) y **+ Nueva compra** (con importaciones, menú Compra local / Importación;
+    solo con permiso de crear compras).
+  - Si una fila no tiene nada: **✓ Al día** (el botón sigue en su lugar).
+  - Debajo, una **línea gris de inventario**: «Inventario: N sin stock · N por reponer · Ver en Reponer →» (sin Reponer:
+    «N con stock bajo · Ver en Inventario →»). En caída y Remate están en Inventario → Reponer.
+  - A la derecha (VE), la tasa en **una píldora**: **Bs/$ 919 · 1.066 · 16%** (BCV · paralelo · diferencial). Al pasar el
+    mouse o tocarla abre el detalle: oficial, paralelo, diferencial (cuánto más cara está la paralela), exceso y Descuento
+    ML (con permiso de costos), la fecha, ↻ actualizar (solo el dueño de la plataforma) y **Ver historial →** (quien
+    entra a Ajustes). Después el bono
   (si lo tienes) y el panel **Cómo va tu negocio**, con los botones **Hoy / Mes / Trim. / Año / Fechas…** (Fechas… abre
   desde/hasta y **Aplicar**; elegidas, el botón muestra el rango, p. ej. «1–20 nov»), que **mandan
   sobre todo lo de abajo** (no sobre los pendientes), siempre contra el período anterior (Hoy = ayer a esta hora; Mes =
@@ -996,9 +1003,8 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   IA, ventas por pregunta) y **Calificaciones** (con 1 o 3 cuentas va como tarjeta al lado de la última cuenta; con 2 o 4, en
   una línea abajo; las negativas y contradictorias se marcan solo si hay;
   lleva a Reputación). Ganancia y costos solo con el permiso de costos.
-  **Inicio sin el permiso de costos** (empleado): la misma primera línea (sus pendientes, la píldora de la tasa en VE y
-  **+ Nueva venta**); **Pendientes** igual que arriba con lo suyo (Por confirmar, Borradores, Por despachar —lleva a Despachos—, y con
-  compras por etapas: Por finalizar, Compra en camino, Importación en camino con sus cajas); el bono (si lo ve); **Ventas
+  **Inicio sin el permiso de costos** (empleado): el mismo bloque de arriba (Ventas, Compras, Inventario y tasa, con
+  lo que su usuario puede hacer); el bono (si lo ve); **Ventas
   del mes** (cuántas van sumadas día a día, en azul, con el ▲▼ contra el mes pasado a la fecha y en gris cómo iban los
   meses anteriores ese mismo día); y con Reportes, abajo y del mes, los más vendidos (en unidades), atención,
   calificaciones y «Se están cayendo». La palabra «Spread» ahora es **Diferencial** en todo el sistema.
@@ -1463,11 +1469,11 @@ mi información, es seguro, comparten mis datos, mi contraseña la ven.
 Junto al título de cada sección hay una **ⓘ**: al tocarla se abre (o se cierra) un resumen corto de cómo funciona esa
 pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuario ese permiso. Lo que dice cada una:
 
-- **Inicio:** **Pendientes** = solo las tareas del día que tienen algo (lo demás, «Al día»); el stock va en la línea gris de abajo. El período (Hoy/Mes/Trim./Año/fechas) cambia
+- **Inicio:** arriba, filas **Ventas** y **Compras** con sus tareas del día (solo las que tienen algo) y su botón **+ Nueva**; el stock va en la línea gris de abajo; la tasa = **Bs/$ BCV · paralelo · diferencial** (tócala para el detalle). Es igual para todos: sale lo que tu usuario puede hacer. El período (Hoy/Mes/Trim./Año/fechas) cambia
   todo lo de abajo, contra el período anterior (**Fechas…** abre desde/hasta). **Te quedó** = ganancia; gráfico
   **acumulado** con pestañas Ventas | Ganancia: color = lo que llevas, gris = lo que llevabas el período anterior a la
   misma fecha; el monto al final de la gris = en cuánto terminó el período anterior. **Pendientes** = tareas del día
-  (Por confirmar, Borradores, Por despachar); el inventario va en la línea gris de abajo. **Ventas registradas** = las procesadas en Ventas (las de ML van abajo por cuenta). «antes N» = cuánto
+  (Ventas: Por confirmar › Por despachar › Borradores; Compras: Por finalizar, en camino); el inventario va en la línea gris. **Ventas registradas** = las procesadas en Ventas (las de ML van abajo por cuenta). «antes N» = cuánto
   era antes, cuando la base es chica. **Diferencial** = cuánto más cara está la tasa paralela que la oficial.
 - **Ventas:** **Por confirmar** = ventas de MercadoLibre que faltan registrar (verificas el pago y «Registrar venta»
   descuenta del inventario). **Traer pagos y ventas** trae al instante las nuevas (con Pagos ME también pagos y guías,
