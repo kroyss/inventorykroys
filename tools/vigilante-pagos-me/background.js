@@ -472,7 +472,7 @@ async function leerPorPaginas(tabId, plan, aviso, vigente) {
  *  cuáles faltan, y se piden solo esas por su número, 5 a la vez, junto con las pendientes que da el latido (pago sin
  *  guía, no leídas). Si los avisos no alcanzan hasta la traída anterior (más de MAX_PAGINAS_AVISOS páginas) o el portal
  *  no los da, `volver` → la extensión lee la lista completa (lento pero seguro). */
-const MAX_PAGINAS_AVISOS = 20
+const MAX_PAGINAS_AVISOS = 30   // la primera vez se leen 7 días (~600–750 avisos por cuenta)
 async function leerPorAvisos(tabId, plan, aviso, vigente, cfg) {
   const desde = Date.parse(plan.avisos.desde)
   if (!Number.isFinite(desde)) return { volver: true }
@@ -485,7 +485,12 @@ async function leerPorAvisos(tabId, plan, aviso, vigente, cfg) {
   if (!r.completo) return { volver: true, hasta: r.hasta ?? null }
   avance()
   let pedir = []
-  try { pedir = (await api(cfg, 'avisos', { cuenta: r.cuenta || null, avisos: r.avisos })).pedir ?? [] }
+  try {
+    const res = await api(cfg, 'avisos', { cuenta: r.cuenta || null, desde: plan.avisos.desde, avisos: r.avisos })
+    // El vigía del sistema vio ventas de ML sin ningún aviso en el portal: los avisos no funcionan → lista de siempre.
+    if (res.avisos_fallan) return { volver: true, hasta: null }
+    pedir = res.pedir ?? []
+  }
   catch (e) {
     // La cuenta del portal no es de ninguna cuenta conectada, o el sistema no respondió: no se baja nada a ciegas.
     if (/cuenta_no_conectada/.test(e.message)) throw e
