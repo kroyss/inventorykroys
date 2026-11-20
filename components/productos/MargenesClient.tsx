@@ -238,7 +238,7 @@ export default function MargenesClient({ initialProducts, categories }: {
           <input type="checkbox" checked={soloSugeridos} onChange={e => setSoloSugeridos(e.target.checked)} />
           Solo con sugerencia
         </label>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <button onClick={() => exportRows(`plan_rentabilidad_${new Date().toISOString().slice(0, 10)}`, plan(), 'Plan')}
             disabled={aplicar.length === 0}
             className="px-3 py-1.5 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-100 disabled:opacity-40">
@@ -255,7 +255,50 @@ export default function MargenesClient({ initialProducts, categories }: {
         <p className={`text-sm ${msg.ok ? 'text-green-700' : 'text-red-600'}`}>{msg.text}</p>
       )}
 
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
+      {/* Celular (20-11): cada producto como tarjeta (antes → ahora, categoría y lo nuevo). */}
+      <div className="md:hidden bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
+        {!loaded && <p className="px-3 py-6 text-center text-sm text-neutral-400">Calculando…</p>}
+        {loaded && visibles.length === 0 && <p className="px-3 py-6 text-center text-sm text-neutral-400">Sin productos para revisar</p>}
+        {visibles.map(r => {
+          const d = destino(r)
+          const nuevo = d && d.id !== r.p.profit_category_id ? evalAt(r.p, d.profit_percentage) : null
+          return (
+            <div key={r.p.id} className={`px-3 py-3 space-y-2 text-sm ${checked.has(r.p.id) ? 'bg-lime-50/60' : ''}`}>
+              <div className="flex items-start gap-2">
+                <label className="-ml-1 p-1"><input type="checkbox" className="h-4 w-4" checked={checked.has(r.p.id)} onChange={() => toggle(r.p.id)} disabled={!nuevo} aria-label={`Aplicar a ${r.p.name}`} /></label>
+                <FotoProducto id={r.p.id} nombre={r.p.name} tam="xs" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-mono text-xs text-neutral-400">{r.p.code}{r.p.weight_kg != null ? ` · ${r.p.weight_kg} kg` : ''}</div>
+                  <div className="leading-snug">{r.p.name}</div>
+                </div>
+                <div className="shrink-0 text-right font-medium">${fmt(r.now.final)}</div>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
+                <span>Ganancia/u: {r.gananciaAntes != null ? `$${fmt(r.gananciaAntes)}` : '—'} → <b className="text-neutral-800">{r.now.ganancia != null ? `$${fmt(r.now.ganancia)}` : '—'}</b></span>
+                <span>Rentab.: <span className={margenCls(r.margenAntes)}>{pct(r.margenAntes)}</span> → <b className={margenCls(r.now.margen)}>{pct(r.now.margen)}</b></span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select value={d?.id ?? ''} aria-label="Categoría"
+                  onChange={e => {
+                    const id = Number(e.target.value)
+                    setChoice(c => ({ ...c, [r.p.id]: id }))
+                    setChecked(s => { const n = new Set(s); if (id !== r.p.profit_category_id) n.add(r.p.id); else n.delete(r.p.id); return n })
+                  }}
+                  className="min-w-0 flex-1 border border-neutral-300 rounded px-1.5 py-1.5 text-xs bg-white">
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{etiquetaCategoria(c.name, c.profit_percentage)}{c.id === r.p.profit_category_id ? ' · actual' : ''}</option>
+                  ))}
+                </select>
+                {nuevo && (
+                  <span className="text-xs text-neutral-600">Lista ${fmt(nuevo.publicado)} · final ${fmt(nuevo.final)} · {nuevo.ganancia != null ? `$${fmt(nuevo.ganancia)}/u` : '—'} · <b className={margenCls(nuevo.margen)}>{pct(nuevo.margen)}</b></span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="hidden md:block bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>

@@ -562,8 +562,19 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
         )}
         {lista.length === 0 ? <EmptyState message="Nada con este filtro." /> : (
           <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="bg-neutral-50 text-xs text-neutral-500">
+            {/* Celular (20-11): cada fila se apila como tarjeta (las mismas celdas, con su nombre); en la computadora, la tabla. */}
+            {seleccionables.length > 0 && (
+              <label className="md:hidden flex items-center gap-2 border-b border-neutral-100 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+                <input type="checkbox" className="h-4 w-4" checked={todasVisibles} onChange={() => setSel(s => {
+                  const n = new Set(s)
+                  for (const v of seleccionables) { if (todasVisibles) n.delete(clave(v)); else n.add(clave(v)) }
+                  return n
+                })} />
+                Marcar las {seleccionables.length} de esta página
+              </label>
+            )}
+            <table className="w-full text-sm max-md:block">
+              <thead className="bg-neutral-50 text-xs text-neutral-500 max-md:hidden">
                 <tr>
                   <th className="px-3 py-2 w-8">
                     <input type="checkbox" checked={todasVisibles} onChange={() => setSel(s => {
@@ -582,19 +593,24 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                   <th className="px-3 py-2 text-left">Descuento máximo</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="max-md:block">
                 {visibles.map(v => {
                   const k = clave(v)
                   const yaEn = enCampElegida(v)
                   return (
-                    <tr key={k} className={`border-t border-neutral-100 align-top ${sel.has(k) ? 'bg-emerald-50/60' : ''}`}>
-                      <td className="px-3 py-2 text-center">
+                    <tr key={k} className={`border-t border-neutral-100 align-top max-md:grid max-md:grid-cols-2 max-md:gap-x-3 max-md:px-1 max-md:py-2 ${sel.has(k) ? 'bg-emerald-50/60' : ''}`}>
+                      <td className="px-3 py-2 text-center max-md:hidden">
                         {yaEn
                           ? <span className="text-emerald-600" title={`Ya está en «${campElegida!.nombre}»`}>✓</span>
                           : <input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} />}
                       </td>
-                      <td className="px-3 py-2 max-w-[340px]">
+                      <td className="px-3 py-2 max-w-[340px] max-md:col-span-2 max-md:max-w-none max-md:px-2">
                         <div className="flex gap-2.5">
+                        <span className="md:hidden shrink-0 pt-1">
+                          {yaEn
+                            ? <span className="text-emerald-600" title={`Ya está en «${campElegida!.nombre}»`}>✓</span>
+                            : <input type="checkbox" className="h-4 w-4" checked={sel.has(k)} onChange={() => toggle(k)} aria-label="Marcar" />}
+                        </span>
                         <Miniatura src={v.foto} />
                         <div className="min-w-0">
                         <a href={urlML(v.id)} target="_blank" rel="noreferrer" className="text-neutral-900 hover:underline line-clamp-2">{v.titulo}</a>
@@ -605,11 +621,13 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                         </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <td className="px-3 py-2 text-right whitespace-nowrap max-md:px-2 max-md:py-1 max-md:text-left max-md:text-xs">
+                        <span className="md:hidden text-neutral-400">Peso: </span>
                         {v.peso != null ? <>{v.peso.toLocaleString('de-DE')} kg<div className="text-[11px] text-neutral-400">{v.pesoFuente === 'portal' ? 'portal' : 'producto'}</div></> : <span className="text-neutral-400">—</span>}
                       </td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">{usd(v.precio)}</td>
-                      <td className="px-3 py-2 text-xs">
+                      <td className="px-3 py-2 text-right whitespace-nowrap max-md:px-2 max-md:py-1 max-md:text-left max-md:text-xs"><span className="md:hidden text-neutral-400">Publicado: </span>{usd(v.precio)}</td>
+                      <td className="px-3 py-2 text-xs max-md:col-span-2 max-md:px-2 max-md:py-1">
+                        <div className="md:hidden text-[11px] text-neutral-400">En promoción</div>
                         {v.enPromo ? <>
                           <div className="font-medium text-neutral-900">{usd(v.actual)} <span className={v.exceso ? 'font-bold text-red-700' : 'text-emerald-700'}>−{pct(v.descuento)}</span></div>
                           {v.exceso && <div className="mt-0.5 inline-block rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold text-red-800" title="Más del doble del descuento habitual de esta cuenta">⚠ {textoExceso(v.exceso)}</div>}
@@ -636,12 +654,14 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                           <div key={p.nombre} className="mt-1 text-sky-800">⏱ {p.nombre}: {usd(p.precio)} desde {fecha(p.inicio)}</div>
                         ))}
                       </td>
-                      <td className="px-3 py-2 text-xs">
+                      <td className="px-3 py-2 text-xs max-md:px-2 max-md:py-1">
+                        <div className="md:hidden text-[11px] text-neutral-400">Puede entrar</div>
                         {v.candidatas.length ? v.candidatas.map(p => (
                           <div key={p.campana}>{p.nombre}{p.minimo != null && <span className="text-neutral-400"> · desde {usd(p.minimo)}</span>}</div>
                         )) : <span className="text-neutral-400">—</span>}
                       </td>
-                      <td className="px-3 py-2 text-xs">
+                      <td className="px-3 py-2 text-xs max-md:px-2 max-md:py-1">
+                        <div className="md:hidden text-[11px] text-neutral-400">Envío gratis hoy</div>
                         <Chip e={v.envio.estado} />
                         {v.envio.minZoom != null && <div className="text-[11px] text-neutral-400 mt-0.5">mín. ZOOM {usd(v.envio.minZoom)} · TEALCA {usd(v.envio.minTealca)}</div>}
                         {v.uTealca && <div className="text-[11px] text-emerald-700 mt-0.5">Gratis desde <b>{v.uTealca.unidades} u.</b> ({usd(v.uTealca.total)})</div>}
@@ -649,11 +669,12 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                           <div className="text-[11px] text-emerald-700">ZOOM desde <b>{v.uZoom.unidades} u.</b> ({usd(v.uZoom.total)})</div>
                         )}
                       </td>
-                      <td className={`px-3 py-2 text-xs text-right whitespace-nowrap ${v.margen == null ? 'text-neutral-400' : v.margen < 0 ? 'text-red-700 font-medium' : v.margen < margenMin ? 'text-amber-700' : 'text-neutral-800'}`}
+                      <td className={`px-3 py-2 text-xs text-right whitespace-nowrap max-md:px-2 max-md:py-1 max-md:text-left ${v.margen == null ? 'text-neutral-400' : v.margen < 0 ? 'text-red-700 font-medium' : v.margen < margenMin ? 'text-amber-700' : 'text-neutral-800'}`}
                         title={v.costo == null ? 'Sin costo: la publicación no está vinculada a un producto con costo' : 'Rentabilidad sobre costo al precio actual (lo que te queda ÷ lo que te costó)'}>
-                        {v.margen == null ? '—' : pct(v.margen)}
+                        <span className="md:hidden font-normal text-neutral-400">Rentabilidad: </span>{v.margen == null ? '—' : pct(v.margen)}
                       </td>
-                      <td className="px-3 py-2 text-xs whitespace-nowrap">
+                      <td className="px-3 py-2 text-xs whitespace-nowrap max-md:px-2 max-md:py-1 max-md:whitespace-normal">
+                        <div className="md:hidden text-[11px] text-neutral-400">Descuento máximo</div>
                         {/* Piso de $2 de ML: se muestra cuando limita más que el envío gratis. */}
                         {(v.topePiso == null || v.topePiso < (v.topeTealca ?? 100)) && (
                           <div className="text-sky-700">{v.topePiso == null || v.topePiso <= 0 ? 'no entra a promos (≤ $2)' : <>piso $2: hasta <b>{pct(v.topePiso)}</b></>}</div>

@@ -158,11 +158,57 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
         {chip('aggregate', '🛒 Por volumen', counts.aggregate, 'bg-sky-600 text-white border-sky-600')}
         {chip('impossible', '🚫 Revisar precio', counts.impossible + counts.overweight, 'bg-red-600 text-white border-red-600')}
         <input type="search" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)}
-          className="ml-auto border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+          className="ml-auto border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full sm:w-52 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+      </div>
+
+      {/* Celular (20-11): tarjetas con el peso editable; la tabla queda para la computadora. */}
+      <div className="md:hidden bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
+        {filtered.length === 0 && <p className="px-3 py-8 text-center text-sm text-neutral-400">Sin productos</p>}
+        {filtered.map(({ p, published, final, info }) => {
+          const meta = STATUS_META[info.status]
+          return (
+            <div key={p.id} className="px-3 py-3 space-y-2 text-sm">
+              <div className="flex items-start gap-2">
+                <FotoProducto id={p.id} nombre={p.name} tam="xs" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-mono text-xs text-neutral-400">{p.code}</div>
+                  <div className="leading-snug">{p.name}</div>
+                </div>
+                <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full border whitespace-nowrap ${meta.chip}`}>
+                  {meta.label}{info.status === 'aggregate' ? ` ~${info.unitsForFree} uds` : ''}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-neutral-500">
+                <span className="flex items-center gap-1.5">Peso:
+                  {p.peso_origen === 'ml' ? (
+                    <span className="font-medium text-neutral-800">{p.weight_kg} kg <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ME</span></span>
+                  ) : (
+                    <input type="number" step="0.001" min="0" inputMode="decimal"
+                      value={weights[p.id] ?? ''}
+                      onChange={e => setWeights(w => ({ ...w, [p.id]: e.target.value }))}
+                      onBlur={() => saveWeight(p.id)}
+                      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                      placeholder="kg" aria-label={`Peso de ${p.name}`}
+                      className={`w-24 border rounded px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-neutral-800
+                                  ${savingId === p.id ? 'border-amber-400 bg-amber-50' : 'border-neutral-300'}`} />
+                  )}
+                </span>
+                <span>Publicado: <span className="font-medium text-neutral-800">${fmt(published)}</span></span>
+                <span>Umbral: {info.tier ? `$${fmt(info.tier.minPrice)}` : '—'}</span>
+                {descuento && <span>Desc.: {info.maxDiscount != null ? `${info.maxDiscount.toFixed(1)}% máx · ` : ''}<span className={info.status === 'capped' ? 'font-medium text-amber-700' : 'font-medium text-neutral-800'}>{info.effectiveDiscount.toFixed(1)}%</span></span>}
+                <span>Final: <span className="font-medium text-green-700">${fmt(final)}</span></span>
+              </div>
+              {p.peso_origen !== 'ml' && p.pesos_ml && (
+                <ElegirPesoML pesos={p.pesos_ml} actual={p.weight_kg} ocupado={savingId === p.id}
+                  onElegir={kg => saveWeight(p.id, String(kg))} />
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* tabla */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
+      <div className="hidden md:block bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-neutral-500 border-b border-neutral-100">
             <tr>

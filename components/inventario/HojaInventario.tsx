@@ -331,8 +331,8 @@ export default function HojaInventario({ items, country, fecha }: Props) {
       </div>
 
       {/* Área de impresión */}
-      <div className="hoja max-w-5xl mx-auto bg-white p-6 my-6 shadow-sm print:shadow-none print:my-0 print:p-0 print:max-w-none">
-        <div className="flex justify-between items-end border-b-2 border-neutral-900 pb-1.5 mb-2">
+      <div className="hoja max-w-5xl mx-auto bg-white p-3 sm:p-6 my-6 shadow-sm print:shadow-none print:my-0 print:p-0 print:max-w-none">
+        <div className="flex flex-wrap justify-between items-end gap-2 border-b-2 border-neutral-900 pb-1.5 mb-2">
           <div>
             <h1 className="text-lg font-bold tracking-tight leading-tight">
               {titulo || 'Inventario'} · {country}
@@ -350,6 +350,7 @@ export default function HojaInventario({ items, country, fecha }: Props) {
         {activeCols.length === 0 ? (
           <p className="text-sm text-neutral-400 py-6 text-center">Elegí al menos una columna.</p>
         ) : (
+          <div className="overflow-x-auto print:overflow-visible">
           <table className="w-full text-xs border-collapse border border-neutral-400">
             <thead>
               <tr className="bg-neutral-100">
@@ -400,6 +401,7 @@ export default function HojaInventario({ items, country, fecha }: Props) {
               )}
             </tbody>
           </table>
+          </div>
         )}
 
         {cols.includes('fisico') && (

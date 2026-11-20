@@ -502,7 +502,7 @@ function LotePrecio({ sel, onCerrar, onHecho }: { sel: Seleccion; onCerrar: () =
               <tbody className="divide-y divide-neutral-100">
                 {vista.map(x => (
                   <tr key={x.item_id} className={x.problema ? 'text-red-700' : x.despues === x.antes ? 'text-neutral-400' : ''}>
-                    <td className="px-2 py-1"><span className="block truncate max-w-[280px]">{x.titulo}</span><span className="text-neutral-400">{x.item_id} · {x.cuenta}</span></td>
+                    <td className="px-2 py-1"><span className="block truncate max-w-[45vw] sm:max-w-[280px]">{x.titulo}</span><span className="text-neutral-400">{x.item_id} · {x.cuenta}</span></td>
                     <td className="px-2 py-1 text-right num line-through text-neutral-400">{precio(x.antes, x.moneda)}</td>
                     <td className="px-2 py-1 text-right num font-medium">{x.problema ?? precio(x.despues, x.moneda)}</td>
                   </tr>
