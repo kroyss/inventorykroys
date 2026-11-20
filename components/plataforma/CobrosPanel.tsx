@@ -30,7 +30,7 @@ const METODO: Record<string, string> = { pago_movil: 'Pago Móvil', binance: 'Bi
 const ESCALON = ['hasta 50', '51–300', '301–1.000', '+1.000']
 const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
 const hora = (s: string) => new Date(s).toLocaleString('es-VE', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/Caracas' })
-const usd = (n: number) => `$${n.toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
+const usd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const TIPO: Record<string, string> = { plan: 'Plan', radar_pro: 'Radar PRO aparte', upgrade: 'Mejora de plan', recarga: 'Recarga de créditos IA', radar_mes: 'Radar mensual' }
 
 /** Qué contrató: cada línea con su monto, el total y las fechas que cubre; abajo lo que tiene vigente la cuenta. */
