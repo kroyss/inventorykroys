@@ -4,6 +4,7 @@ import { PageHeader, Tabs, Cargando } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { AbrirFicha } from './FichaPublicacion'
 import CambiarStock from './CambiarStock'
+import RepartirStock from './RepartirStock'
 import Link from '@/components/ui/Link'
 import { BotonInfo, PanelInfo } from '@/components/ui/Info'
 import { useAvisos } from '@/components/layout/Avisos'
@@ -153,6 +154,8 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
   const [selP, setSelP] = useState<Set<string>>(new Set())
   const [reactivando, setReactivando] = useState<{ hechas: number; total: number } | null>(null)
   const [stockDe, setStockDe] = useState<Fila | null>(null)
+  // 20-11 (el dueño): «Repartir» abre el panel a la derecha (RepartirStock) en vez de llevar a Stock vs inventario.
+  const [repartirDe, setRepartirDe] = useState<Fila | null>(null)
   const alternarP = (f: Fila) => setSelP(m => { const x = new Set(m); if (x.has(clave(f))) x.delete(clave(f)); else x.add(clave(f)); return x })
   const reactivar = async (lista: Fila[]) => {
     if (!lista.length) return
@@ -305,6 +308,10 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
                   className={`${CHIP} bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100`}>Poner {poner}</button>
               ) : conReparto && f.sugerido === 0 && f.en_otras ? (
                 <span title={`Va en 0 a propósito: lo que hay está en ${f.en_otras}`} className="text-neutral-400">· en otra publicación</span>
+              ) : !conReparto && varias && vista !== 'pausadas' && datos?.puedeStock ? (
+                <button type="button" onClick={() => setRepartirDe(f)}
+                  title={`Está en ${f.n_pubs} publicaciones: reparte lo que tienes entre todas sin salir de aquí`}
+                  className={`${CHIP} bg-sky-50 text-sky-700 ring-sky-200 hover:bg-sky-100`}>Repartir →</button>
               ) : !conReparto && varias && vista !== 'pausadas' ? (
                 <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.item_id)}`}
                   title={`Está en ${f.n_pubs} publicaciones: Stock vs inventario reparte lo que tienes entre todas`}
@@ -355,6 +362,7 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
             <li>Se revisa sola cada hora; para revisar ya, toca <b className="font-medium text-neutral-800">↻ Actualizar</b> arriba, junto a Novedades (como mucho cada 10 minutos).</li>
             <li>El tiempo de cada una cuenta desde que el sistema la vio así (lo que ya estaba agotado al empezar, el 02/10, cuenta desde ese día).</li>
             {conInventario && <li><b className="font-medium text-neutral-800">«⚠ desde N u. sin envío gratis»</b>: comprando varias el paquete pesa más y pierde el envío gratis; «pack» lo arma en Stock vs inventario.</li>}
+            {conInventario && <li><b className="font-medium text-neutral-800">«Repartir»</b>: el producto está en varias publicaciones; abre un panel a la derecha con cada una, cuánto tiene hoy en ML y lo que repartiste de tu inventario.</li>}
             {conInventario && <li>Aquí ves <b className="font-medium text-neutral-800">lo que dice MercadoLibre</b>. Para compararlo con tu inventario: <Link href="/inventario/stock-ml" className="underline">Stock vs inventario</Link>.</li>}
         </PanelInfo>
       )}
@@ -394,6 +402,11 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
           className="w-full sm:w-72 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm" />
       </div>
 
+      {repartirDe && (
+        <RepartirStock item={repartirDe.item_id} variante={repartirDe.variante_id} onCerrar={() => setRepartirDe(null)}
+          onGuardado={() => setVez(n => n + 1)} />
+      )}
+
       {stockDe && (
         <CambiarStock item={stockDe.item_id} origen="pausadas" onCerrar={() => setStockDe(null)}
           onGuardado={res => {
@@ -402,6 +415,16 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
             }
             setVez(n => n + 1)
           }} />
+      )}
+
+      {/* 20-11: sin el inventario «al día» no hay reparto sugerido y las de varias publicaciones dicen «Repartir»; marcándolo
+          pasan a «Poner X» (un clic). Aviso corto, solo si hay alguna así. */}
+      {conInventario && datos && datosDe === vista && !datos.alDia && vista !== 'pausadas'
+        && calientes.some(f => (f.n_pubs ?? 1) > 1 && (f.inventario ?? 0) > 0 && !f.entera_variantes) && (
+        <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">
+          Marca tu inventario «al día» en <Link href="/inventario/stock-ml" className="font-medium underline">Stock vs inventario</Link> y
+          te digo cuánto poner en cada publicación (un clic en vez de «Repartir»).
+        </p>
       )}
 
       {/* Al cambiar de pestaña no se muestra la lista anterior mientras llega la nueva. */}

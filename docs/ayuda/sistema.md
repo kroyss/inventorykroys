@@ -1146,7 +1146,7 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   todo el inventario; al pasar el cursor lo explica) y la que está en 0 porque lo que hay está en otra publicación dice
   «Tienes N · en otra publicación» (al pasar el cursor dice en cuál); sin nada en el inventario, «Sin inventario». Si comprando varias pierde el envío gratis, debajo dice «⚠ desde N u. sin envío
   gratis · pack» (el enlace abre Stock vs inventario con esa publicación, para Crear pack). Si el producto está en varias
-  publicaciones y no hay reparto, dice «Tienes N · [Repartir →]» sin sugerir (abre Stock vs inventario, que da el número de cada una). La variante de una publicación **vinculada entera** dice «[Vincular por color →]» (abre Dividir por
+  publicaciones y no hay reparto, dice «Tienes N · [Repartir →]» sin sugerir: abre un **panel a la derecha** (sin salir de Stock) con una línea por publicación (cuenta, MLV, variante, «Hoy en ML: N» y una casilla), el contador «Repartiste X de N» (en ámbar si pasas lo que tienes), «Repartir parejo entre las N» y Guardar en MercadoLibre (reactiva las pausadas si se deja marcado). Arriba de la lista, un aviso sugiere marcar el inventario «al día» para que esas filas pasen a «Poner X». La variante de una publicación **vinculada entera** dice «[Vincular por color →]» (abre Dividir por
   variantes; no se sabe qué producto es: sin inventario ni sugerido). Cada variante sale con su propia foto. Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
   (en «Para decidir» salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
   variantes, descripción) sin ir a MercadoLibre.
@@ -1454,6 +1454,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
 - **Stock** (Automatizaciones): lo vendido en los últimos 30 días que se agotó o está por agotarse; el aviso cuenta 7
   días; se revisa sola cada hora y con ↻ Actualizar (arriba) como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
   «⚠ desde N u. sin envío gratis · pack»: comprando varias pierde el envío gratis (el pack se arma en Stock vs inventario).
+  «Repartir»: el producto está en varias publicaciones; abre un panel a la derecha con cada una y lo que repartiste de tu inventario.
 - **Pagos ME:** **Traer pagos y guías** (la PC trae de MercadoEnvíos pagos, guías y ventas nuevas, 1 a 3 min; también
   sola durante el día). Sin inventario se verifica cada pago aquí (uno a uno o con Comprobar con el banco); con
   inventario se verifica en Ventas → Por confirmar y aquí queda la conexión y el historial. Las guías pagadas pasan
