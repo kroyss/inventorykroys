@@ -92,6 +92,15 @@ select:focus-visible, textarea:focus-visible {
   -moz-appearance: textfield;
 }
 
+/* Celular (20-11): en una grilla, cada hijo puede achicarse (min-width: auto los ensanchaba con un nombre largo
+   o un truncate, y la página se corría de costado: Inicio, Automatizaciones…). En @layer base para que las clases
+   min-w-* de cada pantalla sigan mandando. Solo en celular: en la computadora no cambia nada. */
+@layer base {
+  @media (max-width: 767px) {
+    .grid > * { min-width: 0; }
+  }
+}
+
 /* iPhone (17-10): Safari hace zoom solo al tocar un cuadro con letra de menos de 16 px y no vuelve a su tamaño
    al terminar (la pantalla quedaba "agrandada" hasta pellizcar). En el celular los cuadros de texto van a 16 px.
    Va con !important porque la mayoría de los cuadros tienen text-sm / text-xs de Tailwind. */

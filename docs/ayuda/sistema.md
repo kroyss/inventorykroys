@@ -961,7 +961,7 @@ Importaciones la orden, el proveedor, el estado, lo recibido y el total. En Prod
 marcar y aplicar el **recargo en lote** también desde el celular. Los paneles de detalle se desplazan completos, la
 ventana **Recibir mercancía** deja siempre a la vista **Cancelar** y **Confirmar** aunque la orden tenga muchos productos,
 y al cargar una compra o importación cada producto va en dos líneas (nombre arriba; cantidad, costo y total abajo). Las
-barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan encima del menú inferior.
+barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan encima del menú inferior. En Inicio, Automatizaciones (Preguntas, Mensajes, Stock, Calificaciones), Mi cuenta, Mi IA, Mi plan y Pagos ME ninguna tarjeta se corre de costado con un nombre largo, y el historial de tasas de Ajustes muestra cada cifra en una sola línea.
 
 - **Inicio:** cómo va tu negocio (rehecho el 19-11-2026). Sin título. En la primera línea, a la derecha y fijos, los atajos
   **+ Nueva venta** / **+ Nueva compra** y debajo la tasa en una **píldora chica** (VE): **Bs oficial / paralelo · diferencial %** (diferencial = cuánto más cara está la paralela;

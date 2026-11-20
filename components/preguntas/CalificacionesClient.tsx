@@ -437,7 +437,7 @@ function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Planti
   )
   const caja = (verde: boolean) => `rounded-xl border shadow-sm p-4 space-y-4 ${verde ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
       <section className={caja(p.auto)}>
         <div>
           <h2 className="font-semibold text-neutral-900">✅ Ventas concretadas</h2>

@@ -152,7 +152,7 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-2 items-start">
+      <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0 items-start">
       <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

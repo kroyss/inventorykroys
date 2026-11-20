@@ -88,7 +88,7 @@ export default function MiCuentaClient({ admin, country, inicial }: { admin: boo
       {pestana !== 'equipo' && (errorCarga ? <Mensaje ok={false} texto={errorCarga} />
         : !d ? <div className="h-64 animate-pulse rounded-xl bg-neutral-100" />
         : pestana === 'negocio' && admin ? <MiNegocio d={d} onGuardado={nombre => { setD({ ...d, negocio: nombre }); router.refresh() }} />
-        : <div className="grid gap-4 lg:grid-cols-2">
+        : <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
             <MisDatos d={d} onGuardado={x => setD({ ...d, ...x })} />
             <MiClave />
           </div>)}

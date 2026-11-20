@@ -46,8 +46,8 @@ export function FilaDato({ d, onCambio }: { d: Dato; onCambio: () => void }) {
     </div>
   )
   return (
-    <div className="group flex items-start gap-3 py-1.5">
-      <p className="flex-1 text-sm text-neutral-800 whitespace-pre-line">{d.texto}</p>
+    <div className="group flex flex-wrap items-start gap-x-3 gap-y-0.5 py-1.5 sm:flex-nowrap">
+      <p className="min-w-0 flex-1 basis-full text-sm text-neutral-800 whitespace-pre-line [overflow-wrap:anywhere] sm:basis-0">{d.texto}</p>
       <span className="text-[11px] text-neutral-400 whitespace-nowrap pt-0.5">{fecha(d.created_at)}{d.por ? ` · ${d.por}` : ''}</span>
       <span className="flex gap-1 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <button onClick={() => setEditando(d.texto)} disabled={ocupado} className="text-[11px] text-neutral-500 hover:text-neutral-900 px-1">Editar</button>

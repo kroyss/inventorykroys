@@ -68,7 +68,7 @@ function Seccion({ titulo, ayuda, link, children }: { titulo: string; ayuda?: st
 
 function Esqueleto() {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
       {[0, 1].map(i => <div key={i} className="h-56 animate-pulse rounded-xl border border-neutral-200 bg-neutral-50" />)}
     </div>
   )
@@ -116,7 +116,7 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
   return (
     <div className="space-y-6">
       {(d.top || (d.cuentas && d.cuentas.length > 0) || caen != null || a || c) && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           {d.top && (
             <Seccion titulo="Más vendidos" ayuda={`Unidades del período, ${contra}.`}>
               <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">

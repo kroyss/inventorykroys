@@ -225,7 +225,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
 
       {!enRevision && (s.conectadas > 0 || s.soloRadar) && (
         // 06-11 (el dueño): en pantalla ancha, a la izquierda el plan y a la derecha cómo pagar (antes una columna angosta).
-        <div className="grid gap-4 lg:grid-cols-2 items-start">
+        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0 items-start">
           {/* 1 · Lo que te toca */}
           <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
             <Titulo n={1}>{s.soloRadar ? 'Tu Radar' : s.estado === 'activo' ? 'Qué quieres pagar' : 'Elige tu plan'}</Titulo>

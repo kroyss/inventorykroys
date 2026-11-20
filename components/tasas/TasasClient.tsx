@@ -469,23 +469,23 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-neutral-500 text-xs sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-2 text-left">Fecha</th>
-                  <th className="px-4 py-2 text-right">Oficial</th>
-                  <th className="px-4 py-2 text-right">Paralelo</th>
-                  <th className="px-4 py-2 text-right">Diferencial</th>
-                  {descuento && <th className="px-4 py-2 text-right">Descuento</th>}
-                  <th className="px-4 py-2 text-center">Fuente</th>
+                  <th className="px-2 sm:px-4 py-2 whitespace-nowrap text-left">Fecha</th>
+                  <th className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">Oficial</th>
+                  <th className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">Paralelo</th>
+                  <th className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">Diferencial</th>
+                  {descuento && <th className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">Descuento</th>}
+                  <th className="px-2 sm:px-4 py-2 whitespace-nowrap text-center">Fuente</th>
                 </tr>
               </thead>
               <tbody>
                 {filas.map((r, i) => (
                   <tr key={r.id} className={`border-t border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
-                    <td className="px-4 py-2">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-VE') : ''}</td>
-                    <td className="px-4 py-2 text-right">Bs {money(r.official_rate)}</td>
-                    <td className="px-4 py-2 text-right">Bs {money(r.parallel_rate)}</td>
-                    <td className="px-4 py-2 text-right">{r.spread_percentage}%</td>
-                    {descuento && <td className="px-4 py-2 text-right">{r.recommended_discount}%</td>}
-                    <td className="px-4 py-2 text-center text-xs">
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-VE') : ''}</td>
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">Bs {money(r.official_rate)}</td>
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">Bs {money(r.parallel_rate)}</td>
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">{r.spread_percentage}%</td>
+                    {descuento && <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">{r.recommended_discount}%</td>}
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-center text-xs">
                       <span className={`px-2 py-0.5 rounded ${r.source === 'api' ? 'bg-green-100 text-green-700' : 'bg-sky-100 text-sky-700'}`}>{r.source}</span>
                     </td>
                   </tr>

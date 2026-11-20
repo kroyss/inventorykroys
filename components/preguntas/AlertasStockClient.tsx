@@ -384,7 +384,7 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
       )}
 
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+        <div className="flex min-w-0 max-w-full flex-wrap items-end gap-x-3 gap-y-2">
           <Tabs value={vista} onChange={setVista} items={[
             { value: 'agotadas', label: 'Agotadas', count: datos?.contadores.agotadas },
             { value: 'bajas', label: `Por agotarse (< ${datos?.umbral ?? 3})`, count: datos?.contadores.bajas },
