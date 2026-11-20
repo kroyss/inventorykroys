@@ -157,13 +157,13 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
       <div className={`absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col transition-transform duration-200 ${mounted ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="px-5 py-4 border-b flex items-center justify-between shrink-0">
           <h2 className="font-semibold text-lg">{editing ? 'Editar importación' : 'Nueva importación'}</h2>
-          <button onClick={closePanel} className="text-neutral-400 hover:text-neutral-700 text-xl leading-none">✕</button>
+          <button onClick={closePanel} aria-label="Cerrar" className="-mr-2 p-2 text-neutral-400 hover:text-neutral-700 text-xl leading-none">✕</button>
         </div>
         <div className="px-5 py-4 space-y-3 flex-1 overflow-y-auto">
           {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
           {okMsg && <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded text-sm">{okMsg}</div>}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-neutral-500">Proveedor</label>
               <div className="mt-1">
@@ -219,7 +219,35 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
 
           {items.length > 0 && (
             <div className="border rounded">
-              <table className="w-full text-sm">
+              {/* Celular (20-11): cada producto en dos líneas (nombre arriba; cantidad, costo y total abajo). */}
+              <div className="sm:hidden divide-y divide-neutral-100">
+                {items.map((it, idx) => (
+                  <div key={idx} className="px-3 py-2.5 space-y-2">
+                    <div className="flex items-start gap-2 text-sm">
+                      <FotoProducto id={it.product_id} nombre={it.product_name} tam="xs" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-neutral-400 font-mono">{it.product_code}</div>
+                        <div>{it.product_name}</div>
+                      </div>
+                      <button type="button" onClick={() => removeItem(idx)} aria-label="Quitar" className="-mr-1 -mt-1 px-2 py-1 text-red-500 hover:text-red-700">✕</button>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <label className="w-20 text-[11px] text-neutral-500">Cant.
+                        <NumberInput int min={1} value={it.quantity}
+                          onValueChange={n => updateItem(idx, { quantity: n })}
+                          className="mt-0.5 w-full border rounded px-2 py-1 text-sm" />
+                      </label>
+                      <label className="w-28 text-[11px] text-neutral-500">Costo $/u
+                        <NumberInput step="0.01" min={0} value={it.unit_cost_usd}
+                          onValueChange={n => updateItem(idx, { unit_cost_usd: n })}
+                          className="mt-0.5 w-full border rounded px-2 py-1 text-sm" />
+                      </label>
+                      <span className="ml-auto pb-1.5 text-right text-sm">${fmt(it.quantity * it.unit_cost_usd)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <table className="hidden sm:table w-full text-sm">
                 <thead className="bg-neutral-50 text-xs text-neutral-500">
                   <tr>
                     <th className="px-3 py-2 text-left">Producto</th>

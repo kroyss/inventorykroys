@@ -165,7 +165,7 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
 function SearchBar({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <input type="search" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+      className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full min-w-0 md:w-64 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
   )
 }
 
@@ -239,7 +239,7 @@ function PurchasesReport({ data, search, setSearch, tipo, setTipo, importaciones
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <KPICard compact label="Órdenes"      value={data.totals.count} />
         <KPICard compact label="Total USD"    value={`$${money(data.totals.total_usd)}`} />
         <KPICard compact label="Total pagado" value={`$${money(data.totals.total_paid)}`} />

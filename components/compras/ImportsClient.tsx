@@ -709,7 +709,52 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
 
       {/* Tabla ancha */}
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Celular (20-11): tarjetas; la tabla ancha queda para la computadora. */}
+        <div className="md:hidden divide-y divide-neutral-100">
+          {visibleOrders.length === 0 && <p className="px-3 py-8 text-center text-neutral-400">Sin órdenes</p>}
+          {paginatedOrders.map(o => {
+            const dateSrc = o.updated_at ?? o.created_at
+            const date = dateSrc ? new Date(dateSrc).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
+            const units     = o.items.reduce((a, i) => a + i.quantity, 0)
+            const prods     = o.items.length
+            const recUnits  = o.items.reduce((a, i) => a + (i.total_received_qty || i.received_qty || 0), 0)
+            const receiving = ['PARCIAL','RECIBIDA'].includes(o.status)
+            return (
+              <button key={o.id} type="button" onClick={() => setSelected(o)}
+                className={`block w-full px-4 py-3 text-left active:bg-neutral-50 ${selected?.id === o.id ? 'bg-lime-50/70' : ''}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-mono text-xs font-bold text-neutral-900">{o.order_number}
+                      {o.file_count > 0 && <span className="ml-1 font-normal text-neutral-500">📎{o.file_count}</span>}
+                      {historyMode && o.status === 'INCONSISTENTE' && <span className="ml-1.5 text-red-600" title={o.notes || 'Inconsistente'}>⚠</span>}</div>
+                    <div className="truncate text-sm text-neutral-700">{o.supplier_name || '—'}</div>
+                  </div>
+                  <span className="shrink-0"><StatusBadge status={o.status} label={STATUS_LABELS[o.status]} /></span>
+                </div>
+                <div className="mt-1 truncate text-xs text-neutral-500">
+                  {o.items.map((i, k) => <span key={i.id}>{k > 0 && <span className="text-neutral-300"> · </span>}{i.product_name} <span className="text-neutral-400">x{i.quantity}</span></span>)}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-neutral-500">
+                  <span>{prods} {prods === 1 ? 'producto' : 'productos'}</span>
+                  <span>{receiving
+                    ? <span className={recUnits >= units ? 'font-medium text-green-600' : 'font-medium text-amber-600'}>{recUnits}/{units}</span>
+                    : <span className="font-medium text-neutral-700">{units}</span>} und</span>
+                  {o.box_count > 0 && <span>{o.box_count} {o.box_count === 1 ? 'caja' : 'cajas'}</span>}
+                  {verCostos && <span className="font-semibold text-neutral-900">${fmt(o.total_usd)}</span>}
+                  <span className="ml-auto text-neutral-400">{date}</span>
+                </div>
+                {(o.origin_country || o.tracking_number || o.container_code) && (
+                  <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-neutral-500">
+                    {o.origin_country && <span>🚚 {o.origin_country}</span>}
+                    {o.tracking_number && <span className="max-w-full truncate font-mono">{o.tracking_number}</span>}
+                    {o.container_code && <span className="font-mono">{o.container_code}</span>}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-xs text-neutral-500">
               <tr className="border-b border-neutral-100">
@@ -822,8 +867,8 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
           <div className="absolute inset-0 bg-black/30" onClick={() => setSelected(null)} />
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col">
             {/* Header bar */}
-            <div className="px-4 py-3 border-b border-neutral-100 shrink-0 flex items-start justify-between">
-              <div>
+            <div className="px-4 py-3 border-b border-neutral-100 shrink-0 flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <div className="font-mono text-sm text-neutral-500">{selected.order_number}</div>
                 <div className="font-semibold mt-0.5">{selected.supplier_name}</div>
                 <div className="text-xs text-neutral-400 mt-0.5">
@@ -835,7 +880,7 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                 <span className={`px-2 py-1 rounded text-xs ${STATUS_COLORS[selected.status] ?? 'bg-gray-100'}`}>
                   {STATUS_LABELS[selected.status] ?? selected.status}
                 </span>
-                <button onClick={() => setSelected(null)} className="text-neutral-400 hover:text-neutral-700 text-xl leading-none">×</button>
+                <button onClick={() => setSelected(null)} aria-label="Cerrar" className="-mr-2 p-2 text-neutral-400 hover:text-neutral-700 text-xl leading-none">×</button>
               </div>
             </div>
 
@@ -883,7 +928,7 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
               {isAdmin && selected.status !== 'PENDIENTE' && (
                 <div className="bg-white rounded-lg border shadow-sm p-4">
                   <div className="text-xs text-neutral-500 mb-2">Datos de envío</div>
-                  <div className="grid grid-cols-3 gap-2 items-start">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-start">
                     <Combobox
                       value={trackingInput}
                       options={selected.tracking_number ? [{ id: 1, name: selected.tracking_number }] : []}
@@ -1092,29 +1137,30 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                 <div className="px-4 py-2 border-b bg-neutral-50 text-xs text-neutral-500">
                   Productos ({selected.items.length})
                 </div>
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-neutral-50 text-xs text-neutral-500">
                     <tr>
-                      <th className="px-3 py-2 text-left">Producto</th>
-                      <th className="px-3 py-2 text-right">Cant.</th>
-                      {verCostos && <th className="px-3 py-2 text-right">$/u</th>}
-                      {verCostos && <th className="px-3 py-2 text-right">Total</th>}
-                      <th className="px-3 py-2 text-right">Recibido</th>
+                      <th className="px-2 sm:px-3 py-2 text-left">Producto</th>
+                      <th className="px-2 sm:px-3 py-2 text-right">Cant.</th>
+                      {verCostos && <th className="px-2 sm:px-3 py-2 text-right">$/u</th>}
+                      {verCostos && <th className="px-2 sm:px-3 py-2 text-right">Total</th>}
+                      <th className="px-2 sm:px-3 py-2 text-right">Recibido</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selected.items.map(i => (
                       <tr key={i.id} className="border-t">
-                        <td className="px-3 py-2">
+                        <td className="px-2 sm:px-3 py-2 min-w-[9rem]">
                           <div className="flex items-center gap-2"><FotoProducto id={i.product_id} nombre={i.product_name} tam="xs" /><span>
-                          <span className="font-mono text-xs text-neutral-400 mr-2">{i.product_code}</span>
+                          <span className="block sm:inline font-mono text-xs text-neutral-400 sm:mr-2">{i.product_code}</span>
                           {i.product_name}
                           </span></div>
                         </td>
-                        <td className="px-3 py-2 text-right">{i.quantity}</td>
-                        {verCostos && <td className="px-3 py-2 text-right">${fmt(i.unit_cost_usd)}</td>}
-                        {verCostos && <td className="px-3 py-2 text-right">${fmt(i.total_cost_usd)}</td>}
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-2 sm:px-3 py-2 text-right">{i.quantity}</td>
+                        {verCostos && <td className="px-2 sm:px-3 py-2 text-right whitespace-nowrap">${fmt(i.unit_cost_usd)}</td>}
+                        {verCostos && <td className="px-2 sm:px-3 py-2 text-right whitespace-nowrap">${fmt(i.total_cost_usd)}</td>}
+                        <td className="px-2 sm:px-3 py-2 text-right">
                           {/* Una FINALIZADA está recibida al 100%, aunque el dato venga 0 (legacy/vía completa) */}
                           {i.total_received_qty || i.received_qty ||
                             (selected.status === 'FINALIZADA' ? i.quantity : 0)}
@@ -1123,6 +1169,7 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           </div>
@@ -1131,33 +1178,36 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
 
       {/* Receive modal */}
       {showReceive && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          {/* 20-11: lista desplazable y botones siempre a la vista (en el celular sale desde abajo). */}
+          <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex items-start justify-between gap-3 shrink-0">
               <h2 className="font-semibold">Recibir mercancía</h2>
+              <button onClick={() => setShowReceive(false)} aria-label="Cerrar" className="-mr-2 -mt-2 p-2 text-neutral-400 hover:text-neutral-700 text-xl leading-none">×</button>
             </div>
-            <div className="p-4">
+            <div className="p-2 sm:p-4 flex-1 overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="bg-neutral-50 text-xs text-neutral-500">
                   <tr>
-                    <th className="px-3 py-2 text-left">Producto</th>
-                    <th className="px-3 py-2 text-right">Pedido</th>
-                    <th className="px-3 py-2 text-right">Ya recibido</th>
-                    <th className="px-3 py-2 text-right">A recibir</th>
+                    <th className="px-2 sm:px-3 py-2 text-left">Producto</th>
+                    <th className="px-2 sm:px-3 py-2 text-right">Pedido</th>
+                    <th className="hidden sm:table-cell px-3 py-2 text-right">Ya recibido</th>
+                    <th className="px-2 sm:px-3 py-2 text-right">A recibir</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recvItems.map((it, idx) => (
                     <tr key={it.product_id} className="border-t">
-                      <td className="px-3 py-2">
+                      <td className="px-2 sm:px-3 py-2">
                         <div className="flex items-center gap-2"><FotoProducto id={it.product_id} nombre={it.product_name} /><span>
-                        <span className="font-mono text-xs text-neutral-400 mr-2">{it.product_code}</span>
+                        <span className="block sm:inline font-mono text-xs text-neutral-400 sm:mr-2">{it.product_code}</span>
                         {it.product_name}
+                        {it.already_received > 0 && <span className="sm:hidden ml-1 text-xs text-amber-600">(ya {it.already_received})</span>}
                         </span></div>
                       </td>
-                      <td className="px-3 py-2 text-right">{it.expected}</td>
-                      <td className="px-3 py-2 text-right text-neutral-500">{it.already_received}</td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-2 sm:px-3 py-2 text-right">{it.expected}</td>
+                      <td className="hidden sm:table-cell px-3 py-2 text-right text-neutral-500">{it.already_received}</td>
+                      <td className="px-2 sm:px-3 py-2 text-right">
                         <NumberInput int min={0} value={it.received_qty}
                           onValueChange={n => {
                             const next = [...recvItems]
@@ -1171,12 +1221,12 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                 </tbody>
               </table>
             </div>
-            <p className={`px-4 pb-3 text-xs ${recvPartial && recvTotal > 0 ? 'text-amber-800' : 'text-neutral-500'}`}>
+            <p className={`px-4 py-2 text-xs shrink-0 ${recvPartial && recvTotal > 0 ? 'text-amber-800' : 'text-neutral-500'}`}>
               {recvTotal === 0 ? 'Pon las cantidades que llegaron.'
                 : recvPartial ? `Faltan ${recvFaltan} por llegar: lo recibido entra ya al inventario y la orden queda Parcial para recibir el resto (o Finalizar si no llega más).`
                 : 'Llegó todo lo esperado: queda finalizada y se carga al inventario.'}
             </p>
-            <div className="p-4 border-t flex justify-end gap-2 bg-neutral-50">
+            <div className="p-4 border-t flex flex-wrap justify-end gap-2 bg-neutral-50 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4">
               <button onClick={() => setShowReceive(false)} className="btn-secondary text-sm">Cancelar</button>
               <button onClick={submitReceive} disabled={busy} className="btn-primary text-sm">{recibeTodo ? 'Recibir y finalizar' : recvPartial && recvTotal > 0 ? `Recibir ${recvTotal} de ${recvPend}` : 'Confirmar recepción'}</button>
             </div>

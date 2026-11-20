@@ -953,6 +953,15 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
 
 > Este espacio se prende por empresa (plan Completo). Si no lo ves, tu empresa trabaja «todo desde MercadoLibre».
 
+**En el celular** (20-11-2026): Inventario, Productos, Compras e Importaciones muestran cada producto u orden como una
+**tarjeta** (en vez de la tabla ancha), con lo importante a la vista: en Inventario el stock grande, el estado, el precio y
+los botones **🏷 Etiqueta** / **Ajustar**, con una fila **Ordenar:** (Nombre, Stock, Código, Estado…); en Compras e
+Importaciones la orden, el proveedor, el estado, lo recibido y el total. En Productos cada tarjeta trae su casilla para
+marcar y aplicar el **recargo en lote** también desde el celular. Los paneles de detalle se desplazan completos, la
+ventana **Recibir mercancía** deja siempre a la vista **Cancelar** y **Confirmar** aunque la orden tenga muchos productos,
+y al cargar una compra o importación cada producto va en dos líneas (nombre arriba; cantidad, costo y total abajo). Las
+barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan encima del menú inferior.
+
 - **Inicio:** cómo va tu negocio (rehecho el 19-11-2026). Sin título. En la primera línea, a la derecha y fijos, los atajos
   **+ Nueva venta** / **+ Nueva compra** y debajo la tasa en una **píldora chica** (VE): **Bs oficial / paralelo · diferencial %** (diferencial = cuánto más cara está la paralela;
   al pasar el mouse, el detalle con exceso y fecha; quien entra a Ajustes la toca y va ahí) y, con Descuento ML, otra

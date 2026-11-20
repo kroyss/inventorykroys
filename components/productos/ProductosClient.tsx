@@ -643,8 +643,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       <div className="flex flex-wrap items-center gap-3">
 
         {selected.length > 0 && !simple && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-neutral-500">{selected.length} seleccionados</span>
+            <button type="button" onClick={() => setSelected([])} className="text-xs text-neutral-500 underline-offset-2 hover:underline md:hidden">Quitar</button>
             <label className="flex items-center gap-1 text-sm text-neutral-600">
               Recargo
               <input type="number" min={0} max={200} step={0.5} value={batchPct} onChange={e => setBatchPct(e.target.value)} placeholder="60"
@@ -832,8 +833,14 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           {displayed.map(p => {
             const net = netDe(p)
             return (
-              <div key={p.id} onClick={() => openView(p.id)} className="px-4 py-3 cursor-pointer active:bg-neutral-50">
+              <div key={p.id} onClick={() => openView(p.id)} className={`px-4 py-3 cursor-pointer active:bg-neutral-50 ${selected.includes(p.id) ? 'bg-lime-50/60' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
+                  {/* 20-11: marcar también en el celular (para el recargo en lote). */}
+                  {!simple && (
+                    <label className="-ml-2 -my-1 self-center p-2" onClick={e => e.stopPropagation()} aria-label={`Marcar ${p.name}`}>
+                      <input type="checkbox" checked={selected.includes(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 cursor-pointer" />
+                    </label>
+                  )}
                   <FotoProducto id={p.id} nombre={p.name} tam="md" />
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-xs text-neutral-400">{p.code}</div>
@@ -846,7 +853,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     {p.is_active ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
-                <div className="flex items-center gap-4 mt-2 text-sm">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm">
                   <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">{country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(precioVE(p))}`}</span></span>
                   {country === 'VE' && !simple && (
                     <span className="text-neutral-500">ML: <span className="font-medium text-neutral-900">${fmt(publicadoVE(p))}</span></span>
@@ -858,8 +865,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   <span className="text-neutral-500 ml-auto">Stock: <span className="font-medium text-neutral-900">{p.quantity}</span></span>
                 </div>
                 <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => openEdit(p.id)} className="text-xs px-3 py-1 border border-neutral-200 rounded-lg text-neutral-600">Editar</button>
-                  <button onClick={() => handleStatus(p.id, p.is_active ? 'deactivate' : 'activate')} className="text-xs px-3 py-1 border border-neutral-200 rounded-lg text-neutral-600">
+                  <button onClick={() => openEdit(p.id)} className="text-xs px-3 py-1.5 border border-neutral-200 rounded-lg text-neutral-600">Editar</button>
+                  <button onClick={() => handleStatus(p.id, p.is_active ? 'deactivate' : 'activate')} className="text-xs px-3 py-1.5 border border-neutral-200 rounded-lg text-neutral-600">
                     {p.is_active ? 'Desactivar' : 'Activar'}
                   </button>
                 </div>
@@ -889,19 +896,19 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         <div className="fixed inset-0 z-50">
           <div className={`absolute inset-0 bg-black/30 transition-opacity duration-200 ${mounted ? 'opacity-100' : 'opacity-0'}`} onClick={closeModal} />
           <div className={`absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl flex flex-col transition-transform duration-200 ${mounted ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 shrink-0">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-100 shrink-0">
               <h2 className="font-bold text-neutral-900">
                 {modal === 'create' ? 'Nuevo producto' : 'Editar producto'}
               </h2>
               <button
                 onClick={closeModal}
-                className="text-neutral-400 hover:text-neutral-700 text-lg"
+                className="-mr-2 p-2 text-neutral-400 hover:text-neutral-700 text-lg leading-none" aria-label="Cerrar"
               >
                 ✕
               </button>
             </div>
 
-            <div className="px-6 py-4 space-y-4 flex-1 overflow-y-auto">
+            <div className="px-4 sm:px-6 py-4 space-y-4 flex-1 overflow-y-auto">
               {okMsg && <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded text-sm">{okMsg}</div>}
               {/* código + nombre */}
               <div className="grid grid-cols-2 gap-3">
@@ -1210,7 +1217,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-neutral-100 flex justify-end gap-3 bg-neutral-50 shrink-0">
+            <div className="px-4 sm:px-6 py-4 border-t border-neutral-100 flex flex-wrap justify-end gap-3 bg-neutral-50 shrink-0">
               <button
                 onClick={closeModal}
                 className="px-4 py-2 text-sm text-neutral-600 hover:text-neutral-900"
@@ -1274,7 +1281,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </div>
                   <h2 className="font-bold leading-snug text-neutral-900 line-clamp-2">{v.name}</h2>
                 </FotoEditable>
-                <button onClick={closeView} className="text-neutral-400 hover:text-neutral-700 text-lg" aria-label="Cerrar">✕</button>
+                <button onClick={closeView} className="-mr-2 p-2 text-neutral-400 hover:text-neutral-700 text-lg leading-none" aria-label="Cerrar">✕</button>
               </div>
 
               {/* body */}
@@ -1362,7 +1369,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
               </div>
 
               {/* footer: acciones */}
-              <div className="px-6 py-4 border-t border-neutral-100 flex flex-wrap justify-end gap-2 bg-neutral-50 shrink-0">
+              <div className="px-4 sm:px-6 py-4 border-t border-neutral-100 flex flex-wrap justify-end gap-2 bg-neutral-50 shrink-0">
                 <button
                   onClick={async () => {
                     const ok = await handleStatus(v.id, 'delete')

@@ -687,7 +687,43 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
 
     {/* Tabla ancha */}
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
+      {/* Celular (20-11): tarjetas; la tabla ancha queda para la computadora. */}
+      <div className="md:hidden divide-y divide-neutral-100">
+        {visibleOrders.length === 0 && <p className="px-3 py-8 text-center text-neutral-400">Sin órdenes</p>}
+        {paginatedOrders.map(o => {
+          const dateSrc = o.updated_at ?? o.created_at
+          const date = dateSrc ? new Date(dateSrc).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
+          const units     = o.items.reduce((a, i) => a + i.quantity, 0)
+          const prods     = o.items.length
+          const recUnits  = o.items.reduce((a, i) => a + (i.total_received_qty || i.received_qty || 0), 0)
+          const receiving = ['PARCIAL','RECIBIDA'].includes(o.status)
+          return (
+            <button key={o.id} type="button" onClick={() => setSelected(o)}
+              className={`block w-full px-4 py-3 text-left active:bg-neutral-50 ${selected?.id === o.id ? 'bg-lime-50/70' : ''}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-mono text-xs font-bold text-neutral-900">{o.order_number}
+                    {historyMode && (o.is_incomplete || o.status === 'INCONSISTENTE') && <span className="ml-1.5 text-red-600" title={o.incomplete_note || o.notes || 'Inconsistente'}>⚠</span>}</div>
+                  <div className="truncate text-sm text-neutral-700">{o.supplier_name || '—'}</div>
+                </div>
+                <span className="shrink-0"><StatusBadge status={o.status} label={STATUS_LABELS[o.status]} /></span>
+              </div>
+              <div className="mt-1 truncate text-xs text-neutral-500">
+                {o.items.map((i, k) => <span key={i.id}>{k > 0 && <span className="text-neutral-300"> · </span>}{i.product_name} <span className="text-neutral-400">x{i.quantity}</span></span>)}
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-neutral-500">
+                <span>{prods} {prods === 1 ? 'producto' : 'productos'}</span>
+                <span>{receiving
+                  ? <span className={recUnits >= units ? 'font-medium text-green-600' : 'font-medium text-amber-600'}>{recUnits}/{units}</span>
+                  : <span className="font-medium text-neutral-700">{units}</span>} und</span>
+                {verCostos && <span className="font-semibold text-neutral-900">${fmt(o.total_usd)}</span>}
+                <span className="ml-auto text-neutral-400">{date}</span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr className="border-b border-neutral-100">
@@ -775,11 +811,11 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
     {selected && (
       <div className="fixed inset-0 z-50">
         <div className="absolute inset-0 bg-black/30" onClick={() => setSelected(null)} />
-        <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col">
-          {/* Header */}
-          <div className="p-5 border-b border-neutral-100 shrink-0">
-            <div className="flex items-start justify-between">
-              <div>
+        <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col overflow-y-auto md:overflow-hidden">
+          {/* Header (celular: se desplaza junto con los productos) */}
+          <div className="p-4 sm:p-5 border-b border-neutral-100 shrink-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <h3 className="text-xl font-bold text-neutral-800 font-mono">{selected.order_number}</h3>
                 <p className="text-neutral-600 mt-1">{selected.supplier_name}</p>
                 {selected.reopen_count > 0 && (
@@ -790,7 +826,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 <span className={`px-3 py-1 rounded-full text-sm font-semibold ${STATUS_COLORS[selected.status] ?? 'bg-gray-100'}`}>
                   {STATUS_LABELS[selected.status] ?? selected.status}
                 </span>
-                <button onClick={() => setSelected(null)} className="text-neutral-400 hover:text-neutral-700 text-xl leading-none">×</button>
+                <button onClick={() => setSelected(null)} aria-label="Cerrar" className="-mr-2 p-2 text-neutral-400 hover:text-neutral-700 text-xl leading-none">×</button>
               </div>
             </div>
 
@@ -802,7 +838,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
               />
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
               {verCostos && (
                 <div>
                   <span className="text-neutral-500">Total:</span>
@@ -816,13 +852,13 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 </div>
               )}
               {selected.notes && (
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <span className="text-neutral-500">Notas:</span>
                   <span className="ml-2 text-neutral-500 italic">{selected.notes}</span>
                 </div>
               )}
               {selected.is_incomplete && selected.incomplete_note && (
-                <div className="col-span-2 text-red-600">
+                <div className="sm:col-span-2 text-red-600">
                   <span className="font-semibold">Inconsistencia:</span>
                   <span className="ml-2">{selected.incomplete_note}</span>
                 </div>
@@ -926,33 +962,34 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
           </div>
 
           {/* Items table */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="px-5 py-3 border-b bg-neutral-50 sticky top-0">
+          <div className="md:flex-1 md:overflow-y-auto">
+            <div className="px-4 sm:px-5 py-3 border-b bg-neutral-50 sticky top-0 z-10">
               <h4 className="font-semibold text-neutral-700 text-sm">Productos ({selected.items.length})</h4>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-neutral-500 text-xs">
                 <tr>
-                  <th className="px-4 py-2 text-left">Producto</th>
-                  <th className="px-4 py-2 text-right">Cant.</th>
-                  {verCostos && <th className="px-4 py-2 text-right">C/U</th>}
-                  {verCostos && <th className="px-4 py-2 text-right">Total</th>}
-                  <th className="px-4 py-2 text-right">Recibido</th>
+                  <th className="px-2 sm:px-4 py-2 text-left">Producto</th>
+                  <th className="px-2 sm:px-4 py-2 text-right">Cant.</th>
+                  {verCostos && <th className="px-2 sm:px-4 py-2 text-right">C/U</th>}
+                  {verCostos && <th className="px-2 sm:px-4 py-2 text-right">Total</th>}
+                  <th className="px-2 sm:px-4 py-2 text-right">Recibido</th>
                 </tr>
               </thead>
               <tbody>
                 {selected.items.map((item, idx) => (
                   <tr key={idx} className="border-t hover:bg-neutral-50">
-                    <td className="px-4 py-2">
+                    <td className="px-2 sm:px-4 py-2 min-w-[9rem]">
                       <div className="flex items-center gap-2"><FotoProducto id={item.product_id} nombre={item.product_name} tam="xs" /><span>
-                      <span className="text-neutral-500 font-mono text-xs mr-2">{item.product_code}</span>
+                      <span className="block sm:inline text-neutral-500 font-mono text-xs sm:mr-2">{item.product_code}</span>
                       {item.product_name}
                       </span></div>
                     </td>
-                    <td className="px-4 py-2 text-right">{item.quantity}</td>
-                    {verCostos && <td className="px-4 py-2 text-right">${fmt(item.unit_cost_usd)}</td>}
-                    {verCostos && <td className="px-4 py-2 text-right font-semibold">${fmt(item.total_cost_usd)}</td>}
-                    <td className="px-4 py-2 text-right">
+                    <td className="px-2 sm:px-4 py-2 text-right">{item.quantity}</td>
+                    {verCostos && <td className="px-2 sm:px-4 py-2 text-right whitespace-nowrap">${fmt(item.unit_cost_usd)}</td>}
+                    {verCostos && <td className="px-2 sm:px-4 py-2 text-right font-semibold whitespace-nowrap">${fmt(item.total_cost_usd)}</td>}
+                    <td className="px-2 sm:px-4 py-2 text-right">
                       {(() => {
                         // total_received_qty puede venir 0/null en finalizadas (datos legacy
                         // o vía "completa"): una FINALIZADA está recibida al 100%.
@@ -969,13 +1006,14 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 ))}
                 {verCostos && (
                   <tr className="border-t bg-neutral-50 font-semibold">
-                    <td colSpan={3} className="px-4 py-2 text-right text-neutral-600">Total:</td>
-                    <td className="px-4 py-2 text-right">${fmt(selected.total_usd)}</td>
+                    <td colSpan={3} className="px-2 sm:px-4 py-2 text-right text-neutral-600">Total:</td>
+                    <td className="px-2 sm:px-4 py-2 text-right whitespace-nowrap">${fmt(selected.total_usd)}</td>
                     <td />
                   </tr>
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </div>
@@ -986,16 +1024,16 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowForm(false)} />
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col">
-            <div className="p-5 border-b flex justify-between shrink-0">
+            <div className="p-4 sm:p-5 border-b flex justify-between gap-3 shrink-0">
               <div>
                 <h3 className="font-semibold text-lg">{editId ? 'Editar orden' : etapas ? 'Nueva orden de compra' : 'Nueva compra'}</h3>
                 {!etapas && !editId && (
                   <p className="text-xs text-neutral-500 mt-0.5">Se suma al stock al guardar, y el costo de cada producto pasa a ser lo que pagaste.</p>
                 )}
               </div>
-              <button onClick={() => setShowForm(false)} className="text-neutral-400 hover:text-neutral-700 text-xl">×</button>
+              <button onClick={() => setShowForm(false)} aria-label="Cerrar" className="-mr-2 -mt-1 self-start p-2 text-neutral-400 hover:text-neutral-700 text-xl leading-none">×</button>
             </div>
-            <div className="p-5 space-y-4 flex-1 overflow-y-auto">
+            <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto">
               {error && <div className="bg-red-50 text-red-700 p-3 rounded text-sm">{error}</div>}
               {formMsg && <div className="bg-green-50 text-green-700 border border-green-200 p-3 rounded text-sm">{formMsg}</div>}
               {recuperado && !editId && (
@@ -1005,7 +1043,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Proveedor *</label>
                   <Combobox
@@ -1062,7 +1100,35 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
 
               {formItems.length > 0 && (
                 <div className="border rounded overflow-hidden">
-                  <table className="w-full text-sm">
+                  {/* Celular (20-11): cada producto en dos líneas (nombre arriba; cantidad, costo y total abajo). */}
+                  <div className="sm:hidden divide-y divide-neutral-100">
+                    {formItems.map((item, idx) => (
+                      <div key={idx} className="px-3 py-2.5 space-y-2">
+                        <div className="flex items-start gap-2 text-xs">
+                          <FotoProducto id={item.product_id} nombre={item.product_name} tam="xs" />
+                          <span className="min-w-0 flex-1"><span className="text-neutral-400 mr-1">{item.product_code}</span>{item.product_name}</span>
+                          <button type="button" onClick={() => removeFormItem(idx)} aria-label="Quitar" className="-mr-1 -mt-1 px-2 py-1 text-lg leading-none text-red-400 hover:text-red-600">×</button>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <label className="w-20 text-[11px] text-neutral-500">Cant.
+                            <NumberInput int min={1} value={item.quantity}
+                              onValueChange={n => updateFormItem(idx, 'quantity', String(n))}
+                              className="mt-0.5 w-full text-right border rounded px-2 py-1 text-sm" />
+                          </label>
+                          <label className="w-28 text-[11px] text-neutral-500">Costo U.
+                            <NumberInput min={0} step="0.01" value={item.unit_cost_usd}
+                              onValueChange={n => updateFormItem(idx, 'unit_cost_usd', String(n))}
+                              className="mt-0.5 w-full text-right border rounded px-2 py-1 text-sm" />
+                          </label>
+                          <span className="ml-auto pb-1.5 text-right text-sm font-semibold">${fmt(item.quantity * item.unit_cost_usd)}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between bg-neutral-50 px-3 py-2 text-sm">
+                      <span className="font-semibold">Total:</span><span className="font-bold">${fmt(formTotal)}</span>
+                    </div>
+                  </div>
+                  <table className="hidden sm:table w-full text-sm">
                     <thead className="bg-neutral-50 text-xs text-neutral-500">
                       <tr>
                         <th className="px-3 py-2 text-left">Producto</th>
@@ -1115,7 +1181,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 </div>
               )}
             </div>
-            <div className="p-5 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-neutral-50">
+            <div className="p-4 sm:p-5 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-neutral-50">
               <button onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>
               {editId ? (
                 <button onClick={() => saveOrder('close')} disabled={saving} className="btn-primary">
@@ -1142,26 +1208,27 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
 
       {/* Receive Modal */}
       {showReceive && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-lg">
-            <div className="p-5 border-b flex justify-between">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
+          {/* 20-11: alto máximo y lista desplazable; Cancelar/Confirmar siempre a la vista (antes en el celular quedaban fuera). */}
+          <div className="bg-white rounded-t-2xl sm:rounded-lg w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-5 border-b flex justify-between gap-3 shrink-0">
               <h3 className="font-semibold text-lg">Recibir Mercancía — {selected?.order_number}</h3>
-              <button onClick={() => setShowReceive(false)} className="text-neutral-400 hover:text-neutral-600 text-xl">×</button>
+              <button onClick={() => setShowReceive(false)} aria-label="Cerrar" className="-mr-2 -mt-1 self-start p-2 text-neutral-400 hover:text-neutral-600 text-xl leading-none">×</button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto">
               {error && <div className="bg-red-50 text-red-700 p-3 rounded text-sm">{error}</div>}
               <table className="w-full text-sm">
                 <thead className="bg-neutral-50 text-xs text-neutral-500">
                   <tr>
-                    <th className="px-3 py-2 text-left">Producto</th>
-                    <th className="px-3 py-2 text-right">Esperado</th>
-                    <th className="px-3 py-2 text-right">Recibir</th>
+                    <th className="px-2 sm:px-3 py-2 text-left">Producto</th>
+                    <th className="px-2 sm:px-3 py-2 text-right">Esperado</th>
+                    <th className="px-2 sm:px-3 py-2 text-right w-24">Recibir</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recvItems.map((item, idx) => (
                     <tr key={idx} className="border-t">
-                      <td className="px-3 py-2 text-xs">
+                      <td className="px-2 sm:px-3 py-2 text-xs">
                         <div className="flex items-center gap-2"><FotoProducto id={item.product_id} nombre={item.product_name} /><span>
                         <span className="text-neutral-400 mr-1">{item.product_code}</span>
                         {item.product_name}
@@ -1170,8 +1237,8 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                         )}
                         </span></div>
                       </td>
-                      <td className="px-3 py-2 text-right text-neutral-500">{item.expected - item.already_received}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-2 sm:px-3 py-2 text-right text-neutral-500">{item.expected - item.already_received}</td>
+                      <td className="px-2 sm:px-3 py-2">
                         <NumberInput
                           int min={0}
                           value={item.received_qty}
@@ -1192,7 +1259,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                   : 'Llegó todo lo esperado: queda finalizada y se carga al inventario.'}
               </p>
             </div>
-            <div className="p-5 border-t flex justify-end gap-3">
+            <div className="p-4 sm:p-5 border-t flex flex-wrap justify-end gap-3 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-5">
               <button onClick={() => setShowReceive(false)} className="btn-secondary">Cancelar</button>
               <button onClick={submitReceive} disabled={saving} className="btn-primary">
                 {saving ? 'Guardando...' : recibeTodo ? 'Recibir y finalizar' : recvPartial ? `Recibir ${recvTotal} de ${recvPend}` : 'Confirmar Recepción'}

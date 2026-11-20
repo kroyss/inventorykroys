@@ -383,7 +383,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
   }
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-4 pb-40 md:pb-24">
       {/* Cabecera */}
       <div className="flex flex-wrap items-start gap-3">
         {p.fotos[0] && <img src={p.fotos[0].url} alt="" className="w-16 h-16 rounded-lg object-contain bg-neutral-50 border border-neutral-200" />}
@@ -598,7 +598,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
 
       {/* Barra de guardar */}
       {hayCambios && (
-        <div className="fixed inset-x-0 bottom-16 md:bottom-0 z-30 bg-white/95 backdrop-blur border-t border-neutral-200 px-4 py-3">
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 z-30 bg-white/95 backdrop-blur border-t border-neutral-200 px-4 py-3">
           <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-neutral-700">{dif.lista.length} cambio{dif.lista.length === 1 ? '' : 's'} sin guardar</span>
             <div className="flex gap-2">
