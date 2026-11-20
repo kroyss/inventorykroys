@@ -963,8 +963,8 @@ ventana **Recibir mercancía** deja siempre a la vista **Cancelar** y **Confirma
 y al cargar una compra o importación cada producto va en dos líneas (nombre arriba; cantidad, costo y total abajo). Las
 barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan encima del menú inferior. En Inicio, Automatizaciones (Preguntas, Mensajes, Stock, Calificaciones), Mi cuenta, Mi IA, Mi plan y Pagos ME ninguna tarjeta se corre de costado con un nombre largo, y el historial de tasas de Ajustes muestra cada cifra en una sola línea. También en el celular: Finanzas (montos uno debajo del otro), Bonos de Ajustes, Despachos, Conteos de Reportes, Configuración de Calificaciones y los enlaces largos en Preguntas y Mensajes ya no se salen de la pantalla.
 
-- **Inicio:** cómo va tu negocio (rehecho el 19-11-2026). Sin título. En la primera línea, a la derecha y fijos, los atajos
-  **+ Nueva venta** / **+ Nueva compra** y debajo la tasa en una **píldora chica** (VE): **Bs oficial / paralelo · diferencial %** (diferencial = cuánto más cara está la paralela;
+- **Inicio:** cómo va tu negocio (rehecho el 19-11-2026; gráfico acumulado el 20-11-2026). Sin título. En la primera línea, a la derecha y fijos, los atajos
+  **+ Nueva venta** / **+ Nueva compra** y debajo la tasa en una **píldora chica** (VE): **BCV · Paralelo · Dif. %** (diferencial = cuánto más cara está la paralela;
   al pasar el mouse, el detalle con exceso y fecha; quien entra a Ajustes la toca y va ahí) y, con Descuento ML, otra
   píldora **Desc. ML %**. A la izquierda, **Pendientes** (bajan a una segunda fila si hay muchos)
   (sin título): botones chicos con el número, solo los que
@@ -972,16 +972,24 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   cayendo: venden la mitad o menos que en los 4 meses anteriores—, **Remate** —tienes stock y casi no se venden—, **En
   camino** —compras—; al pasar el mouse dice qué es cada uno); cada uno lleva a su lista y lo que está en 0 sale en una
   línea gris «Al día: …». Si no hay nada: «Nada pendiente hoy». Después el bono
-  (si lo tienes) y el panel **Cómo va tu negocio**, con los botones **Hoy / Mes / Trim. / Año** o fechas, que **mandan
+  (si lo tienes) y el panel **Cómo va tu negocio**, con los botones **Hoy / Mes / Trim. / Año / Fechas…** (Fechas… abre
+  desde/hasta y **Aplicar**; elegidas, el botón muestra el rango, p. ej. «1–20 nov»), que **mandan
   sobre todo lo de abajo** (no sobre los pendientes), siempre contra el período anterior (Hoy = ayer a esta hora; Mes =
   el mes pasado hasta el mismo día; Año = el año pasado hasta el mismo día; fechas = los mismos días justo antes): la
   cifra grande **Te quedó** (ganancia, con su ▲▼, «vendiste − costos» —mercancía + comisión ML— y la **rentabilidad**
-  sobre el costo de la mercancía), y al lado **Ventas**, **Ventas concretadas** y **Ticket promedio**, cada una con su
-  ▲▼. El gráfico: **barras azules = ventas**, **línea naranja = ganancia** y **línea gris = ventas del período
-  anterior**; al pasar el dedo o el mouse, el detalle de ese día (ventas, ganancia, anterior, costos y ventas
-  concretadas). Abajo, en dos columnas: a la izquierda **Más vendidos** (top 5 con barra y cuánto subió o bajó; «Ver
-  todos los productos» abre Reportes → Ventas → Por producto con esas fechas); a la derecha **Por cuenta de
-  MercadoLibre** (ventas y «antes N»), **Atención en MercadoLibre** (preguntas, tiempo de respuesta, cuántas respondió la
+  sobre el costo de la mercancía), y al lado **Ventas registradas** (las procesadas en Ventas de este sistema; las de
+  MercadoLibre, registradas o no, están abajo por cuenta), **Unidades vendidas** y **Ticket promedio**, cada una con su
+  ▲▼ contra el período anterior; si antes había poco (menos de 5, o el cambio pasa del 100 %) dice **«▲ antes 1»** en vez
+  de un % engañoso. El gráfico es **acumulado**: cuánto llevas desde el inicio del período, día a día (los días sin ventas
+  la línea queda plana), con dos pestañas, **Ventas** (línea azul) y **Ganancia** (línea naranja), y la **línea gris** =
+  cuánto llevabas el período anterior a la misma altura (Mes = mes pasado a la fecha; Hoy = ayer, por hora; Año = año
+  pasado, por mes). Si la de color va por encima de la gris, vas mejor que antes. Arriba, la leyenda con el total de cada
+  línea; al final de la línea, el valor de hoy. Al pasar el dedo o el mouse: lo que llevabas ese día, lo del período
+  anterior, la diferencia (▲▼) y lo de ese día solo. Al cambiar el período, el gráfico anterior queda a media luz hasta
+  que llega el nuevo. Abajo, en dos columnas: a la izquierda **Más vendidos** (top 5 y cuánto subió o bajó —«▲ antes
+  2», «antes 0» si antes no vendió—; la barra sale solo si no vendieron todos lo mismo; «Ver todos los productos» abre
+  Reportes → Ventas → Por producto con esas fechas); a la derecha **Por cuenta de MercadoLibre** (ventas, «antes N» y el
+  monto en **$**; en VE, los Bs pasados a $ con la tasa oficial de cada día y al lado los Bs), **Atención en MercadoLibre** (preguntas, tiempo de respuesta, cuántas respondió la
   IA, ventas por pregunta) y **Calificaciones** (con 1 o 3 cuentas va como tarjeta al lado de la última cuenta; con 2 o 4, en
   una línea abajo; las negativas y contradictorias se marcan solo si hay;
   lleva a Reputación). Ganancia y costos solo con el permiso de costos.
@@ -1453,8 +1461,10 @@ Junto al título de cada sección hay una **ⓘ**: al tocarla se abre (o se cier
 pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuario ese permiso. Lo que dice cada una:
 
 - **Inicio:** **Pendientes** = solo lo que tiene algo (lo demás, «Al día»); En caída = se están cayendo. El período (Hoy/Mes/Trim./Año/fechas) cambia
-  todo lo de abajo, contra el período anterior. **Te quedó** = ganancia; gráfico: barras = ventas, naranja = ganancia,
-  gris = ventas del período anterior. **Diferencial** = cuánto más cara está la tasa paralela que la oficial.
+  todo lo de abajo, contra el período anterior (**Fechas…** abre desde/hasta). **Te quedó** = ganancia; gráfico
+  **acumulado** con pestañas Ventas | Ganancia: color = lo que llevas, gris = lo que llevabas el período anterior a la
+  misma fecha. **Ventas registradas** = las procesadas en Ventas (las de ML van abajo por cuenta). «antes N» = cuánto
+  era antes, cuando la base es chica. **Diferencial** = cuánto más cara está la tasa paralela que la oficial.
 - **Ventas:** **Por confirmar** = ventas de MercadoLibre que faltan registrar (verificas el pago y «Registrar venta»
   descuenta del inventario). **Traer pagos y ventas** trae al instante las nuevas (con Pagos ME también pagos y guías,
   1 a 3 min); además llegan solas cada hora. **Comprobar con el banco** (con Pagos ME) cruza con el estado de cuenta;
