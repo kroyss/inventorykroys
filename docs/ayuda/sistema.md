@@ -953,7 +953,8 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
 
 > Este espacio se prende por empresa (plan Completo). Si no lo ves, tu empresa trabaja «todo desde MercadoLibre».
 
-**En el celular** (20-11-2026): Inventario, Productos, Compras e Importaciones muestran cada producto u orden como una
+**En el celular** (20-11-2026): Inventario, Productos, Compras, Importaciones, Márgenes, MercadoEnvíos (con el peso
+editable en la tarjeta) y Promociones (con su casilla para marcar) muestran cada producto, publicación u orden como una
 **tarjeta** (en vez de la tabla ancha), con lo importante a la vista: en Inventario el stock grande, el estado, el precio y
 los botones **🏷 Etiqueta** / **Ajustar**, con una fila **Ordenar:** (Nombre, Stock, Código, Estado…); en Compras e
 Importaciones la orden, el proveedor, el estado, lo recibido y el total. En Productos cada tarjeta trae su casilla para
