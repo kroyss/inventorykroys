@@ -40,6 +40,35 @@ BEGIN
 END $$;
 GRANT SELECT, INSERT, UPDATE, DELETE ON me_seguimiento TO inventory_app;
 
+-- Avisos del portal que leyó la extensión 1.4.1 (la campanita: «Tienes una nueva orden», «Tienes un nuevo pago»).
+-- Para el VIGÍA: si MercadoLibre tiene ventas nuevas de la cuenta y el portal no publicó NINGÚN aviso de ellas, los
+-- avisos dejaron de funcionar → la extensión vuelve sola a leer la lista y se avisa al dueño por Telegram.
+-- Se guardan 10 días.
+CREATE TABLE IF NOT EXISTS me_avisos (
+  empresa_id     INTEGER NOT NULL DEFAULT NULLIF(current_setting('app.empresa_id', true), '')::int
+                   REFERENCES empresas(id),
+  cuenta         TEXT NOT NULL,
+  orden          TEXT NOT NULL,
+  tipo           TEXT NOT NULL,             -- pago | orden | otro
+  publicado_at   TIMESTAMPTZ,
+  visto_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (empresa_id, cuenta, orden, tipo)
+);
+ALTER TABLE me_avisos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE me_avisos FORCE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+                 WHERE c.relname = 'me_avisos' AND p.polname = 'empresa_aislada') THEN
+    CREATE POLICY empresa_aislada ON me_avisos
+      USING      (empresa_id = NULLIF(current_setting('app.empresa_id', true), '')::int)
+      WITH CHECK (empresa_id = NULLIF(current_setting('app.empresa_id', true), '')::int);
+  END IF;
+END $$;
+GRANT SELECT, INSERT, UPDATE, DELETE ON me_avisos TO inventory_app;
+-- Cuándo el vigía vio que los avisos de ese perfil no funcionan (24 h sin leer por avisos; NULL = funcionan).
+ALTER TABLE me_latidos ADD COLUMN IF NOT EXISTS avisos_fallan_at TIMESTAMPTZ;
+
 -- Rescate (corre como postgres, sin RLS): saltadas de los últimos 7 días que todavía no están en me_pagos.
 INSERT INTO me_seguimiento (empresa_id, cuenta, orden, venta, fecha_orden, motivo, vista_pedido, caida_at)
 SELECT DISTINCT ON (p.empresa_id, COALESCE(NULLIF(v->>'cuenta', ''), e.k), s->>'orden')

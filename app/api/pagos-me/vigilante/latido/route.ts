@@ -10,8 +10,6 @@ const MAX_REVISAR = 200
 const MARGEN_CORTE_MIN = 30
 /** 1.4.1: margen hacia atrás del último aviso leído (avisos publicados mientras se leía). */
 const MARGEN_AVISOS_MIN = 10
-/** 1.4.1: cada cuánto, como máximo, una lectura de la lista (barrido) además de los avisos. */
-const BARRIDO_CADA_H = 20
 
 /**
  * POST /api/pagos-me/vigilante/latido (clave del vigilante + x-perfil) → cada ~1 min desde la extensión.
@@ -56,12 +54,11 @@ export async function POST(req: NextRequest) {
     // llegan con pago y guía o vencen (7 días). Si una se mandó a revisar y no volvió (caida_at, la marca el fin), el
     // corte se corre hasta su fecha: así la lista la procesa (esas páginas ya se leían igual: no cuesta más).
     // 1.4.1 (x-version): en vez de la lista lee los AVISOS del portal («Tienes un nuevo pago», 50 por página, ~15 KB)
-    // desde el último leído; `revisar` = solo las que tienen algo a medias o no se pudieron leer. Una vez cada
-    // BARRIDO_CADA_H (o sin avisos leídos todavía) hace además la lectura corta de siempre con todas las pendientes.
+    // desde el último leído; `revisar` = solo las que tienen algo a medias o no se pudieron leer.
     let corte: string | null = null
     let revisar: string[] = []
-    let avisos: { desde: string; hasta: string } | null = null
-    let barrido = false
+    let avisos: { desde: string; hasta: string | null } | null = null
+    const barrido = false   // 20-11: sin barrido (el campo queda para la 1.4.1, que lo entiende)
     if (p) {
       const conAvisos = versionAlMenos(versionExtension(req), [1, 4, 1])
       const cuenta = await cuentaDePerfil(a.db, a.perfil)
@@ -87,20 +84,25 @@ export async function POST(req: NextRequest) {
          LIMIT 300`, [cuenta])
       const mediasIds = medias.map(m => String(m.venta)).filter(v => /^\d{10,}$/.test(v))
 
-      if (conAvisos) {
+      // 20-11 (el dueño): SIN barrido. Probado con PIKEKE (5 días): el portal publicó el aviso del 100 % de las órdenes
+      // (289/289) y de los pagos (240/240). Sin avisos leídos todavía (o hace más de 7 días) se leen los avisos de los 7
+      // días (~600, ~12 páginas de 15 KB). Si el vigía vio que los avisos no funcionan (avisos route), 24 h con la
+      // lectura de la lista de siempre.
+      const { rows: [l] } = await a.db.query(
+        `SELECT avisos_fallan_at > NOW() - INTERVAL '24 hours' AS fallan FROM me_latidos WHERE perfil = $1`, [a.perfil])
+      if (conAvisos && !l?.fallan) {
         const { rows: [c] } = await a.db.query(
           `SELECT r->>'avisos_hasta' AS hasta
            FROM me_pedidos, LATERAL (SELECT resultados->$1::text AS r) x
-           WHERE pedido_at > NOW() - make_interval(days => $2) AND r->>'ok' = 'true' AND r->>'avisos_hasta' IS NOT NULL
-           ORDER BY pedido_at DESC LIMIT 1`, [a.perfil, COMPLETA_SI_NO_HAY_DIAS])
+           WHERE pedido_at > NOW() - INTERVAL '7 days' AND r->>'ok' = 'true' AND r->>'avisos_hasta' IS NOT NULL
+           ORDER BY pedido_at DESC LIMIT 1`, [a.perfil])
         const hasta = c?.hasta ? Date.parse(c.hasta) : NaN
-        const barridoReciente = !!u && new Date(u.pedido_at).getTime() > Date.now() - BARRIDO_CADA_H * 3600e3
-        if (Number.isFinite(hasta) && barridoReciente) {
-          avisos = { desde: new Date(hasta - MARGEN_AVISOS_MIN * 60e3).toISOString(), hasta: new Date(hasta).toISOString() }
-          const ids = new Set<string>(mediasIds)
-          for (const s of seg) if (s.motivo === 'no_leida' || s.caida_at) ids.add(String(s.orden))
-          revisar = [...ids].slice(0, MAX_REVISAR)
-        } else barrido = true
+        const sieteDias = Date.now() - 7 * 864e5
+        const desde = Number.isFinite(hasta) ? Math.max(sieteDias, hasta - MARGEN_AVISOS_MIN * 60e3) : sieteDias
+        avisos = { desde: new Date(desde).toISOString(), hasta: Number.isFinite(hasta) ? new Date(hasta).toISOString() : null }
+        const ids = new Set<string>(mediasIds)
+        for (const s of seg) if (s.motivo === 'no_leida' || s.caida_at) ids.add(String(s.orden))
+        revisar = [...ids].slice(0, MAX_REVISAR)
       }
       if (!avisos && u?.corte) {
         const ids = new Set<string>([...seg.map(s => String(s.orden)), ...mediasIds])
