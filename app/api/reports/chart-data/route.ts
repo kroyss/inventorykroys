@@ -17,6 +17,9 @@ export async function GET(req: NextRequest) {
   const ALLOWED_TRUNCS = new Set(['hour', 'day', 'month'])
 
   let rangeSql: string
+  // 20-11 (el dueño: «al usuario normal se le ve hasta fin de mes»): con Hoy / Mes / Año el eje llega al FIN del período
+  // (23 h, último día del mes, diciembre) y el período anterior viene COMPLETO, así la línea gris dice en cuánto cerró.
+  // Las cifras ▲▼ siguen siendo «a la fecha» (columnas *_af: lo del anterior hasta NOW() − shift).
   // 19-11 (Inicio nuevo): el mismo tramo del período anterior, corrido hacia adelante (shiftSql) para que caiga en las
   // mismas etiquetas del gráfico (día 5 de octubre → «día 5» de noviembre) y se dibuje como línea de comparación.
   let prevSql: string
@@ -29,9 +32,9 @@ export async function GET(req: NextRequest) {
   switch (period) {
     case 'today':
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN CURRENT_DATE AND NOW()`
-      prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN CURRENT_DATE - 1 AND NOW() - INTERVAL '1 day'`
+      prevSql  = `COALESCE(s.processed_at, s.created_at) >= CURRENT_DATE - 1 AND COALESCE(s.processed_at, s.created_at) < CURRENT_DATE`
       shiftSql = `INTERVAL '1 day'`
-      ejeSql   = `DATE_TRUNC('day', NOW()), DATE_TRUNC('hour', NOW()), INTERVAL '1 hour'`
+      ejeSql   = `DATE_TRUNC('day', NOW()), DATE_TRUNC('day', NOW()) + INTERVAL '23 hours', INTERVAL '1 hour'`
       trunc    = 'hour'
       break
     case 'quarter':
@@ -44,9 +47,9 @@ export async function GET(req: NextRequest) {
       break
     case 'year':
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('year', NOW()) AND NOW()`
-      prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('year', NOW()) - INTERVAL '1 year' AND NOW() - INTERVAL '1 year'`
+      prevSql  = `COALESCE(s.processed_at, s.created_at) >= DATE_TRUNC('year', NOW()) - INTERVAL '1 year' AND COALESCE(s.processed_at, s.created_at) < DATE_TRUNC('year', NOW())`
       shiftSql = `INTERVAL '1 year'`
-      ejeSql   = `DATE_TRUNC('year', NOW()), DATE_TRUNC('month', NOW()), INTERVAL '1 month'`
+      ejeSql   = `DATE_TRUNC('year', NOW()), DATE_TRUNC('year', NOW()) + INTERVAL '11 months', INTERVAL '1 month'`
       trunc    = 'month'
       break
     case 'custom':
@@ -70,9 +73,9 @@ export async function GET(req: NextRequest) {
       break
     default: // month
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) AND NOW()`
-      prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) - INTERVAL '1 month' AND NOW() - INTERVAL '1 month'`
+      prevSql  = `COALESCE(s.processed_at, s.created_at) >= DATE_TRUNC('month', NOW()) - INTERVAL '1 month' AND COALESCE(s.processed_at, s.created_at) < DATE_TRUNC('month', NOW())`
       shiftSql = `INTERVAL '1 month'`
-      ejeSql   = `DATE_TRUNC('month', NOW()), DATE_TRUNC('day', NOW()), INTERVAL '1 day'`
+      ejeSql   = `DATE_TRUNC('month', NOW()), DATE_TRUNC('month', NOW()) + INTERVAL '1 month' - INTERVAL '1 day', INTERVAL '1 day'`
       trunc    = 'day'
   }
   // 20-11: la etiqueta se arma en SQL, en la hora del país (la conexión ya trae su TimeZone). Antes salía de
@@ -113,7 +116,11 @@ export async function GET(req: NextRequest) {
              COALESCE(SUM(s.total_amount), 0) AS ventas,
              COALESCE(SUM(si_cost.costo), 0)  AS costos,
              COALESCE(SUM(si_cost.unidades), 0) AS unidades,
-             COUNT(DISTINCT s.id)             AS cantidad_ventas
+             COUNT(DISTINCT s.id)             AS cantidad_ventas,
+             COALESCE(SUM(s.total_amount) FILTER (WHERE COALESCE(s.processed_at, s.created_at) + ${shiftSql} <= NOW()), 0) AS ventas_af,
+             COALESCE(SUM(si_cost.costo) FILTER (WHERE COALESCE(s.processed_at, s.created_at) + ${shiftSql} <= NOW()), 0) AS costos_af,
+             COALESCE(SUM(si_cost.unidades) FILTER (WHERE COALESCE(s.processed_at, s.created_at) + ${shiftSql} <= NOW()), 0) AS unidades_af,
+             COUNT(DISTINCT s.id) FILTER (WHERE COALESCE(s.processed_at, s.created_at) + ${shiftSql} <= NOW()) AS cantidad_af
       FROM sales s
       LEFT JOIN (
         SELECT si.sale_id, SUM(si.quantity * (COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0))) AS costo,
@@ -127,6 +134,8 @@ export async function GET(req: NextRequest) {
     `, queryParams)
     const { rows: ejeRows } = await db.query(
       `SELECT to_char(g, ${FMT[trunc]}) AS label FROM generate_series(${ejeSql}) g ORDER BY g`, queryParams)
+    // Dónde está «ahora» en el eje: la línea de este período llega hasta ahí; después, solo la gris.
+    const { rows: [{ hoy }] } = await db.query(`SELECT to_char(DATE_TRUNC('${trunc}', NOW()), ${FMT[trunc]}) AS hoy`)
 
     let totalVentas  = 0
     let totalCostos  = 0
@@ -158,7 +167,8 @@ export async function GET(req: NextRequest) {
     const antPorLabel = new Map<string, { ventas: number; costos: number }>()
     for (const r of prevRows) {
       const v = parseFloat(r.ventas) || 0, c = parseFloat(r.costos) || 0
-      ant.ventas += v; ant.costos += c; ant.cantidad += parseInt(r.cantidad_ventas, 10) || 0; ant.unidades += parseFloat(r.unidades) || 0
+      ant.ventas += parseFloat(r.ventas_af) || 0; ant.costos += parseFloat(r.costos_af) || 0
+      ant.cantidad += parseInt(r.cantidad_af, 10) || 0; ant.unidades += parseFloat(r.unidades_af) || 0
       const l = String(r.periodo), x = antPorLabel.get(l) ?? { ventas: 0, costos: 0 }
       antPorLabel.set(l, { ventas: x.ventas + v, costos: x.costos + c })
     }
@@ -172,6 +182,7 @@ export async function GET(req: NextRequest) {
     const r2 = (n: number) => Math.round(n * 100) / 100
 
     return NextResponse.json({
+      hoy: String(hoy),
       chart_data: eje.map(l => {
         const d = porLabel.get(l) ?? { label: l, ventas: 0, costos: 0, cantidad: 0 }
         const a = antPorLabel.get(l)
