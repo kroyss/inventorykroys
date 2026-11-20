@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { autenticarVigilante, verificarCuenta } from '@/lib/pagosME'
+import { autenticarVigilante, cuentaDePerfil, verificarCuenta } from '@/lib/pagosME'
 
 const Body = z.object({
   cuenta: z.string().trim().max(80).nullish(),        // nombre en el portal (extensión 1.3.4+)
@@ -9,6 +9,7 @@ const Body = z.object({
     venta: z.string().regex(/^\d{6,20}$/),
     guia: z.boolean(),
     comprobante: z.boolean(),
+    orden: z.string().max(60).nullish(),   // 1.4.1: id en el portal (en un paquete puede no ser el número de venta)
   })).max(1000),
 })
 
@@ -54,6 +55,15 @@ export async function POST(req: NextRequest) {
       if (!r) return !resuelta.has(o.venta)
       return (o.guia && !r.g) || (o.comprobante && !r.c)
     }).map(o => o.venta)
+    // 20-11 (mig. 191): las que ya vinieron con pago o guía y NO hay que subir (ya están, o su guía ya se imprimió) salen
+    // del seguimiento. Las que sí se suben salen al guardarse (vigilante/orden): si la subida falla, siguen anotadas.
+    // Si les falta la otra mitad, quedan en me_pagos a medias y el latido las sigue revisando por ahí.
+    const listas = ordenes.filter(o => !faltan.includes(o.venta)).flatMap(o => o.orden ? [o.venta, o.orden] : [o.venta])
+    if (listas.length) {
+      const cta = await cuentaDePerfil(a.db, a.perfil, cuenta ?? null)
+      await a.db.query(`DELETE FROM me_seguimiento WHERE cuenta = $1 AND (orden = ANY($2::text[]) OR venta = ANY($2::text[]))`,
+        [cta, listas])
+    }
     return NextResponse.json({ faltan, verificacion })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })

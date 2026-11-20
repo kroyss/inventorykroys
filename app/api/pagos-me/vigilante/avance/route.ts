@@ -10,7 +10,7 @@ const Body = z.object({
   hechas: z.number().int().min(0).max(100000),
   total: z.number().int().min(0).max(100000).nullish(),     // null = todavía no se sabe (lectura corta)
   faltan_s: z.number().int().min(0).max(36000).nullish(),   // estimado con lo que viene tardando
-  modo: z.enum(['completa', 'corta']).nullish(),
+  modo: z.enum(['completa', 'corta', 'avisos']).nullish(),   // 1.4.1: 'avisos'
 })
 
 /**

@@ -60,7 +60,9 @@ async function anotar(texto) {
 }
 
 async function api(cfg, ruta, body) {
-  const headers = { 'Content-Type': 'application/json', 'x-vigilante-clave': cfg.clave, 'x-perfil': cfg.perfil }
+  // 1.4.1: x-version: el sistema sabe qué sabe hacer esta extensión (lectura por avisos solo a la 1.4.1+).
+  const headers = { 'Content-Type': 'application/json', 'x-vigilante-clave': cfg.clave, 'x-perfil': cfg.perfil,
+    'x-version': chrome.runtime.getManifest().version }
   if (cfg.basica) headers.Authorization = 'Basic ' + btoa(cfg.basica)   // clave de nginx en staging
   const r = await fetch(`${cfg.servidor}/api/pagos-me/vigilante/${ruta}`, {
     method: 'POST', headers, body: JSON.stringify(body ?? {}),
@@ -79,7 +81,11 @@ async function latido() {
   try {
     const d = await api(cfg, 'latido')
     // 1.4.0: `corte` + `revisar` (lectura corta segura). El `desde` de la 1.3.9 ya no se usa.
-    if (d.pedido && !trabajando) procesarConVigia(cfg, d.pedido, !!d.pesos, d.corte ? { corte: d.corte, revisar: d.revisar ?? [] } : null)
+    // 1.4.1: `avisos` = { desde, hasta } → lee los avisos del portal en vez de la lista; `barrido` = lectura de la lista
+    // (corta, o completa sin corte) y además anota hasta qué aviso hay leído para la próxima.
+    const plan = d.avisos?.desde ? { avisos: d.avisos, revisar: d.revisar ?? [] }
+      : d.corte || d.barrido ? { corte: d.corte ?? null, revisar: d.revisar ?? [], barrido: !!d.barrido } : null
+    if (d.pedido && !trabajando) procesarConVigia(cfg, d.pedido, !!d.pesos, plan)
     // Abierto por el despertador pero ya no hay nada que hacer aquí (otro lo hizo, venció): se cierra.
     if (!d.pedido && !trabajando) for (const t of await tabsDelDespertador()) cerrarVentana(t)
     const texto = d.pedido ? `Conectado: trayendo pagos y guías (pedido ${d.pedido})…` : 'Conectado ✓ (esperando pedidos)'
@@ -138,13 +144,31 @@ async function procesar(cfg, pedido, pesos = false, mio = turno, plan = null) {
 
     avance()
     const aviso = avisador(cfg, pedido)
-    let leido = await leerPorPaginas(tabId, plan, aviso, vigente)
+    // 1.4.1: con `avisos`, lee la campanita del portal (~15 KB) y pide solo esas órdenes; si no alcanza a llegar a la
+    // traída anterior o el portal no da avisos, lee la lista completa (lento pero seguro). Con `barrido`, antes de la
+    // lista anota el aviso más nuevo: desde ahí sigue la próxima por avisos.
+    let avisosHasta = null
+    const leer = async () => {
+      if (plan?.avisos) {
+        const r = await leerPorAvisos(tabId, plan, aviso, vigente, cfg)
+        if (!r?.volver) return r
+        if (r.hasta) avisosHasta = r.hasta
+        await anotar('Los avisos del portal no alcanzaron: leyendo la lista completa…')
+        return leerPorPaginas(tabId, null, aviso, vigente)
+      }
+      if (plan?.barrido && !avisosHasta) {
+        const r = await ejecutar(tabId, leerAvisos, [Date.now(), PAGINA_MS, INTENTOS_PAGINA, 1, false]).catch(() => null)
+        if (r?.ok && r.hasta) avisosHasta = r.hasta
+      }
+      return leerPorPaginas(tabId, plan, aviso, vigente)
+    }
+    let leido = await leer()
     avance()
     // Sesión vencida (MercadoEnvíos la cierra a diario): se entra solo con "Ingresar con mi cuenta
     // de Mercado Libre", que pasa directo si este Chrome tiene la sesión de ML. Nunca escribe claves:
     // si ML pide clave o código, queda como sin sesión y la ventana abierta para hacerlo a mano.
     if (leido?.error === 'sin_sesion' && await reingresar(tabId)) {
-      leido = await leerPorPaginas(tabId, plan, aviso, vigente)
+      leido = await leer()
     }
     if (!vigente()) return
     if (!leido?.ok) throw new Error(leido?.error || 'No se pudo leer el portal')
@@ -154,7 +178,7 @@ async function procesar(cfg, pedido, pesos = false, mio = turno, plan = null) {
     // responde 409 'cuenta_no_conectada' y no se sube nada.
     const { faltan, verificacion } = await api(cfg, 'faltan', {
       cuenta: leido.cuenta || null,
-      ordenes: leido.ordenes.map(o => ({ venta: o.venta, guia: !!o.guia_url, comprobante: !!o.comprobante_url })),
+      ordenes: leido.ordenes.map(o => ({ venta: o.venta, guia: !!o.guia_url, comprobante: !!o.comprobante_url, orden: o.orden_me ?? null })),
     })
     if (verificacion) await chrome.storage.local.set({ verificacion: { ...verificacion, at: new Date().toLocaleString('es-VE') } })
     const porVenta = new Map(leido.ordenes.map(o => [o.venta, o]))
@@ -172,6 +196,7 @@ async function procesar(cfg, pedido, pesos = false, mio = turno, plan = null) {
       i++
       await api(cfg, 'orden', {
         cuenta: leido.cuenta || cfg.perfil,
+        orden_me: o.orden_me ?? null,
         orden: o.orden,
         guia_b64: archivos?.guia_b64 ?? null,
         comprobante_b64: archivos?.comprobante_b64 ?? null,
@@ -197,9 +222,10 @@ async function procesar(cfg, pedido, pesos = false, mio = turno, plan = null) {
     }
     if (!vigente()) return
     await api(cfg, 'fin', { pedido, ok: true, cuenta: leido.cuenta || cfg.perfil, vistas, nuevas, saltadas: (leido.saltadas ?? []).slice(0, 500),
-      modo: leido.parcial ? 'parcial' : leido.modo, segundos: Math.round((Date.now() - t0) / 1000) })
+      modo: leido.parcial ? 'parcial' : leido.modo, segundos: Math.round((Date.now() - t0) / 1000),
+      avisos_hasta: leido.parcial ? null : (leido.avisos_hasta ?? avisosHasta) })
     const nSalt = leido.saltadas?.length ?? 0
-    await anotar(`Listo${leido.modo === 'corta' ? ' (lo nuevo desde la última traída y las pendientes)' : ''}: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.${nSalt ? ` ${nSalt} sin pago o sin guía todavía.` : ''}`
+    await anotar(`Listo${leido.modo === 'avisos' ? ' (avisos de pago desde la última traída y las pendientes)' : leido.modo === 'corta' ? ' (lo nuevo desde la última traída y las pendientes)' : ''}: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.${nSalt ? ` ${nSalt} sin pago o sin guía todavía.` : ''}`
       + (leido.parcial ? ' El portal estaba lento: se leyeron solo las más recientes.' : ''))
   } catch (e) {
     if (!vigente()) return
@@ -439,6 +465,61 @@ async function leerPorPaginas(tabId, plan, aviso, vigente) {
   return { ok: true, cuenta, ordenes, notas, saltadas, parcial, modo }
 }
 
+/** 1.4.1 (20-11-2026): traída por AVISOS. El portal guarda un aviso por cada orden nueva y cada pago («Tienes un nuevo
+ *  pago», con el número de orden): 50 avisos pesan ~15 KB, cuando una página de 20 órdenes pesa ~370 KB (cada orden trae
+ *  la ficha entera del producto y el portal no comprime). Se leen los avisos publicados desde la traída anterior (por
+ *  fecha, no por «leído»: marcarlos leídos en el portal no cambia nada, y la extensión nunca los marca), el sistema dice
+ *  cuáles faltan, y se piden solo esas por su número, 5 a la vez, junto con las pendientes que da el latido (pago sin
+ *  guía, no leídas). Si los avisos no alcanzan hasta la traída anterior (más de MAX_PAGINAS_AVISOS páginas) o el portal
+ *  no los da, `volver` → la extensión lee la lista completa (lento pero seguro). */
+const MAX_PAGINAS_AVISOS = 20
+async function leerPorAvisos(tabId, plan, aviso, vigente, cfg) {
+  const desde = Date.parse(plan.avisos.desde)
+  if (!Number.isFinite(desde)) return { volver: true }
+  aviso('leyendo', 0, null, null, true, 'avisos')
+  let r
+  try { r = await ejecutar(tabId, leerAvisos, [desde, PAGINA_MS, INTENTOS_PAGINA, MAX_PAGINAS_AVISOS, true]) }
+  catch { return { volver: true } }
+  if (!r?.ok) return r?.error === 'sin_sesion' ? r : { volver: true }
+  // No alcanzó hasta la traída anterior: lista completa, y la próxima sigue desde el aviso más nuevo de ahora.
+  if (!r.completo) return { volver: true, hasta: r.hasta ?? null }
+  avance()
+  let pedir = []
+  try { pedir = (await api(cfg, 'avisos', { cuenta: r.cuenta || null, avisos: r.avisos })).pedir ?? [] }
+  catch (e) {
+    // La cuenta del portal no es de ninguna cuenta conectada, o el sistema no respondió: no se baja nada a ciegas.
+    if (/cuenta_no_conectada/.test(e.message)) throw e
+    return { volver: true }
+  }
+  const ids = [...new Set([...pedir.map(String), ...(plan.revisar ?? []).map(String)])]
+  const ordenes = [], notas = [], saltadas = []
+  const vO = new Set(), vN = new Set(), vS = new Set()
+  const tanda = 5
+  const med = medidor()
+  for (let i = 0; i < ids.length; i += tanda) {
+    if (!vigente()) break
+    const lote = ids.slice(i, i + tanda)
+    aviso('revisando', i, ids.length, med.faltan(Math.ceil((ids.length - i) / tanda)), false, 'avisos')
+    const tp = Date.now()
+    let x
+    try { x = await ejecutar(tabId, leerOrdenes, [DIAS, med.espera(), INTENTOS_ADAPT, 0, { ids: lote, conCuenta: false }]) }
+    catch (e) { x = { ok: false, error: e.message } }
+    if (x?.error === 'sin_sesion') return x
+    if (!x?.ok) {
+      // No se pudieron leer: quedan anotadas y se revisan en la próxima.
+      for (const id of lote) saltadas.push({ orden: id, venta: /^\d{10,20}$/.test(id) ? id : null, motivo: 'no_leida', estado: null, fecha: null })
+      continue
+    }
+    med.anotar(Date.now() - tp)
+    avance()
+    for (const o of x.ordenes) if (!vO.has(o.venta)) { vO.add(o.venta); ordenes.push(o) }
+    for (const n of x.notas) if (!vN.has(n.orden)) { vN.add(n.orden); notas.push(n) }
+    for (const n of x.saltadas) if (!vS.has(n.orden)) { vS.add(n.orden); saltadas.push(n) }
+  }
+  return { ok: true, cuenta: r.cuenta, ordenes, notas, saltadas, parcial: false, modo: 'avisos',
+    avisos_hasta: r.hasta ?? plan.avisos.hasta ?? null }
+}
+
 /** 1.3.8: corre una función dentro de la página. Si la página se recargó a mitad («Frame with ID 0 was removed», el
  *  portal se recarga solo cuando sus datos tardan), espera que cargue y prueba una vez más. */
 async function ejecutar(tabId, func, args = []) {
@@ -551,7 +632,8 @@ async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000,
       let rs
       if (soloIds) {
         rs = []
-        for (const id of soloIds) {
+        // 1.4.1: las de la tanda a la vez (antes de a una, en fila).
+        await Promise.all(soloIds.map(async id => {
           try {
             const r = await json(`/api/v1/seller/orders/${encodeURIComponent(id)}/`)
             const d = r?.data ?? r
@@ -560,7 +642,7 @@ async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000,
             if (e.message === 'sin_sesion') throw e
             noLeidas.push(String(id))
           }
-        }
+        }))
         fin = true
       } else {
         let res
@@ -574,13 +656,15 @@ async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000,
         }
         rs = res?.data?.results ?? []
       }
-      for (const o of rs) vistos.push(String(o._id))
       if (rs.length === 0) { fin = true; break }
       n += rs.length
       ultima = fechaDe(rs[rs.length - 1])
       for (const o of rs) {
         if (new Date(o.date_created).getTime() < desde) continue
         if (corte && !soloIds && fechaDe(o) < corte) continue
+        // 1.4.1: «vista» solo la que se procesó de verdad. La 1.4.0 marcaba también las de la última página más viejas
+        // que el corte (que se saltan sin anotar) y por eso no las pedía aparte: se perdían (venta 2000019671715396).
+        vistos.push(String(o._id))
         const p = o.payment || {}
         const mk = p.method && p[p.method] ? p.method : METODOS.find(k => p[k] && typeof p[k] === 'object')
         const m = mk ? p[mk] : null
@@ -603,7 +687,7 @@ async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000,
         }
         const receptor = m?.seller_mobile_payment?.bank ?? m?.seller_transfer?.bank ?? m?.seller_bank ?? m?.receiver_bank ?? null
         ordenes.push({
-          venta, guia_url: guia, comprobante_url: comprobante,
+          venta, guia_url: guia, comprobante_url: comprobante, orden_me: corto(o._id, 60),
           orden: {
             venta,
             estado_me: corto(o.status, 30),
@@ -631,6 +715,64 @@ async function leerOrdenes(dias, paginaMs = 45000, intentos = 3, maxMs = 300000,
     // No se pudieron leer: quedan anotadas para revisarlas en la próxima traída (si no, se perderían de vista).
     for (const id of noLeidas) saltadas.push({ orden: corto(id, 60), venta: /^\d{10,20}$/.test(id) ? id : null, motivo: 'no_leida', estado: null, fecha: null })
     return { ok: true, cuenta, ordenes, notas, saltadas, parcial, fin, n, ultima, vistos }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+}
+
+// 1.4.1: avisos del portal (la campanita) publicados desde `desdeMs`, del más nuevo al más viejo. Solo los que llevan a
+// una orden. `completo` = llegó hasta `desdeMs` (o se acabaron). `hasta` = fecha del aviso más nuevo (de ahí sigue la
+// próxima). Solo LEE: no los marca como leídos.
+async function leerAvisos(desdeMs, paginaMs = 45000, intentos = 3, maxPaginas = 20, conCuenta = true) {
+  const espera = ms => new Promise(r => setTimeout(r, ms))
+  const json = async url => {
+    let ultimo = null
+    for (let i = 0; i < intentos; i++) {
+      if (i) await espera(3000 * i)
+      const c = new AbortController()
+      const t = setTimeout(() => c.abort(), paginaMs)
+      try {
+        const r = await fetch(url, { credentials: 'include', signal: c.signal })
+        if (r.status === 401 || r.status === 403) throw new Error('sin_sesion')
+        if (r.status >= 500 || r.status === 429) { ultimo = `El portal respondió ${r.status}`; continue }
+        if (!r.ok) throw new Error(`El portal respondió ${r.status}`)
+        return await r.json()
+      } catch (e) {
+        if (e.message === 'sin_sesion' || /^El portal respondió/.test(e.message)) throw e
+        ultimo = e.name === 'AbortError' ? `El portal de MercadoEnvíos no respondió en ${Math.round(paginaMs / 1000)} s` : e.message
+      } finally { clearTimeout(t) }
+    }
+    throw new Error(`${ultimo} (${intentos} intentos)`)
+  }
+  try {
+    let cuenta = null
+    if (conCuenta) try {
+      const me = await json('/api/v1/seller/me/')
+      const d = me?.data ?? me
+      const n = d?.name ?? d?.profile?.name ?? null
+      cuenta = n == null ? null : String(n).slice(0, 80)
+    } catch (e) { if (e.message === 'sin_sesion') throw e }
+    const avisos = []
+    let hasta = null
+    let completo = false
+    for (let pag = 1; pag <= maxPaginas && !completo; pag++) {
+      const r = await json(`/api/v1/seller/notifications/?page_size=50&page=${pag}&ordering=-published_date`)
+      const d = r?.data ?? r
+      const rs = Array.isArray(d?.results) ? d.results : []
+      if (!rs.length) { completo = true; break }
+      for (const x of rs) {
+        const t = Date.parse(x?.published_date)
+        if (hasta == null && Number.isFinite(t)) hasta = String(x.published_date).slice(0, 40)
+        if (Number.isFinite(t) && t < desdeMs) { completo = true; break }
+        const m = String(x?.link?.href ?? '').match(/\/orden\/(\d{6,20})/)
+        if (!m) continue
+        const tit = String(x?.title ?? '').toLowerCase()
+        const tipo = /pago/.test(tit) ? 'pago' : /orden/.test(tit) ? 'orden' : 'otro'
+        avisos.push({ orden: m[1], tipo, fecha: Number.isFinite(t) ? String(x.published_date).slice(0, 40) : null })
+      }
+      if (rs.length < 50) completo = true
+    }
+    return { ok: true, cuenta, avisos: avisos.slice(0, 2000), hasta, completo }
   } catch (e) {
     return { ok: false, error: e.message }
   }
@@ -694,9 +836,11 @@ async function bajarArchivos(guiaUrl, comprobanteUrl, tope = 45000) {
     return String(data).split(',')[1] ?? null
   }
   const ext = (comprobanteUrl || '').split('?')[0].split('.').pop().toLowerCase()
+  // 1.4.1: guía y comprobante a la vez.
+  const [guia_b64, comprobante_b64] = await Promise.all([guiaUrl ? b64(guiaUrl) : null, comprobanteUrl ? b64(comprobanteUrl) : null])
   return {
-    guia_b64: guiaUrl ? await b64(guiaUrl) : null,
-    comprobante_b64: comprobanteUrl ? await b64(comprobanteUrl) : null,
+    guia_b64,
+    comprobante_b64,
     comprobante_ext: ['jpeg', 'jpg', 'png', 'webp', 'pdf'].includes(ext) ? ext : 'jpeg',
   }
 }

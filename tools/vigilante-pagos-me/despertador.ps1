@@ -4,7 +4,7 @@
 # Arranca solo al iniciar sesion en Windows (instalar-despertador.cmd) y queda como un icono junto al
 # reloj, como el Reportador y el vigilante del Radar: verde = en espera, azul = trayendo pagos,
 # rojo = sin conexion con el sistema. Pasar el mouse muestra el estado; clic derecho: Ver registro / Salir.
-# Cada minuto le pregunta SOLO al sistema si alguien toco "Traer pagos y guias". Si hay pedido, abre
+# Cada 30 s (1.3.8) le pregunta SOLO al sistema si alguien toco "Traer pagos y guias". Si hay pedido, abre
 # Chrome en el portal con cada perfil que todavia no lo hizo; la extension trabaja y cierra su ventana
 # sola. Chrome queda cerrado el resto del tiempo.
 # Configuracion y registro: %APPDATA%\VigilantePagosME (los deja el instalador y no se borran al
@@ -222,8 +222,10 @@ function Revisar {
 Anotar "Arranca el despertador (Chrome: $chrome)"
 $reloj = New-Object System.Windows.Forms.Timer
 # 1.3.6: tic cada 15 s; consulta al sistema cada 60 s, o cada 15 s mientras hay un pedido en curso (arranca antes).
+# 1.3.8 (20-11): cada 30 s sin pedido (la traida arranca antes). Nunca abre un perfil que ya esta trabajando: el
+# sistema no se lo pasa si su extension dio senal hace poco o ya esta leyendo ese pedido (Chrome abierto).
 $reloj.Interval = 15000
-$reloj.add_Tick({ if ($script:conPedido -or ((Get-Date) - $script:revisadoAt).TotalSeconds -ge 58) { Revisar } })
+$reloj.add_Tick({ if ($script:conPedido -or ((Get-Date) - $script:revisadoAt).TotalSeconds -ge 28) { Revisar } })
 $reloj.Start()
 Revisar
 [System.Windows.Forms.Application]::Run()
