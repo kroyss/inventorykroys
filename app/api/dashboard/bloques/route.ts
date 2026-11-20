@@ -43,8 +43,14 @@ export async function GET(req: NextRequest) {
         `SELECT k.nickname AS cuenta, MAX(m.moneda) AS moneda,
                 COUNT(*) FILTER (WHERE ${ENTRE('m.fecha', 1, 2)})::int AS ventas,
                 COALESCE(SUM(m.total) FILTER (WHERE ${ENTRE('m.fecha', 1, 2)}), 0)::float AS monto,
+                -- 20-11: en VE el monto de ML viene en Bs; se pasa a $ con la tasa oficial (BCV) del día de cada venta,
+                -- que es la que usa ML, para que se compare con el resto del Inicio (todo en $).
+                SUM(CASE WHEN m.moneda = 'VES' THEN m.total / NULLIF(t.bcv, 0) END) FILTER (WHERE ${ENTRE('m.fecha', 1, 2)})::float AS monto_usd,
                 COUNT(*) FILTER (WHERE ${ENTRE('m.fecha', 3, 4)})::int AS antes_ventas
          FROM ml_ordenes m JOIN ml_conexiones k ON k.id = m.conexion_id
+         LEFT JOIN LATERAL (SELECT r.official_rate::float AS bcv FROM venezuela_exchange_rates r
+                            WHERE m.moneda = 'VES' AND r.rate_date <= m.fecha::date
+                            ORDER BY r.rate_date DESC, r.created_at DESC LIMIT 1) t ON TRUE
          WHERE COALESCE(m.estado, '') <> 'cancelled' AND ${SQL_NO_PRACTICA_DEMO('m.id')} AND (${ENTRE('m.fecha', 1, 2)} OR ${ENTRE('m.fecha', 3, 4)})
          GROUP BY k.nickname ORDER BY ventas DESC`, P).then(x => x.rows) : null,
       ml ? db.query(

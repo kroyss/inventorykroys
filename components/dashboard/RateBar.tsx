@@ -42,10 +42,13 @@ export default function RateBar({ puedeActualizar = false, descuento = true, exc
   const fecha = rate.rate_date ? parseLocalDate(rate.rate_date).toLocaleDateString('es-VE', { day: 'numeric', month: 'numeric' }) : null
   const detalle = `Oficial Bs ${fmt(rate.official_rate)} · Paralelo Bs ${fmt(rate.parallel_rate)} · Diferencial ${pct(rate.spread_percentage)} %`
     + (exceso ? ` · Exceso ${pct(rate.excess_percentage)} %` : '') + (fecha ? ` · al ${fecha}` : '') + (ajustes ? ' · toca para ver Ajustes' : '')
+  // 20-11: con nombres cortos («BCV 919 · Paralelo 1.066 · Dif. 16 %»): «Bs 919 / 1.066 · 16 %» no lo entendía alguien nuevo.
   const contenido = <>
-    <span>Bs <b className="num font-medium text-neutral-800">{fmt(rate.official_rate)}</b> / <b className="num font-medium text-neutral-800">{fmt(rate.parallel_rate)}</b></span>
+    <span>BCV <b className="num font-medium text-neutral-800">{fmt(rate.official_rate)}</b></span>
     <span className="text-neutral-300" aria-hidden>·</span>
-    <b className="num font-medium text-neutral-800">{pct(rate.spread_percentage, 1)}%</b>
+    <span>Paralelo <b className="num font-medium text-neutral-800">{fmt(rate.parallel_rate)}</b></span>
+    <span className="text-neutral-300" aria-hidden>·</span>
+    <span>Dif. <b className="num font-medium text-neutral-800">{pct(rate.spread_percentage, 1)}%</b></span>
   </>
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">

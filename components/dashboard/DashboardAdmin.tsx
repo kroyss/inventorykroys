@@ -6,7 +6,7 @@ import {
   CategoryScale, LinearScale, PointElement, LineElement, BarElement, BarController, LineController,
   Tooltip, Filler,
 } from 'chart.js'
-import type { ChartOptions, ChartData as ChartJsData } from 'chart.js'
+import type { ChartOptions, ChartData as ChartJsData, Plugin, ScriptableContext } from 'chart.js'
 import Link from '@/components/ui/Link'
 import type { Country } from '@/lib/types'
 import { Cargando, chipCls } from '@/components/ui'
@@ -38,20 +38,24 @@ export interface Summary {
   last_month_profit_amount: number
 }
 
-interface ChartPoint { label: string; ventas: number; costos: number; cantidad: number; anterior?: number }
+interface ChartPoint { label: string; ventas: number; costos: number; cantidad: number; anterior?: number; anterior_costos?: number }
 export interface ChartData {
   chart_data: ChartPoint[]
-  summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; margen_pct?: number; rentabilidad_pct?: number | null; cantidad: number; estimado_pct?: number }
+  summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; margen_pct?: number; rentabilidad_pct?: number | null; cantidad: number; unidades?: number; estimado_pct?: number }
   /** 19-11: el mismo tramo del período anterior (para el ▲▼ de las cifras). */
-  anterior?: { ventas: number; ganancia: number; cantidad: number }
+  anterior?: { ventas: number; ganancia: number; cantidad: number; unidades?: number }
 }
+type Metrica = 'ventas' | 'ganancia'
 
 type Period = 'today' | 'month' | 'quarter' | 'year'
 
 // 19-11 (Inicio nuevo, guía dataviz): dos series con colores validados (azul = ventas, naranja = ganancia; pasan las
 // pruebas de daltonismo y contraste) y el período anterior en gris, sin punteados. El texto nunca va del color de la
 // serie: el puntito de color al lado es el que dice cuál es.
+// 20-11 (el dueño, comparando con Mercasist): el gráfico pasa a ACUMULADO contra el período anterior a la misma
+// fecha, una métrica a la vez (pestañas Ventas | Ganancia): línea de color = este período, gris = el anterior.
 const AZUL = '#2a78d6', NARANJA = '#eb6834', GRIS = '#b5b5b0'
+const LAVADO: Record<Metrica, [string, string]> = { ventas: ['rgba(42,120,214,0.16)', 'rgba(42,120,214,0)'], ganancia: ['rgba(235,104,52,0.16)', 'rgba(235,104,52,0)'] }
 
 const money = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -77,25 +81,79 @@ function etiquetaLarga(l: string) {
   return l
 }
 
+/** Montos del eje: $0 · $850 · $1,2 k · $15 k. */
+const montoEje = (n: number) => {
+  const a = Math.abs(n)
+  if (a < 1000) return `${n < 0 ? '-' : ''}$${Math.round(a)}`
+  return `${n < 0 ? '-' : ''}$${(a / 1000).toLocaleString('de-DE', { maximumFractionDigits: a >= 10000 ? 0 : 1 })} k`
+}
+
+/** «1–20 nov» para el botón de fechas. */
+function textoFechas(a: string, b: string) {
+  const f = (x: string) => `${Number(x.slice(8))} ${MESES[Number(x.slice(5, 7)) - 1]}`
+  if (a === b) return f(a)
+  return a.slice(0, 7) === b.slice(0, 7) ? `${Number(a.slice(8))}–${f(b)}` : `${f(a)} – ${f(b)}`
+}
+
+/** El valor de hoy, escrito al final de la línea (la única cifra sobre el gráfico). */
+const valorAlFinal: Plugin<'line'> = {
+  id: 'valorAlFinal',
+  afterDatasetsDraw(c) {
+    const meta = c.getDatasetMeta(0)
+    const pts = meta?.data
+    if (!pts?.length || meta.hidden) return
+    const ult = pts[pts.length - 1]
+    const v = Number((c.data.datasets[0].data as number[])[pts.length - 1] ?? 0)
+    const { ctx, chartArea } = c
+    ctx.save()
+    ctx.fillStyle = String(c.data.datasets[0].borderColor)
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.arc(ult.x, ult.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    const txt = '$' + money0(v)
+    ctx.font = '600 12px Inter, system-ui, sans-serif'
+    const w = ctx.measureText(txt).width
+    // A la izquierda del punto si no entra a la derecha; arriba del punto para no tapar la línea.
+    const x = ult.x + 8 + w > chartArea.right ? ult.x - 8 - w : ult.x + 8
+    const y = Math.max(chartArea.top + 10, ult.y - 10)
+    ctx.fillStyle = '#262626'
+    ctx.textBaseline = 'middle'
+    ctx.lineWidth = 4
+    ctx.strokeText(txt, x, y)
+    ctx.fillText(txt, x, y)
+    ctx.restore()
+  },
+}
+
 const CONTRA: Record<Period | 'custom', string> = {
   today: 'que ayer a esta hora', month: 'que el mes pasado a la fecha', quarter: 'que los 3 meses anteriores',
   year: 'que el año pasado a la fecha', custom: 'que los mismos días justo antes',
 }
-const ANTERIOR: Record<Period | 'custom', string> = {
-  today: 'Ayer', month: 'Mes pasado', quarter: '3 meses anteriores', year: 'Año pasado', custom: 'Días anteriores',
+/** Etiqueta de la línea gris: «Mes pasado a la fecha». */
+const ANTERIOR_A_LA_FECHA: Record<Period | 'custom', string> = {
+  today: 'Ayer a esta hora', month: 'Mes pasado a la fecha', quarter: '3 meses anteriores', year: 'Año pasado a la fecha', custom: 'Días anteriores',
 }
 
-/** ▲▼ % contra el período anterior (null si antes fue 0: no hay con qué comparar). */
-function Delta({ ahora, antes }: { ahora: number; antes: number | undefined }) {
-  if (antes == null || antes <= 0) return null
+/** ▲▼ contra el período anterior. 20-11: con bases chicas el % engaña (de 1 a 3 es «▲ 200 %»): entonces dice
+ *  «▲ antes 1». `fmt` da formato al «antes» (montos con $); `chica` = base desde la que ya se muestra el %. */
+function Delta({ ahora, antes, fmt = (n: number) => n.toLocaleString('es-VE'), chica = 5 }: {
+  ahora: number; antes: number | undefined; fmt?: (n: number) => string; chica?: number
+}) {
+  if (antes == null) return null
+  if (antes <= 0) return ahora > 0 ? <span className="num text-neutral-500">antes {fmt(0)}</span> : null
   const pct = Math.round(((ahora - antes) / antes) * 1000) / 10
   if (pct === 0) return <span className="text-neutral-500">igual</span>
+  const color = pct > 0 ? 'text-emerald-700' : 'text-red-600'
+  if (antes < chica || Math.abs(pct) >= 100) {
+    return <span className={`num font-medium ${color}`}>{pct > 0 ? '▲' : '▼'} <span className="font-normal">antes</span> {fmt(antes)}</span>
+  }
   return (
-    <span className={`num font-medium ${pct > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+    <span className={`num font-medium ${color}`}>
       {pct > 0 ? '▲' : '▼'} {Math.abs(pct).toLocaleString('de-DE')}%
     </span>
   )
 }
+const fmtMonto = (n: number) => `$${money0(n)}`
 
 export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, reportes = false, ajustes = false, inicial }: {
   inicial?: { summary: Summary | null; chart: ChartData | null }   // 12-11: lo que ya vino en el HTML (lib/inicial.ts)
@@ -116,6 +174,10 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
   const [dateFrom, setDateFrom] = useState(monthStartStr())
   const [dateTo,   setDateTo]   = useState(todayStr())
   const [compraMenu, setCompraMenu] = useState(false)
+  const [metrica, setMetrica] = useState<Metrica>('ventas')
+  const [fechasAbiertas, setFechasAbiertas] = useState(false)
+  // Mientras llega el período nuevo, el gráfico anterior queda a media luz (no salta ni se vacía).
+  const [cargandoGrafico, setCargandoGrafico] = useState(false)
   const [caen, setCaen] = useState<number | null>(null)
   const conCayendo = reportes && analisisStock
 
@@ -130,7 +192,12 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
     const url = period === 'custom'
       ? `/api/reports/chart-data?period=custom&date_from=${dateFrom}&date_to=${dateTo}`
       : `/api/reports/chart-data?period=${period}`
-    fetch(url).then(r => r.json()).then(setChart)
+    let vivo = true
+    setCargandoGrafico(true)
+    fetch(url).then(r => r.ok ? r.json() : Promise.reject())
+      .then(j => { if (vivo) setChart(j) }).catch(() => {})
+      .finally(() => { if (vivo) setCargandoGrafico(false) })
+    return () => { vivo = false }
   }, [period, dateFrom, dateTo])
 
   // «Se están cayendo» (regla de Reportes → Stock): va con los pendientes; se pide después de abrir.
@@ -144,26 +211,48 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
     return () => { vivo = false; clearTimeout(t) }
   }, [conCayendo])
 
-  const datosGrafico = useMemo<ChartJsData<'bar' | 'line'> | null>(() => {
-    if (!chart?.chart_data.length) return null
-    const d = chart.chart_data
+  // Acumulados: lo que llevas hasta cada día (este período) y lo que llevabas el período anterior a esa misma altura.
+  const serie = useMemo(() => {
+    const d = chart?.chart_data ?? []
+    const out: { label: string; dia: number; actual: number; anterior: number; cantidad: number }[] = []
+    let a = 0, b = 0
+    for (const p of d) {
+      const ahora = metrica === 'ventas' ? p.ventas : p.ventas - p.costos
+      const antes = metrica === 'ventas' ? (p.anterior ?? 0) : (p.anterior ?? 0) - (p.anterior_costos ?? 0)
+      a += ahora; b += antes
+      out.push({ label: p.label, dia: ahora, actual: Math.round(a * 100) / 100, anterior: Math.round(b * 100) / 100, cantidad: p.cantidad })
+    }
+    return out
+  }, [chart, metrica])
+  const hayDatos = serie.some(p => p.dia !== 0 || p.anterior !== 0)
+  const color = metrica === 'ventas' ? AZUL : NARANJA
+
+  const datosGrafico = useMemo<ChartJsData<'line'> | null>(() => {
+    if (!serie.length || !hayDatos) return null
     return {
-      labels: d.map(p => p.label),
+      labels: serie.map(p => p.label),
       datasets: [
-        { type: 'bar' as const, label: 'Ventas', data: d.map(p => p.ventas), backgroundColor: AZUL, hoverBackgroundColor: '#1f63b5',
-          borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom' as const, maxBarThickness: 22, categoryPercentage: 0.78, barPercentage: 0.9, order: 3 },
-        { type: 'line' as const, label: 'Ganancia', data: d.map(p => p.ventas - p.costos), borderColor: NARANJA, backgroundColor: NARANJA,
-          borderWidth: 2, pointBackgroundColor: NARANJA, pointBorderColor: '#fff', pointBorderWidth: 2, order: 1 },
-        { type: 'line' as const, label: `Ventas · ${ANTERIOR[period].toLowerCase()}`, data: d.map(p => p.anterior ?? 0), borderColor: GRIS, backgroundColor: GRIS,
-          borderWidth: 1.5, pointBackgroundColor: GRIS, pointBorderColor: '#fff', pointBorderWidth: 2, order: 2 },
+        { label: metrica === 'ventas' ? 'Ventas' : 'Ganancia', data: serie.map(p => p.actual), borderColor: color, borderWidth: 2.25,
+          pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 2, fill: 'origin', order: 1,
+          backgroundColor: (ctx: ScriptableContext<'line'>) => {
+            const { chartArea, ctx: c } = ctx.chart
+            if (!chartArea) return LAVADO[metrica][0]
+            const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+            g.addColorStop(0, LAVADO[metrica][0]); g.addColorStop(1, LAVADO[metrica][1])
+            return g
+          } },
+        { label: ANTERIOR_A_LA_FECHA[period], data: serie.map(p => p.anterior), borderColor: GRIS, backgroundColor: GRIS, borderWidth: 1.75,
+          pointBackgroundColor: GRIS, pointBorderColor: '#fff', pointBorderWidth: 2, fill: false, order: 2 },
       ],
     }
-  }, [chart, period])
+  }, [serie, hayDatos, metrica, color, period])
 
-  const chartOptions = useMemo<ChartOptions<'bar' | 'line'>>(() => ({
+  const chartOptions = useMemo<ChartOptions<'line'>>(() => ({
     responsive: true,
     maintainAspectRatio: false,
+    animation: { duration: 350 },
     interaction: { mode: 'index', intersect: false },
+    layout: { padding: { right: 8, top: 6 } },
     plugins: {
       legend: { display: false },   // la leyenda va en HTML, arriba del gráfico
       tooltip: {
@@ -171,34 +260,41 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
         titleFont: { size: 12, weight: 'bold' }, bodyFont: { size: 12 }, footerFont: { size: 11, weight: 'normal' }, footerColor: '#d4d4d4',
         callbacks: {
           title: items => etiquetaLarga(String(items[0]?.label ?? '')),
-          label: ctx => ` ${ctx.dataset.label}: $${money(ctx.parsed.y ?? 0)}`,
-          footer: items => {
-            const p = chart?.chart_data[items[0]?.dataIndex ?? -1]
+          label: ctx => ctx.datasetIndex === 0 ? ` Llevas: $${money(ctx.parsed.y ?? 0)}` : ` ${ctx.dataset.label}: $${money(ctx.parsed.y ?? 0)}`,
+          afterBody: items => {
+            const p = serie[items[0]?.dataIndex ?? -1]
             if (!p) return ''
-            return [`Costos: $${money(p.costos)}`, `Ventas concretadas: ${p.cantidad}`]
+            const dif = p.actual - p.anterior
+            if (Math.abs(dif) < 0.005) return ' Igual que antes'
+            return ` ${dif > 0 ? '▲' : '▼'} $${money(Math.abs(dif))} ${dif > 0 ? 'más' : 'menos'} que antes`
+          },
+          footer: items => {
+            const p = serie[items[0]?.dataIndex ?? -1]
+            if (!p) return ''
+            const cuando = period === 'today' ? 'Esa hora' : period === 'year' ? 'Ese mes' : 'Ese día'
+            return `${cuando}: $${money(p.dia)}${metrica === 'ventas' ? ` · ${p.cantidad} venta${p.cantidad === 1 ? '' : 's'}` : ''}`
           },
         },
       },
     },
-    elements: { point: { radius: 0, hoverRadius: 5, hitRadius: 14 }, line: { tension: 0.35 } },
+    elements: { point: { radius: 0, hoverRadius: 5, hitRadius: 14 }, line: { tension: 0.25, cubicInterpolationMode: 'monotone' } },
     scales: {
       y: {
         beginAtZero: true,
         border: { display: false },
-        ticks: { maxTicksLimit: 5, font: { size: 11 }, color: '#8a8a85', padding: 8,
-          callback: v => { const n = Number(v); return '$' + (Math.abs(n) >= 1000 ? `${Math.round(n / 100) / 10}k` : Math.round(n)) } },
+        ticks: { maxTicksLimit: 5, font: { size: 11 }, color: '#8a8a85', padding: 8, callback: v => montoEje(Number(v)) },
         grid: { color: 'rgba(0,0,0,0.05)' },
       },
       x: {
         border: { display: false },
         grid: { display: false },
         ticks: {
-          color: '#8a8a85', font: { size: 11 }, maxRotation: 0, autoSkipPadding: 14,
+          color: '#8a8a85', font: { size: 11 }, maxRotation: 0, autoSkipPadding: 18,
           callback(v) { return etiquetaCorta(String(this.getLabelForValue(Number(v)))) },
         },
       },
     },
-  }), [chart])
+  }), [serie, period, metrica])
 
   if (!summary) return <Cargando />
 
@@ -264,19 +360,21 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
             <h2 id="neg-t" className="font-semibold text-neutral-900">Cómo va tu negocio</h2>
             <p className="text-xs text-neutral-500">El período elegido cambia todo lo de esta página, salvo los pendientes.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Período">
+          {/* 20-11: Hoy / Mes / Trim. / Año y «Fechas…», que abre las dos fechas solo cuando se necesitan. */}
+          <div className="relative flex flex-wrap items-center gap-1.5" role="group" aria-label="Período">
             {(['today', 'month', 'quarter', 'year'] as Period[]).map(p => (
-              <button key={p} type="button" onClick={() => setPeriod(p)} aria-pressed={period === p} className={chipCls(period === p)}>
+              <button key={p} type="button" onClick={() => { setPeriod(p); setFechasAbiertas(false) }} aria-pressed={period === p} className={chipCls(period === p)}>
                 {p === 'today' ? 'Hoy' : p === 'month' ? 'Mes' : p === 'quarter' ? 'Trim.' : 'Año'}
               </button>
             ))}
-            <span className="mx-1 h-5 w-px bg-neutral-200" aria-hidden />
-            <DateField value={dateFrom} max={dateTo} onChange={(v: string) => setDateFrom(v)}
-              className={`border rounded-lg px-2 py-1 text-xs ${period === 'custom' ? 'border-neutral-900' : 'border-neutral-200'}`} />
-            <span className="text-xs text-neutral-400">–</span>
-            <DateField value={dateTo} min={dateFrom} max={todayStr()} onChange={(v: string) => setDateTo(v)}
-              className={`border rounded-lg px-2 py-1 text-xs ${period === 'custom' ? 'border-neutral-900' : 'border-neutral-200'}`} />
-            <button type="button" onClick={() => setPeriod('custom')} className={chipCls(period === 'custom')}>Aplicar</button>
+            <button type="button" onClick={() => setFechasAbiertas(v => !v)} aria-expanded={fechasAbiertas} aria-pressed={period === 'custom'}
+              className={chipCls(period === 'custom')}>
+              {period === 'custom' ? textoFechas(dateFrom, dateTo) : 'Fechas…'}
+            </button>
+            {fechasAbiertas && <>
+              <div className="fixed inset-0 z-10" onClick={() => setFechasAbiertas(false)} aria-hidden />
+              <FechasPopover desde={dateFrom} hasta={dateTo} onAplicar={(a, b) => { setDateFrom(a); setDateTo(b); setPeriod('custom'); setFechasAbiertas(false) }} />
+            </>}
           </div>
         </div>
 
@@ -289,7 +387,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
             {s ? <>
               <div className="num mt-1 text-4xl font-semibold tracking-tight text-neutral-900 sm:text-5xl">${money0(s.ganancia)}</div>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                <Delta ahora={s.ganancia} antes={ant?.ganancia} />
+                <Delta ahora={s.ganancia} antes={ant?.ganancia} fmt={fmtMonto} chica={(ant?.cantidad ?? 0) < 5 ? Infinity : 0} />
                 {ant && ant.ganancia > 0 && <span className="text-neutral-500">{contra}</span>}
               </div>
               <p className="mt-1 text-xs text-neutral-500">
@@ -301,10 +399,14 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
             </> : <div className="mt-2 h-12 w-48 animate-pulse rounded-lg bg-neutral-100" />}
           </div>
           <div className="grid grid-cols-3 gap-2.5">
-            <Apoyo punto={AZUL} titulo="Ventas" valor={s ? `$${money0(s.ventas)}` : null} delta={s && <Delta ahora={s.ventas} antes={ant?.ventas} />} />
-            <Apoyo titulo="Ventas concretadas" valor={s ? s.cantidad.toLocaleString('es-VE') : null} delta={s && <Delta ahora={s.cantidad} antes={ant?.cantidad} />} />
+            {/* 20-11: «Ventas $» ya está en «Vendiste …» de Te quedó y en el gráfico: en su lugar, las unidades. */}
+            <Apoyo titulo="Ventas registradas" valor={s ? s.cantidad.toLocaleString('es-VE') : null} delta={s && <Delta ahora={s.cantidad} antes={ant?.cantidad} />}
+              ayuda="Las ventas procesadas en Ventas de este sistema. Las de MercadoLibre, registradas o no, están más abajo por cuenta." />
+            <Apoyo titulo="Unidades vendidas" valor={s ? (s.unidades ?? 0).toLocaleString('es-VE') : null}
+              delta={s && ant?.unidades != null ? <Delta ahora={s.unidades ?? 0} antes={ant.unidades} /> : null}
+              ayuda="Cuántas unidades salieron en esas ventas" />
             <Apoyo titulo="Ticket promedio" valor={s ? (s.cantidad ? `$${money0(s.ventas / s.cantidad)}` : '—') : null}
-              delta={s && ant && ant.cantidad > 0 && s.cantidad > 0 ? <Delta ahora={s.ventas / s.cantidad} antes={ant.ventas / ant.cantidad} /> : null}
+              delta={s && ant && ant.cantidad > 0 && s.cantidad > 0 ? <Delta ahora={s.ventas / s.cantidad} antes={ant.ventas / ant.cantidad} fmt={fmtMonto} chica={ant.cantidad < 5 ? Infinity : 0} /> : null}
               ayuda="Lo que deja en promedio cada venta (vendido ÷ ventas)" />
           </div>
         </div>
@@ -318,21 +420,37 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
         )}
 
         <div className="border-t border-neutral-100 px-3 pb-3 pt-3 sm:px-4">
-          <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-neutral-600" aria-hidden={!datosGrafico}>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-2.5 rounded-sm" style={{ background: AZUL }} />Ventas</span>
-            <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded-full" style={{ background: NARANJA }} />Ganancia</span>
-            <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded-full" style={{ background: GRIS }} />Ventas · {ANTERIOR[period].toLowerCase()}</span>
+          {/* 20-11: una métrica a la vez (pestañas) y su leyenda con el total de cada línea. */}
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1">
+            <div className="inline-flex rounded-lg bg-neutral-100 p-0.5 text-xs font-medium" role="tablist" aria-label="Qué mostrar en el gráfico">
+              {(['ventas', 'ganancia'] as Metrica[]).map(m => (
+                <button key={m} type="button" role="tab" aria-selected={metrica === m} onClick={() => setMetrica(m)}
+                  className={`rounded-md px-3 py-1 transition ${metrica === m ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'}`}>
+                  {m === 'ventas' ? 'Ventas' : 'Ganancia'}
+                </button>
+              ))}
+            </div>
+            {datosGrafico && serie.length > 0 && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-600">
+                <span className="flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-4 rounded-full" style={{ background: color }} />
+                  {period === 'today' ? 'Hoy' : period === 'month' ? 'Este mes' : period === 'year' ? 'Este año' : 'Este período'}
+                  <b className="num font-semibold text-neutral-900">${money0(serie[serie.length - 1].actual)}</b></span>
+                <span className="flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-4 rounded-full" style={{ background: GRIS }} />
+                  {ANTERIOR_A_LA_FECHA[period]} <b className="num font-semibold text-neutral-700">${money0(serie[serie.length - 1].anterior)}</b></span>
+              </div>
+            )}
           </div>
           {datosGrafico ? (
-            <div className="relative h-64" role="img" aria-label={`Gráfico de ventas y ganancia del período${s ? `: vendiste $${money0(s.ventas)} y te quedaron $${money0(s.ganancia)}` : ''}`}>
-              <Chart type="bar" data={datosGrafico} options={chartOptions} />
+            <div className={`relative h-56 transition-opacity sm:h-64 ${cargandoGrafico ? 'opacity-50' : ''}`} role="img"
+              aria-label={`${metrica === 'ventas' ? 'Ventas' : 'Ganancia'} acumulada del período: $${money0(serie[serie.length - 1]?.actual ?? 0)}, contra $${money0(serie[serie.length - 1]?.anterior ?? 0)} ${ANTERIOR_A_LA_FECHA[period].toLowerCase()}`}>
+              <Chart type="line" data={datosGrafico} options={chartOptions} plugins={[valorAlFinal]} />
             </div>
           ) : chart ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
               <p className="text-sm font-medium text-neutral-700">Todavía no hay ventas en este período</p>
               <Link href="/ventas?new=1" className="btn-secondary text-sm">Registrar una venta</Link>
             </div>
-          ) : <div className="h-64 animate-pulse rounded-lg bg-neutral-50" />}
+          ) : <div className="h-56 animate-pulse rounded-lg bg-neutral-50 sm:h-64" />}
         </div>
       </section>
 
@@ -355,6 +473,25 @@ function Apoyo({ punto, titulo, valor, delta, ayuda }: { punto?: string; titulo:
         ? <div className="num mt-0.5 truncate text-base font-semibold tracking-tight text-neutral-900 sm:text-xl">{valor}</div>
         : <div className="mt-1 h-6 w-16 animate-pulse rounded bg-neutral-200/70" />}
       <div className="mt-0.5 min-h-[1rem] text-[11px] sm:text-xs">{delta}</div>
+    </div>
+  )
+}
+
+/** «Fechas…» (20-11): las dos fechas en un recuadro, se aplican juntas. */
+function FechasPopover({ desde, hasta, onAplicar }: { desde: string; hasta: string; onAplicar: (a: string, b: string) => void }) {
+  const [a, setA] = useState(desde)
+  const [b, setB] = useState(hasta)
+  return (
+    <div className="absolute right-0 top-full z-20 mt-1.5 w-64 rounded-xl border border-neutral-200 bg-white p-3 shadow-lg">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-neutral-500">Desde
+          <DateField value={a} max={b} onChange={(v: string) => setA(v)} className="mt-0.5 w-full rounded-lg border border-neutral-200 px-2 py-1 text-xs" />
+        </label>
+        <label className="text-xs text-neutral-500">Hasta
+          <DateField value={b} min={a} max={todayStr()} onChange={(v: string) => setB(v)} className="mt-0.5 w-full rounded-lg border border-neutral-200 px-2 py-1 text-xs" />
+        </label>
+      </div>
+      <button type="button" disabled={!a || !b || a > b} onClick={() => onAplicar(a, b)} className="btn-primary mt-3 w-full text-sm disabled:opacity-50">Aplicar</button>
     </div>
   )
 }

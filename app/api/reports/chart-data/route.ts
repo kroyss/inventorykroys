@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
   // mismas etiquetas del gráfico (día 5 de octubre → «día 5» de noviembre) y se dibuje como línea de comparación.
   let prevSql: string
   let shiftSql: string
+  // 20-11 (gráfico acumulado): el eje completo, del inicio del período a hoy, aunque haya días sin ventas.
+  let ejeSql: string
   let queryParams: unknown[] = []
   let trunc: string
 
@@ -29,6 +31,7 @@ export async function GET(req: NextRequest) {
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN CURRENT_DATE AND NOW()`
       prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN CURRENT_DATE - 1 AND NOW() - INTERVAL '1 day'`
       shiftSql = `INTERVAL '1 day'`
+      ejeSql   = `DATE_TRUNC('day', NOW()), DATE_TRUNC('hour', NOW()), INTERVAL '1 hour'`
       trunc    = 'hour'
       break
     case 'quarter':
@@ -36,12 +39,14 @@ export async function GET(req: NextRequest) {
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) - INTERVAL '2 months' AND NOW()`
       prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) - INTERVAL '5 months' AND NOW() - INTERVAL '3 months'`
       shiftSql = `INTERVAL '3 months'`
+      ejeSql   = `DATE_TRUNC('month', NOW()) - INTERVAL '2 months', DATE_TRUNC('day', NOW()), INTERVAL '1 day'`
       trunc    = 'day'
       break
     case 'year':
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('year', NOW()) AND NOW()`
       prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('year', NOW()) - INTERVAL '1 year' AND NOW() - INTERVAL '1 year'`
       shiftSql = `INTERVAL '1 year'`
+      ejeSql   = `DATE_TRUNC('year', NOW()), DATE_TRUNC('month', NOW()), INTERVAL '1 month'`
       trunc    = 'month'
       break
     case 'custom':
@@ -51,10 +56,15 @@ export async function GET(req: NextRequest) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
         return NextResponse.json({ error: 'Formato de fecha inválido (YYYY-MM-DD)' }, { status: 400 })
       }
+      if (dateFrom > dateTo || (Date.parse(dateTo) - Date.parse(dateFrom)) / 864e5 > 731) {
+        return NextResponse.json({ error: 'Rango de fechas inválido (máximo 2 años)' }, { status: 400 })
+      }
       // Use parameterized query for user-supplied dates (defense-in-depth)
-      rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN $1::date AND $2::date`
-      prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN $1::date - ($2::date - $1::date + 1) AND $2::date - ($2::date - $1::date + 1)`
+      // 20-11: el último día entra completo (antes «BETWEEN … AND $2::date» cortaba en las 00:00 de ese día).
+      rangeSql = `COALESCE(s.processed_at, s.created_at) >= $1::date AND COALESCE(s.processed_at, s.created_at) < $2::date + 1`
+      prevSql  = `COALESCE(s.processed_at, s.created_at) >= $1::date - ($2::date - $1::date + 1) AND COALESCE(s.processed_at, s.created_at) < $1::date`
       shiftSql = `make_interval(days => $2::date - $1::date + 1)`
+      ejeSql   = `$1::date::timestamptz, $2::date::timestamptz, INTERVAL '1 day'`
       queryParams = [dateFrom, dateTo]
       trunc       = 'day'
       break
@@ -62,8 +72,12 @@ export async function GET(req: NextRequest) {
       rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) AND NOW()`
       prevSql  = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) - INTERVAL '1 month' AND NOW() - INTERVAL '1 month'`
       shiftSql = `INTERVAL '1 month'`
+      ejeSql   = `DATE_TRUNC('month', NOW()), DATE_TRUNC('day', NOW()), INTERVAL '1 day'`
       trunc    = 'day'
   }
+  // 20-11: la etiqueta se arma en SQL, en la hora del país (la conexión ya trae su TimeZone). Antes salía de
+  // toISOString (UTC) y en «Hoy» las horas quedaban corridas.
+  const FMT: Record<string, string> = { hour: `'YYYY-MM-DD"T"HH24'`, day: `'YYYY-MM-DD'`, month: `'YYYY-MM'` }
 
   if (!ALLOWED_TRUNCS.has(trunc)) {
     return NextResponse.json({ error: 'Trunc inválido' }, { status: 400 })
@@ -72,17 +86,18 @@ export async function GET(req: NextRequest) {
   try {
     const { rows } = await db.query(`
       SELECT
-        DATE_TRUNC('${trunc}', COALESCE(s.processed_at, s.created_at))          AS periodo,
+        to_char(DATE_TRUNC('${trunc}', COALESCE(s.processed_at, s.created_at)), ${FMT[trunc]}) AS periodo,
         COALESCE(SUM(s.total_amount), 0)              AS ventas,
         COALESCE(SUM(si_cost.costo), 0)               AS costos,
         COALESCE(SUM(si_cost.mercancia), 0)           AS mercancia,
         COALESCE(SUM(si_cost.bruto), 0)               AS bruto,
         COALESCE(SUM(si_cost.estimado), 0)            AS estimado,
+        COALESCE(SUM(si_cost.unidades), 0)            AS unidades,
         COUNT(DISTINCT s.id)                          AS cantidad_ventas
       FROM sales s
       LEFT JOIN (
         SELECT si.sale_id, SUM(si.quantity * (COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0))) AS costo,
-               SUM(si.quantity * COALESCE(si.unit_cost, 0)) AS mercancia,
+               SUM(si.quantity * COALESCE(si.unit_cost, 0)) AS mercancia, SUM(si.quantity) AS unidades,
                -- Mig 180: lo vendido con costo estimado (la ganancia de eso es aproximada).
                SUM(si.total_price) AS bruto, SUM(si.total_price) FILTER (WHERE si.costo_estimado) AS estimado
         FROM sale_items si
@@ -94,13 +109,15 @@ export async function GET(req: NextRequest) {
       ORDER BY periodo ASC
     `, queryParams)
     const { rows: prevRows } = await db.query(`
-      SELECT DATE_TRUNC('${trunc}', COALESCE(s.processed_at, s.created_at) + ${shiftSql}) AS periodo,
+      SELECT to_char(DATE_TRUNC('${trunc}', COALESCE(s.processed_at, s.created_at) + ${shiftSql}), ${FMT[trunc]}) AS periodo,
              COALESCE(SUM(s.total_amount), 0) AS ventas,
              COALESCE(SUM(si_cost.costo), 0)  AS costos,
+             COALESCE(SUM(si_cost.unidades), 0) AS unidades,
              COUNT(DISTINCT s.id)             AS cantidad_ventas
       FROM sales s
       LEFT JOIN (
-        SELECT si.sale_id, SUM(si.quantity * (COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0))) AS costo
+        SELECT si.sale_id, SUM(si.quantity * (COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0))) AS costo,
+               SUM(si.quantity) AS unidades
         FROM sale_items si GROUP BY si.sale_id
       ) si_cost ON si_cost.sale_id = s.id
       WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
@@ -108,15 +125,14 @@ export async function GET(req: NextRequest) {
       GROUP BY periodo
       ORDER BY periodo ASC
     `, queryParams)
+    const { rows: ejeRows } = await db.query(
+      `SELECT to_char(g, ${FMT[trunc]}) AS label FROM generate_series(${ejeSql}) g ORDER BY g`, queryParams)
 
     let totalVentas  = 0
     let totalCostos  = 0
     let totalMercancia = 0
     let totalCantidad = 0
-    let totalBruto = 0, totalEstimado = 0
-
-    // ISO label length: hour=13 (YYYY-MM-DDTHH), day=10 (YYYY-MM-DD), month=7 (YYYY-MM)
-    const labelLen = trunc === 'hour' ? 13 : trunc === 'month' ? 7 : 10
+    let totalBruto = 0, totalEstimado = 0, totalUnidades = 0
 
     const chartData = rows.map(r => {
       const ventas  = parseFloat(r.ventas)  || 0
@@ -128,11 +144,9 @@ export async function GET(req: NextRequest) {
       totalCantidad += cant
       totalBruto    += parseFloat(r.bruto) || 0
       totalEstimado += parseFloat(r.estimado) || 0
-      const periodoStr = r.periodo instanceof Date
-        ? r.periodo.toISOString()
-        : String(r.periodo ?? '')
+      totalUnidades += parseFloat(r.unidades) || 0
       return {
-        label:    periodoStr.slice(0, labelLen),
+        label:    String(r.periodo),
         ventas:   Math.round(ventas  * 100) / 100,
         costos:   Math.round(costos  * 100) / 100,
         cantidad: cant,
@@ -140,25 +154,34 @@ export async function GET(req: NextRequest) {
     })
 
     // Período anterior: por etiqueta (para la línea gris) y en total (para el ▲▼ de las cifras del Inicio).
-    const ant = { ventas: 0, costos: 0, cantidad: 0 }
-    const antPorLabel = new Map<string, number>()
+    const ant = { ventas: 0, costos: 0, cantidad: 0, unidades: 0 }
+    const antPorLabel = new Map<string, { ventas: number; costos: number }>()
     for (const r of prevRows) {
-      const v = parseFloat(r.ventas) || 0
-      ant.ventas += v; ant.costos += parseFloat(r.costos) || 0; ant.cantidad += parseInt(r.cantidad_ventas, 10) || 0
-      const l = (r.periodo instanceof Date ? r.periodo.toISOString() : String(r.periodo ?? '')).slice(0, labelLen)
-      antPorLabel.set(l, (antPorLabel.get(l) ?? 0) + Math.round(v * 100) / 100)
+      const v = parseFloat(r.ventas) || 0, c = parseFloat(r.costos) || 0
+      ant.ventas += v; ant.costos += c; ant.cantidad += parseInt(r.cantidad_ventas, 10) || 0; ant.unidades += parseFloat(r.unidades) || 0
+      const l = String(r.periodo), x = antPorLabel.get(l) ?? { ventas: 0, costos: 0 }
+      antPorLabel.set(l, { ventas: x.ventas + v, costos: x.costos + c })
     }
-    // Etiquetas = las del período + las del anterior que no tuvieron ventas ahora (así la línea gris no se corta).
-    const actuales = new Set(chartData.map(d => d.label))
-    for (const l of antPorLabel.keys()) if (!actuales.has(l)) chartData.push({ label: l, ventas: 0, costos: 0, cantidad: 0 })
-    chartData.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0)
+    // 20-11: el eje completo (del inicio del período a hoy): los días sin ventas van en 0, así la línea acumulada no
+    // une días separados como si en el medio hubiera habido ventas.
+    const porLabel = new Map(chartData.map(d => [d.label, d]))
+    const eje = ejeRows.map(r => String(r.label))
+    const enEje = new Set(eje)
+    for (const l of [...porLabel.keys(), ...antPorLabel.keys()]) if (!enEje.has(l)) { eje.push(l); enEje.add(l) }
+    eje.sort()
+    const r2 = (n: number) => Math.round(n * 100) / 100
 
     return NextResponse.json({
-      chart_data: chartData.map(d => ({ ...d, anterior: antPorLabel.get(d.label) ?? 0 })),
+      chart_data: eje.map(l => {
+        const d = porLabel.get(l) ?? { label: l, ventas: 0, costos: 0, cantidad: 0 }
+        const a = antPorLabel.get(l)
+        return { ...d, anterior: r2(a?.ventas ?? 0), anterior_costos: r2(a?.costos ?? 0) }
+      }),
       anterior: {
         ventas:   Math.round(ant.ventas * 100) / 100,
         ganancia: Math.round((ant.ventas - ant.costos) * 100) / 100,
         cantidad: ant.cantidad,
+        unidades: ant.unidades,
       },
       summary: {
         ventas:       Math.round(totalVentas  * 100) / 100,
@@ -180,6 +203,7 @@ export async function GET(req: NextRequest) {
           ? Math.round(((totalVentas - totalCostos) / totalMercancia) * 1000) / 10
           : null,
         cantidad:     totalCantidad,
+        unidades:     totalUnidades,
         // Mig 180: % de lo vendido con costo estimado (0 = todo con costo real).
         estimado_pct: totalBruto > 0 && totalEstimado > 0
           ? Math.max(1, Math.round((totalEstimado / totalBruto) * 100))

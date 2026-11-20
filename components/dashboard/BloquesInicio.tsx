@@ -13,12 +13,18 @@ interface Top { id: number; nombre: string; unidades: number; monto?: number; an
 interface Datos {
   rango: RangoInicio
   top: Top[] | null
-  cuentas: { cuenta: string; moneda: string | null; ventas: number; monto: number; antes_ventas: number }[] | null
+  cuentas: { cuenta: string; moneda: string | null; ventas: number; monto: number; monto_usd?: number | null; antes_ventas: number }[] | null
   calificaciones: { positivas: number; neutrales: number; negativas: number; antes_negativas: number; contradictorias: number } | null
   historialML: boolean
   atencion: { actual: CifrasAtencion; anterior: CifrasAtencion } | null
 }
 const n = (x: number) => x.toLocaleString('es-VE')
+/** 20-11: el monto de cada cuenta en $ (como todo el Inicio); en VE, los Bs al lado, chicos. */
+function montoCuenta(k: { moneda: string | null; monto: number; monto_usd?: number | null }) {
+  const f0 = (x: number) => x.toLocaleString('de-DE', { maximumFractionDigits: 0 })
+  if (k.moneda === 'VES') return k.monto_usd != null ? `$${f0(k.monto_usd)} · Bs ${f0(k.monto)}` : `Bs ${f0(k.monto)}`
+  return `$${f0(k.monto)}`
+}
 
 function Cambio({ ahora, antes, menosEsMejor = false }: { ahora: number | null; antes: number | null; menosEsMejor?: boolean }) {
   if (ahora == null || antes == null) return null
@@ -29,8 +35,8 @@ function Cambio({ ahora, antes, menosEsMejor = false }: { ahora: number | null; 
   return <span className={bueno ? 'text-emerald-600' : 'text-red-600'}>{c > 0 ? '▲' : '▼'} {Math.abs(c)}%</span>
 }
 
-function Tarjeta({ titulo, valor, ahora, antes, menosEsMejor, detalle, conNumero = false }: {
-  titulo: string; valor: string; ahora?: number | null; antes?: number | null; menosEsMejor?: boolean; detalle?: string
+function Tarjeta({ titulo, valor, ahora, antes, menosEsMejor, detalle, detalleTitulo, conNumero = false }: {
+  titulo: string; valor: string; ahora?: number | null; antes?: number | null; menosEsMejor?: boolean; detalle?: string; detalleTitulo?: string
   /** 19-11: «antes N» en vez de % (con bases chicas el % engaña: de 8 a 62 es «▲675 %»). */
   conNumero?: boolean
 }) {
@@ -44,7 +50,7 @@ function Tarjeta({ titulo, valor, ahora, antes, menosEsMejor, detalle, conNumero
             ? <span className={ahora === antes ? 'text-neutral-500' : ahora > antes ? 'text-emerald-700' : 'text-red-600'}>
                 {ahora === antes ? '' : ahora > antes ? '▲ ' : '▼ '}antes {n(antes)}</span>
             : <Cambio ahora={ahora ?? null} antes={antes ?? null} menosEsMejor={menosEsMejor} />)}
-          {detalle && <span className="text-neutral-500">{detalle}</span>}
+          {detalle && <span className="num text-neutral-500" title={detalleTitulo}>{detalle}</span>}
         </div>
       )}
     </div>
@@ -106,6 +112,8 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
   const r = d.rango
   const contra = `contra ${textoRango(r.antesDesde, r.antesHasta)}`
   const max = Math.max(1, ...(d.top ?? []).map(p => p.unidades))
+  // 20-11: si todos vendieron lo mismo, las barras salen todas llenas y no dicen nada: entonces no se dibujan.
+  const conBarras = (d.top ?? []).some(p => p.unidades !== max)
   const verTodos = `/reportes?tab=ventas&vista=producto&desde=${r.desde}&hasta=${r.hasta}`
   const a = d.atencion, c = d.calificaciones
   // 19-11 (el dueño): con cuentas impares (1, 3…) las calificaciones van como tarjeta en el hueco al lado de la
@@ -133,15 +141,16 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
                         <FotoProducto id={p.id} nombre={p.nombre} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm text-neutral-900" title={p.nombre}>{p.nombre}</p>
-                          <div className="mt-1 h-1.5 rounded-full bg-neutral-100">
-                            <div className="h-1.5 rounded-full bg-sky-500" style={{ width: `${Math.max(4, p.unidades / max * 100)}%` }} />
-                          </div>
+                          {conBarras && <div className="mt-1.5 h-1 rounded-full bg-neutral-100">
+                            <div className="h-1 rounded-full bg-sky-500" style={{ width: `${Math.max(4, p.unidades / max * 100)}%` }} />
+                          </div>}
                         </div>
                         <div className="w-16 shrink-0 text-right">
                           <span className="num text-sm font-semibold text-neutral-900">{n(p.unidades)}</span>
                           <span className="block text-[11px] num">
-                            {p.antes === 0 ? <span className="text-neutral-400">nuevo</span>
-                              : p.antes < 5 ? <span className={p.unidades >= p.antes ? 'text-emerald-600' : 'text-red-600'}>antes {p.antes}</span>
+                            {p.antes === 0 ? <span className="text-neutral-400" title="En el período anterior no vendió">antes 0</span>
+                              : p.antes < 5 ? <span className={p.unidades === p.antes ? 'text-neutral-500' : p.unidades > p.antes ? 'text-emerald-600' : 'text-red-600'}>
+                                  {p.unidades === p.antes ? '' : p.unidades > p.antes ? '▲ ' : '▼ '}antes {p.antes}</span>
                               : <Cambio ahora={p.unidades} antes={p.antes} />}
                           </span>
                         </div>
@@ -164,7 +173,8 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
                 <div className="grid grid-cols-2 gap-3">
                   {d.cuentas.map(k => (
                     <Tarjeta key={k.cuenta} titulo={k.cuenta} valor={`${n(k.ventas)} ventas`} ahora={k.ventas} antes={k.antes_ventas} conNumero
-                      detalle={`${k.moneda === 'VES' ? 'Bs' : '$'} ${k.monto.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`} />
+                      detalle={montoCuenta(k)} detalleTitulo={k.moneda === 'VES' && k.monto_usd != null
+                        ? `Bs ${k.monto.toLocaleString('de-DE', { maximumFractionDigits: 0 })} pasados a $ con la tasa oficial de cada día` : undefined} />
                   ))}
                   {califEnGrilla && c && (
                     <Link href="/reputacion" title={tituloCalif}
