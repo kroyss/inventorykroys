@@ -39,7 +39,8 @@ export default async function DashboardPage() {
       descuento={tieneModulo(session!.user, 'descuento_ml')} importaciones={importaciones}
       analisisStock={analisisStock} etapas={tieneModulo(session!.user, 'compras_etapas')}
       categorias={tieneModulo(session!.user, 'precios_categorias')} porConfirmar={porConfirmar}
-      reportes={reportes} ajustes={rutaPermitida('/tasas', session!.user)} />
+      reportes={reportes} ajustes={rutaPermitida('/tasas', session!.user)}
+      despachos={tieneModulo(session!.user, 'despachos') && puede(session!.user, 'ver_despachos')} />
     </div>)
   }
   return <div className="space-y-4">{sugerencia}<DashboardUser country={country} bonos={bonos} importaciones={importaciones}
