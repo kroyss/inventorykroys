@@ -41,6 +41,8 @@ export interface Summary {
 interface ChartPoint { label: string; ventas: number; costos: number; cantidad: number; anterior?: number; anterior_costos?: number }
 export interface ChartData {
   chart_data: ChartPoint[]
+  /** 20-11: etiqueta de «ahora» en el eje (con Hoy / Mes / Año el eje sigue hasta el fin del período). */
+  hoy?: string
   summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; margen_pct?: number; rentabilidad_pct?: number | null; cantidad: number; unidades?: number; estimado_pct?: number }
   /** 19-11: el mismo tramo del período anterior (para el ▲▼ de las cifras). */
   anterior?: { ventas: number; ganancia: number; cantidad: number; unidades?: number }
@@ -95,17 +97,34 @@ function textoFechas(a: string, b: string) {
   return a.slice(0, 7) === b.slice(0, 7) ? `${Number(a.slice(8))}–${f(b)}` : `${f(a)} – ${f(b)}`
 }
 
-/** El valor de hoy, escrito al final de la línea (la única cifra sobre el gráfico). */
+/** El valor de hoy, escrito al final de la línea de color (la única cifra sobre el gráfico). 20-11: si el eje sigue
+ *  hasta el fin del período, también «cerró $X» al final de la gris (en cuánto terminó el período anterior). */
 const valorAlFinal: Plugin<'line'> = {
   id: 'valorAlFinal',
   afterDatasetsDraw(c) {
     const meta = c.getDatasetMeta(0)
     const pts = meta?.data
     if (!pts?.length || meta.hidden) return
-    const ult = pts[pts.length - 1]
-    const v = Number((c.data.datasets[0].data as number[])[pts.length - 1] ?? 0)
+    const datos = c.data.datasets[0].data as (number | null)[]
+    let i = datos.length - 1
+    while (i > 0 && datos[i] == null) i--
+    const ult = pts[i]
+    const v = Number(datos[i] ?? 0)
     const { ctx, chartArea } = c
     ctx.save()
+    // «cerró $X» al final de la línea gris, solo si sigue más allá de hoy.
+    const gris = c.getDatasetMeta(1)?.data
+    const datosGris = c.data.datasets[1]?.data as number[] | undefined
+    if (gris?.length && datosGris && i < gris.length - 1) {
+      const fin = gris[gris.length - 1]
+      const t = `cerró $${money0(Number(datosGris[datosGris.length - 1] ?? 0))}`
+      ctx.font = '500 11px Inter, system-ui, sans-serif'
+      const wg = ctx.measureText(t).width
+      ctx.fillStyle = '#737373'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.textBaseline = 'middle'
+      const yg = Math.max(chartArea.top + 8, fin.y - 10)
+      ctx.strokeText(t, Math.min(fin.x - wg, chartArea.right - wg), yg)
+      ctx.fillText(t, Math.min(fin.x - wg, chartArea.right - wg), yg)
+    }
     ctx.fillStyle = String(c.data.datasets[0].borderColor)
     ctx.strokeStyle = '#fff'
     ctx.lineWidth = 2
@@ -214,16 +233,23 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
   // Acumulados: lo que llevas hasta cada día (este período) y lo que llevabas el período anterior a esa misma altura.
   const serie = useMemo(() => {
     const d = chart?.chart_data ?? []
-    const out: { label: string; dia: number; actual: number; anterior: number; cantidad: number }[] = []
+    const hoy = chart?.hoy
+    // 20-11: la línea de este período llega hasta hoy (null después); la gris sigue hasta el fin del período.
+    const out: { label: string; dia: number; actual: number | null; anterior: number; cantidad: number }[] = []
     let a = 0, b = 0
     for (const p of d) {
       const ahora = metrica === 'ventas' ? p.ventas : p.ventas - p.costos
       const antes = metrica === 'ventas' ? (p.anterior ?? 0) : (p.anterior ?? 0) - (p.anterior_costos ?? 0)
       a += ahora; b += antes
-      out.push({ label: p.label, dia: ahora, actual: Math.round(a * 100) / 100, anterior: Math.round(b * 100) / 100, cantidad: p.cantidad })
+      const futuro = !!hoy && p.label > hoy
+      out.push({ label: p.label, dia: ahora, actual: futuro ? null : Math.round(a * 100) / 100, anterior: Math.round(b * 100) / 100, cantidad: p.cantidad })
     }
     return out
   }, [chart, metrica])
+  // Dónde está hoy en la serie (lo que llevas y lo que llevabas a esta fecha), y el cierre del período anterior.
+  const iHoy = (() => { let i = serie.length - 1; while (i > 0 && serie[i].actual == null) i--; return i })()
+  const enHoy = serie[iHoy]
+  const cierre = iHoy < serie.length - 1 ? serie[serie.length - 1]?.anterior : null
   const hayDatos = serie.some(p => p.dia !== 0 || p.anterior !== 0)
   const color = metrica === 'ventas' ? AZUL : NARANJA
 
@@ -258,19 +284,20 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
       tooltip: {
         backgroundColor: 'rgba(23,23,23,0.94)', padding: 10, cornerRadius: 8, boxWidth: 8, boxHeight: 8, boxPadding: 4, usePointStyle: true,
         titleFont: { size: 12, weight: 'bold' }, bodyFont: { size: 12 }, footerFont: { size: 11, weight: 'normal' }, footerColor: '#d4d4d4',
+        filter: item => item.parsed.y != null,
         callbacks: {
           title: items => etiquetaLarga(String(items[0]?.label ?? '')),
           label: ctx => ctx.datasetIndex === 0 ? ` Llevas: $${money(ctx.parsed.y ?? 0)}` : ` ${ctx.dataset.label}: $${money(ctx.parsed.y ?? 0)}`,
           afterBody: items => {
             const p = serie[items[0]?.dataIndex ?? -1]
-            if (!p) return ''
+            if (!p || p.actual == null) return ''
             const dif = p.actual - p.anterior
             if (Math.abs(dif) < 0.005) return ' Igual que antes'
             return ` ${dif > 0 ? '▲' : '▼'} $${money(Math.abs(dif))} ${dif > 0 ? 'más' : 'menos'} que antes`
           },
           footer: items => {
             const p = serie[items[0]?.dataIndex ?? -1]
-            if (!p) return ''
+            if (!p || p.actual == null) return ''
             const cuando = period === 'today' ? 'Esa hora' : period === 'year' ? 'Ese mes' : 'Ese día'
             return `${cuando}: $${money(p.dia)}${metrica === 'ventas' ? ` · ${p.cantidad} venta${p.cantidad === 1 ? '' : 's'}` : ''}`
           },
@@ -430,19 +457,20 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
                 </button>
               ))}
             </div>
-            {datosGrafico && serie.length > 0 && (
+            {datosGrafico && enHoy && (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-600">
                 <span className="flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-4 rounded-full" style={{ background: color }} />
                   {period === 'today' ? 'Hoy' : period === 'month' ? 'Este mes' : period === 'year' ? 'Este año' : 'Este período'}
-                  <b className="num font-semibold text-neutral-900">${money0(serie[serie.length - 1].actual)}</b></span>
+                  <b className="num font-semibold text-neutral-900">${money0(enHoy.actual ?? 0)}</b></span>
                 <span className="flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-4 rounded-full" style={{ background: GRIS }} />
-                  {ANTERIOR_A_LA_FECHA[period]} <b className="num font-semibold text-neutral-700">${money0(serie[serie.length - 1].anterior)}</b></span>
+                  {ANTERIOR_A_LA_FECHA[period]} <b className="num font-semibold text-neutral-700">${money0(enHoy.anterior)}</b>
+                  {cierre != null && <span className="text-neutral-500">· cerró <span className="num">${money0(cierre)}</span></span>}</span>
               </div>
             )}
           </div>
           {datosGrafico ? (
             <div className={`relative h-56 transition-opacity sm:h-64 ${cargandoGrafico ? 'opacity-50' : ''}`} role="img"
-              aria-label={`${metrica === 'ventas' ? 'Ventas' : 'Ganancia'} acumulada del período: $${money0(serie[serie.length - 1]?.actual ?? 0)}, contra $${money0(serie[serie.length - 1]?.anterior ?? 0)} ${ANTERIOR_A_LA_FECHA[period].toLowerCase()}`}>
+              aria-label={`${metrica === 'ventas' ? 'Ventas' : 'Ganancia'} acumulada del período: $${money0(enHoy?.actual ?? 0)}, contra $${money0(enHoy?.anterior ?? 0)} ${ANTERIOR_A_LA_FECHA[period].toLowerCase()}${cierre != null ? `; el período anterior cerró en $${money0(cierre)}` : ''}`}>
               <Chart type="line" data={datosGrafico} options={chartOptions} plugins={[valorAlFinal]} />
             </div>
           ) : chart ? (

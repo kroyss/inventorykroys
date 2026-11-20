@@ -983,7 +983,9 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   de un % engañoso. El gráfico es **acumulado**: cuánto llevas desde el inicio del período, día a día (los días sin ventas
   la línea queda plana), con dos pestañas, **Ventas** (línea azul) y **Ganancia** (línea naranja), y la **línea gris** =
   cuánto llevabas el período anterior a la misma altura (Mes = mes pasado a la fecha; Hoy = ayer, por hora; Año = año
-  pasado, por mes). Si la de color va por encima de la gris, vas mejor que antes. Arriba, la leyenda con el total de cada
+  pasado, por mes). Con Hoy / Mes / Año el eje llega al **fin del período** (23 h, último día del mes, diciembre): tu
+  línea termina en hoy y la gris sigue hasta el final con **«cerró $X»** (en cuánto terminó el período anterior: tu meta).
+  Si la de color va por encima de la gris, vas mejor que antes. Arriba, la leyenda con el total de cada
   línea; al final de la línea, el valor de hoy. Al pasar el dedo o el mouse: lo que llevabas ese día, lo del período
   anterior, la diferencia (▲▼) y lo de ese día solo. Al cambiar el período, el gráfico anterior queda a media luz hasta
   que llega el nuevo. Abajo, en dos columnas: a la izquierda **Más vendidos** (top 5 y cuánto subió o bajó —«▲ antes
@@ -1463,7 +1465,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
 - **Inicio:** **Pendientes** = solo lo que tiene algo (lo demás, «Al día»); En caída = se están cayendo. El período (Hoy/Mes/Trim./Año/fechas) cambia
   todo lo de abajo, contra el período anterior (**Fechas…** abre desde/hasta). **Te quedó** = ganancia; gráfico
   **acumulado** con pestañas Ventas | Ganancia: color = lo que llevas, gris = lo que llevabas el período anterior a la
-  misma fecha. **Ventas registradas** = las procesadas en Ventas (las de ML van abajo por cuenta). «antes N» = cuánto
+  misma fecha; «cerró $X» = en cuánto terminó el período anterior. **Ventas registradas** = las procesadas en Ventas (las de ML van abajo por cuenta). «antes N» = cuánto
   era antes, cuando la base es chica. **Diferencial** = cuánto más cara está la tasa paralela que la oficial.
 - **Ventas:** **Por confirmar** = ventas de MercadoLibre que faltan registrar (verificas el pago y «Registrar venta»
   descuenta del inventario). **Traer pagos y ventas** trae al instante las nuevas (con Pagos ME también pagos y guías,
