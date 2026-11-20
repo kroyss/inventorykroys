@@ -234,6 +234,9 @@ export default function DashboardAdmin({ country, bonos, reportes = false, accio
   const enHoy = serie[iHoy]
   const cierre = iHoy < serie.length - 1 ? serie[serie.length - 1]?.anterior : null
   const hayDatos = serie.some(p => p.dia !== 0 || p.anterior !== 0)
+  // 20-11 (el dueño): si el período anterior no tuvo ventas (empresa nueva), la línea gris pegada a $0, su «$0» y
+  // «Mes pasado a la fecha $0 · cerró $0» no dicen nada: queda solo la línea de este período.
+  const sinAnterior = (chart?.chart_data ?? []).every(p => !(p.anterior ?? 0))
   const color = metrica === 'ventas' ? AZUL : NARANJA
 
   const datosGrafico = useMemo<ChartJsData<'line'> | null>(() => {
@@ -250,11 +253,11 @@ export default function DashboardAdmin({ country, bonos, reportes = false, accio
             g.addColorStop(0, LAVADO[metrica][0]); g.addColorStop(1, LAVADO[metrica][1])
             return g
           } },
-        { label: ANTERIOR_A_LA_FECHA[period], data: serie.map(p => p.anterior), borderColor: GRIS, backgroundColor: GRIS, borderWidth: 1.75,
-          pointBackgroundColor: GRIS, pointBorderColor: '#fff', pointBorderWidth: 2, fill: false, order: 2 },
+        ...(sinAnterior ? [] : [{ label: ANTERIOR_A_LA_FECHA[period], data: serie.map(p => p.anterior), borderColor: GRIS, backgroundColor: GRIS, borderWidth: 1.75,
+          pointBackgroundColor: GRIS, pointBorderColor: '#fff', pointBorderWidth: 2, fill: false, order: 2 }]),
       ],
     }
-  }, [serie, hayDatos, metrica, color, period])
+  }, [serie, hayDatos, metrica, color, period, sinAnterior])
 
   const chartOptions = useMemo<ChartOptions<'line'>>(() => ({
     responsive: true,
@@ -273,7 +276,7 @@ export default function DashboardAdmin({ country, bonos, reportes = false, accio
           label: ctx => ctx.datasetIndex === 0 ? ` Llevas: $${money(ctx.parsed.y ?? 0)}` : ` ${ctx.dataset.label}: $${money(ctx.parsed.y ?? 0)}`,
           afterBody: items => {
             const p = serie[items[0]?.dataIndex ?? -1]
-            if (!p || p.actual == null) return ''
+            if (!p || p.actual == null || sinAnterior) return ''
             const dif = p.actual - p.anterior
             if (Math.abs(dif) < 0.005) return ' Igual que antes'
             return ` ${dif > 0 ? '▲' : '▼'} $${money(Math.abs(dif))} ${dif > 0 ? 'más' : 'menos'} que antes`
@@ -304,7 +307,7 @@ export default function DashboardAdmin({ country, bonos, reportes = false, accio
         },
       },
     },
-  }), [serie, period, metrica])
+  }), [serie, period, metrica, sinAnterior])
 
   if (!summary) return <Cargando />
 
@@ -357,7 +360,7 @@ export default function DashboardAdmin({ country, bonos, reportes = false, accio
             {s ? <>
               <div className="num mt-1 text-4xl font-semibold tracking-tight text-neutral-900 sm:text-5xl">${money0(s.ganancia)}</div>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                <Delta ahora={s.ganancia} antes={ant?.ganancia} fmt={fmtMonto} chica={(ant?.cantidad ?? 0) < 5 ? Infinity : 0} />
+                <Delta ahora={s.ganancia} antes={ant?.cantidad ? ant.ganancia : undefined} fmt={fmtMonto} chica={(ant?.cantidad ?? 0) < 5 ? Infinity : 0} />
                 {ant && ant.ganancia > 0 && <span className="text-neutral-500">{contra}</span>}
               </div>
               <p className="mt-1 text-xs text-neutral-500">
@@ -369,11 +372,12 @@ export default function DashboardAdmin({ country, bonos, reportes = false, accio
             </> : <div className="mt-2 h-12 w-48 animate-pulse rounded-lg bg-neutral-100" />}
           </div>
           <div className="grid grid-cols-3 gap-2.5">
+            {/* 20-11: sin ventas en el período anterior (ant.cantidad = 0) no se compara: «antes 0» en todo era ruido. */}
             {/* 20-11: «Ventas $» ya está en «Vendiste …» de Te quedó y en el gráfico: en su lugar, las unidades. */}
-            <Apoyo titulo="Ventas registradas" valor={s ? s.cantidad.toLocaleString('es-VE') : null} delta={s && <Delta ahora={s.cantidad} antes={ant?.cantidad} />}
+            <Apoyo titulo="Ventas registradas" valor={s ? s.cantidad.toLocaleString('es-VE') : null} delta={s && <Delta ahora={s.cantidad} antes={ant?.cantidad || undefined} />}
               ayuda="Las ventas procesadas en Ventas de este sistema. Las de MercadoLibre, registradas o no, están más abajo por cuenta." />
             <Apoyo titulo="Unidades vendidas" valor={s ? (s.unidades ?? 0).toLocaleString('es-VE') : null}
-              delta={s && ant?.unidades != null ? <Delta ahora={s.unidades ?? 0} antes={ant.unidades} /> : null}
+              delta={s && ant?.cantidad && ant.unidades != null ? <Delta ahora={s.unidades ?? 0} antes={ant.unidades} /> : null}
               ayuda="Cuántas unidades salieron en esas ventas" />
             <Apoyo titulo="Ticket promedio" valor={s ? (s.cantidad ? `$${money0(s.ventas / s.cantidad)}` : '—') : null}
               delta={s && ant && ant.cantidad > 0 && s.cantidad > 0 ? <Delta ahora={s.ventas / s.cantidad} antes={ant.ventas / ant.cantidad} fmt={fmtMonto} chica={ant.cantidad < 5 ? Infinity : 0} /> : null}
@@ -405,15 +409,15 @@ export default function DashboardAdmin({ country, bonos, reportes = false, accio
                 <span className="flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-4 rounded-full" style={{ background: color }} />
                   {period === 'today' ? 'Hoy' : period === 'month' ? 'Este mes' : period === 'year' ? 'Este año' : 'Este período'}
                   <b className="num font-semibold text-neutral-900">${money0(enHoy.actual ?? 0)}</b></span>
-                <span className="flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-4 rounded-full" style={{ background: GRIS }} />
+                {!sinAnterior && <span className="flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-4 rounded-full" style={{ background: GRIS }} />
                   {ANTERIOR_A_LA_FECHA[period]} <b className="num font-semibold text-neutral-700">${money0(enHoy.anterior)}</b>
-                  {cierre != null && <span className="text-neutral-500">· cerró <span className="num">${money0(cierre)}</span></span>}</span>
+                  {cierre != null && <span className="text-neutral-500">· cerró <span className="num">${money0(cierre)}</span></span>}</span>}
               </div>
             )}
           </div>
           {datosGrafico ? (
             <div className={`relative h-56 transition-opacity sm:h-64 ${cargandoGrafico ? 'opacity-50' : ''}`} role="img"
-              aria-label={`${metrica === 'ventas' ? 'Ventas' : 'Ganancia'} acumulada del período: $${money0(enHoy?.actual ?? 0)}, contra $${money0(enHoy?.anterior ?? 0)} ${ANTERIOR_A_LA_FECHA[period].toLowerCase()}${cierre != null ? `; el período anterior cerró en $${money0(cierre)}` : ''}`}>
+              aria-label={`${metrica === 'ventas' ? 'Ventas' : 'Ganancia'} acumulada del período: $${money0(enHoy?.actual ?? 0)}${sinAnterior ? '' : `, contra $${money0(enHoy?.anterior ?? 0)} ${ANTERIOR_A_LA_FECHA[period].toLowerCase()}`}${!sinAnterior && cierre != null ? `; el período anterior cerró en $${money0(cierre)}` : ''}`}>
               <Chart type="line" data={datosGrafico} options={chartOptions} plugins={[valorAlFinal]} />
             </div>
           ) : chart ? (
