@@ -136,7 +136,70 @@ export default function UsuariosClient({ country, embebido = false }: { country:
           }} />
       )}
 
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
+      {/* Celular (20-11): una tarjeta por persona en vez de la tabla ancha (rol y botones quedaban fuera de vista). */}
+      <div className="md:hidden space-y-3">
+        {users.map(u => {
+          const yo = u.id === me
+          return (
+            <div key={u.id} className={`rounded-xl border border-neutral-200 bg-white p-4 shadow-sm space-y-3 ${!u.is_active ? 'opacity-50' : ''}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <button onClick={() => renombrar(u)} className="block max-w-full text-left font-medium text-neutral-900 hover:underline [overflow-wrap:anywhere]" title="Cambiar nombre">{u.full_name ?? '—'}</button>
+                  <p className="font-mono text-xs text-neutral-500">{u.username}{yo && <span className="ml-1 font-sans text-neutral-400">(tú)</span>}</p>
+                  <button onClick={() => cambiarCorreo(u)} title="Con el correo recupera su clave sola"
+                    className={`block max-w-full text-left text-xs hover:underline [overflow-wrap:anywhere] ${u.email ? 'text-neutral-400' : 'text-amber-600'}`}>
+                    {u.email ?? '+ agregar correo'}
+                  </button>
+                </div>
+                {u.is_active
+                  ? <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800">Activo</span>
+                  : <span className="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600">Inactivo</span>}
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <label className="block">
+                  <span className="mb-1 block text-neutral-500">Rol</span>
+                  <select value={u.role} disabled={yo || !u.is_active} onChange={e => cambiarRol(u, e.target.value as Usuario['role'])}
+                    className="w-full border border-neutral-300 rounded px-2 py-1.5 text-xs bg-white disabled:bg-neutral-50"
+                    title={yo ? 'No puedes cambiar tu propio rol' : undefined}>
+                    <option value="admin">Admin</option>
+                    <option value="user">Usuario</option>
+                  </select>
+                </label>
+                <div>
+                  <span className="mb-1 block text-neutral-500">Último ingreso</span>
+                  <span className="text-neutral-700">{fecha(u.last_login)}</span>
+                </div>
+              </div>
+              <div className="text-xs">
+                <span className="mb-1 block text-neutral-500">Permisos</span>
+                <ResumenPermisos u={u} disponibles={disponibles} predeterminado={predeterminado}
+                  onAbrir={() => { setPermisosDe(u); setClaveDe(null); setError(null) }} />
+              </div>
+              <div className="flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
+                {u.role === 'user' && u.is_active && !yo && (
+                  <button onClick={() => verComo(u)} disabled={entrandoComo !== null}
+                    className="btn-secondary text-xs inline-flex items-center gap-1.5"
+                    title="Ver el sistema exactamente como lo ve esta persona (solo lectura)">
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />
+                    </svg>
+                    {entrandoComo === u.id ? 'Entrando…' : 'Ver como'}
+                  </button>
+                )}
+                <button onClick={() => { setClaveDe(u); setError(null) }} className="btn-secondary text-xs">Cambiar contraseña</button>
+                {!yo && (
+                  <button onClick={() => toggleActivo(u)} className="btn-secondary text-xs">
+                    {u.is_active ? 'Desactivar' : 'Activar'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="hidden md:block bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>
