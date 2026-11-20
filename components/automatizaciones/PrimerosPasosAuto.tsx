@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import Link from '@/components/ui/Link'
 
-// Inicio de Automatizaciones → «Primeros pasos» (20-11, el dueño; idea vista en Mercasist). Lo único necesario es
+// Inicio de Automatizaciones → «Primeros pasos» (20-11, el dueño; idea vista en Mercasist). Compacta como la de
+// Inventario (el dueño): un paso a la vista («Paso 2 de 4»), ‹ › y los puntos pasan de uno en uno. Lo único necesario es
 // conectar MercadoLibre; lo demás es opcional y se dice así (se puede trabajar a mano solo con la cuenta conectada).
 // Cada paso se marca solo (/api/automatizaciones/primeros-pasos). «Comprendo, ocultar» la quita para toda la empresa
 // y no vuelve a salir; con todo hecho también se va. Los días de prueba NO van aquí: ya los dice el aviso de arriba.
@@ -39,6 +40,7 @@ function pasos(e: Estado): Paso[] {
 export default function PrimerosPasosAuto() {
   const [e, setE] = useState<Estado | null>(null)
   const [cerrando, setCerrando] = useState(false)
+  const [ver, setVer] = useState<number | null>(null)   // paso a la vista (null = el primero pendiente)
 
   useEffect(() => {
     let vivo = true
@@ -51,62 +53,58 @@ export default function PrimerosPasosAuto() {
   const lista = pasos(e)
   const hechos = lista.filter(p => p.hecho).length
   if (hechos === lista.length) return null
+  // Se abre en el primer paso pendiente; ‹ › avanzan o retroceden de a uno (así se salta un opcional sin ocultar todo).
+  const primero = lista.findIndex(p => !p.hecho)
+  const idx = Math.min(ver ?? primero, lista.length - 1)
+  const p = lista[idx]
 
   const ocultar = async () => {
     setCerrando(true)
     try { await fetch('/api/automatizaciones/primeros-pasos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ocultar: true }) }) } catch { /* igual se oculta ahora */ }
     setE({ ...e, oculta: true })
   }
+  const flecha = 'flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent'
 
   return (
     <section className="rounded-xl border border-neutral-200 bg-white shadow-sm" aria-label="Primeros pasos">
-      <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h2 className="font-semibold text-neutral-900">Primeros pasos</h2>
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+            <span className="font-medium text-neutral-700">Primeros pasos · Paso {idx + 1} de {lista.length}</span>
             <span className="flex items-center gap-1" role="progressbar" aria-valuemin={0} aria-valuemax={lista.length} aria-valuenow={hechos} aria-label={`${hechos} de ${lista.length} listos`}>
-              {lista.map(p => <span key={p.k} title={p.titulo} className={`h-1.5 w-4 rounded-full ${p.hecho ? 'bg-emerald-500' : 'bg-neutral-200'}`} />)}
+              {lista.map((x, i) => (
+                <button key={x.k} type="button" onClick={() => setVer(i)} title={x.titulo} aria-label={`Paso ${i + 1}: ${x.titulo}`}
+                  className={`h-1.5 rounded-full transition-all ${i === idx ? 'w-6 bg-neutral-900' : x.hecho ? 'w-4 bg-emerald-500' : 'w-4 bg-neutral-200 hover:bg-neutral-300'}`} />
+              ))}
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-neutral-500">Lo único necesario es conectar MercadoLibre; lo demás es opcional y te ahorra tiempo.</p>
-        </div>
-        {/* Sin MercadoLibre conectado no se oculta: es lo único necesario. */}
-        {e.ml && (
-          <button type="button" onClick={ocultar} disabled={cerrando} title="Deja de verse en el Inicio para toda tu empresa"
-            className="btn-secondary !px-3 !py-1 text-xs">{cerrando ? 'Ocultando…' : 'Comprendo, ocultar'}</button>
-        )}
-      </div>
-      <ol className="mt-2 divide-y divide-neutral-100 border-t border-neutral-100">
-        {lista.map((p, i) => (
-          <li key={p.k} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 sm:flex-nowrap">
-            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${p.hecho ? 'bg-emerald-500 text-white' : 'border border-neutral-300 text-neutral-500'}`} aria-hidden>
-              {p.hecho ? '✓' : i + 1}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <p className={`font-semibold ${p.hecho ? 'text-neutral-500' : 'text-neutral-900'}`}>{p.hecho ? '✓ ' : ''}{p.titulo}</p>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${p.hecho ? 'bg-emerald-50 text-emerald-700' : p.necesario ? 'bg-lime-100 text-lime-800' : 'bg-neutral-100 text-neutral-500'}`}>
+              {p.hecho ? 'Listo' : p.necesario ? 'Necesario' : 'Opcional'}
             </span>
-            <div className="min-w-0 flex-1 basis-48">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span className={`text-sm font-medium ${p.hecho ? 'text-neutral-400 line-through decoration-neutral-300' : 'text-neutral-900'}`}>{p.titulo}</span>
-                {!p.hecho && (
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${p.necesario ? 'bg-lime-100 text-lime-800' : 'bg-neutral-100 text-neutral-500'}`}>
-                    {p.necesario ? 'Necesario' : 'Opcional'}
-                  </span>
-                )}
-              </div>
-              {!p.hecho && <p className="text-xs text-neutral-500">{p.para}</p>}
-            </div>
-            {!p.hecho && (
-              <div className="ml-9 flex shrink-0 items-center gap-2 sm:ml-0">
-                <Link href={p.guia} title="Cómo se hace (manual)" aria-label={`Guía: ${p.titulo}`}
-                  className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M4 5a2 2 0 0 1 2-2h5v17H6a2 2 0 0 0-2 2V5z" /><path d="M20 5a2 2 0 0 0-2-2h-5v17h5a2 2 0 0 1 2 2V5z" />
-                  </svg>
-                </Link>
-                <Link href={p.href} className={`${p.necesario ? 'btn-primary' : 'btn-secondary'} whitespace-nowrap !px-3 !py-1.5 text-sm`}>{p.ir} →</Link>
-              </div>
+          </div>
+          <p className="mt-0.5 text-sm leading-relaxed text-neutral-600">{p.para}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end">
+          {!p.hecho && <Link href={p.href} className={`${p.necesario ? 'btn-primary' : 'btn-secondary'} whitespace-nowrap px-4 text-sm`}>{p.ir} →</Link>}
+          <div className="flex items-center gap-2 text-xs">
+            <button type="button" onClick={() => setVer(idx - 1)} disabled={idx === 0} className={flecha} aria-label="Paso anterior">‹</button>
+            <button type="button" onClick={() => setVer(idx + 1)} disabled={idx === lista.length - 1} className={flecha} aria-label="Paso siguiente">›</button>
+            <Link href={p.guia} title="Cómo se hace (manual)" aria-label={`Guía: ${p.titulo}`}
+              className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 5a2 2 0 0 1 2-2h5v17H6a2 2 0 0 0-2 2V5z" /><path d="M20 5a2 2 0 0 0-2-2h-5v17h5a2 2 0 0 1 2 2V5z" />
+              </svg>
+            </Link>
+            {/* Sin MercadoLibre conectado no se oculta: es lo único necesario. */}
+            {e.ml && (
+              <button type="button" onClick={ocultar} disabled={cerrando} title="Deja de verse en el Inicio para toda tu empresa"
+                className="text-neutral-400 hover:text-neutral-700">{cerrando ? 'Ocultando…' : 'Comprendo, ocultar'}</button>
             )}
-          </li>
-        ))}
-      </ol>
+          </div>
+        </div>
+      </div>
     </section>
   )
 }
