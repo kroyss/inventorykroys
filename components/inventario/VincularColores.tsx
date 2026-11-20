@@ -13,7 +13,9 @@ import { createPortal } from 'react-dom'
 
 interface Variante { id: string; nombre: string | null; disponible: number; foto: string | null }
 interface Prod { id: number; code: string; name: string; stock?: number }
-interface Datos { item_id: string; titulo: string; estado: string | null; cuenta: string | null; variantes: Variante[]; vinculados: Prod[] }
+interface Datos { item_id: string; titulo: string; estado: string | null; cuenta: string | null; variantes: Variante[]; vinculados: Prod[]
+  /** Colores que ya tienen su producto (variante → product_id). */
+  actuales: Record<string, number> }
 
 const SIN_PESO = new Set(['color', 'talla', 'modelo', 'tamano', 'tamaño', 'diseno', 'diseño', 'tipo', 'de', 'y', 'con', 'x', 'para'])
 const palabras = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/)
@@ -61,7 +63,7 @@ export default function VincularColores({ item, foco = null, imagen = null, conS
       const datos = a.j as Datos
       if (foco) datos.variantes.sort((x, y) => Number(y.id === foco) - Number(x.id === foco))
       setD(datos)
-      setElegido(Object.fromEntries(datos.variantes.map(v => [v.id, sugerir(v.nombre, datos.vinculados)])))
+      setElegido(Object.fromEntries(datos.variantes.map(v => [v.id, datos.actuales?.[v.id] ?? sugerir(v.nombre, datos.vinculados)])))
     }).catch(() => vivo && setError('No se pudo conectar'))
     return () => { vivo = false }
   }, [item, foco])

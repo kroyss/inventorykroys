@@ -54,16 +54,19 @@ export async function GET(req: NextRequest) {
       const [{ rows: [c] }, { rows: vinc }] = await Promise.all([
         s.db.query(`SELECT item_id, titulo, estado, variantes FROM ml_catalogo WHERE substring(item_id FROM 4) = $1 LIMIT 1`, [pub]),
         s.db.query(
-          `SELECT p.id, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock, m.ml_account AS cuenta
+          // Lo vinculado a la publicación entera y a cada color (lo ya dividido viene elegido).
+          `SELECT p.id, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock, m.ml_account AS cuenta,
+                  NULLIF(split_part(m.ml_code, ':', 2), '') AS variante
            FROM product_ml_codes m JOIN products p ON p.id = m.product_id LEFT JOIN inventory i ON i.product_id = p.id
-           WHERE m.is_active AND m.ml_code = $1 ORDER BY p.code`, [pub]),
+           WHERE m.is_active AND split_part(m.ml_code, ':', 1) = $1 ORDER BY (m.ml_code = $1) DESC, p.code`, [pub]),
       ])
       if (!c) return NextResponse.json({ error: 'No encontré la publicación (actualiza las publicaciones)' }, { status: 404 })
       const vs: { id: number | string; nombre: string | null; disponible: number; foto?: string | null }[] = Array.isArray(c.variantes) ? c.variantes : []
       return NextResponse.json({
         item_id: c.item_id, titulo: c.titulo, estado: c.estado, cuenta: vinc[0]?.cuenta ?? null,
         variantes: vs.map(v => ({ id: String(v.id), nombre: v.nombre, disponible: Number(v.disponible) || 0, foto: v.foto ?? null })),
-        vinculados: vinc.map(v => ({ id: v.id, code: v.code, name: v.name })),
+        vinculados: [...new Map(vinc.map(v => [v.id, { id: v.id, code: v.code, name: v.name }])).values()],
+        actuales: Object.fromEntries(vinc.filter(v => v.variante).map(v => [String(v.variante), v.id])),
       })
     }
     const userId = Number(s.session.user.id)
@@ -119,7 +122,13 @@ export async function POST(req: NextRequest) {
       if (rows.length !== ids.length) return NextResponse.json({ error: 'Algún producto no existe o está desactivado' }, { status: 400 })
       // Sin transacción (vincular() pide pesos y traga sus errores): si algo falla a medias, la variante vinculada ya le
       // gana al vínculo entero, y el entero se quita solo al final, cuando todas quedaron.
-      for (const a of b.asignaciones) await vincular(s.db, a.product_id, b.cuenta, `${b.item}:${a.variante}`, userId)
+      for (const a of b.asignaciones) {
+        // 20-11: cada color queda con UN producto: si ya tenía otro, ese vínculo se quita (queda quién y cuándo).
+        await s.db.query(
+          `UPDATE product_ml_codes SET is_active = FALSE, desvinculado_por = $3, desvinculado_at = NOW()
+           WHERE ml_code = $1 AND is_active AND product_id <> $2`, [`${b.item}:${a.variante}`, a.product_id, userId])
+        await vincular(s.db, a.product_id, b.cuenta, `${b.item}:${a.variante}`, userId)
+      }
       await s.db.query(
         `UPDATE product_ml_codes SET is_active = FALSE, desvinculado_por = $2, desvinculado_at = NOW() WHERE ml_code = $1 AND is_active`,
         [b.item, userId])
