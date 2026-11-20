@@ -43,8 +43,8 @@ Lo que no es de ningún espacio (Usuarios, Aprendizaje, Novedades) está en todo
   empresa y no vuelve a salir (sin ML conectado no se puede ocultar). Con todo hecho, se va sola.
 - **Pendiente ahora**: lo que espera hoy (preguntas sin responder, mensajes sin leer, etc.) y abajo todas las
   herramientas agrupadas. En la tarjeta **Preguntas con IA** sale una línea chica con **cómo te fue en 7 días**:
-  cuántas respondiste, el **tiempo típico** (la mitad se respondió en menos de eso; ↓ verde si fue más rápido que la
-  semana anterior, ↑ ámbar si más lento) y qué parte respondió la IA sola. Si no hubo preguntas, no sale.
+  cuántas respondiste, el tiempo **típico** de respuesta (la mitad se respondió en menos de eso; «< 1 min» si fue casi al
+  instante; ↓ verde si fue más rápido que la semana anterior, ↑ ámbar si más lento) y qué % respondió la IA sola. Si no hubo preguntas, no sale.
 
 **Avisos de tu cuenta** (20-11-2026, arriba de todas las pantallas): el vencimiento de la prueba o del plan, el pago en
 revisión, una cuenta de ML desconectada, los créditos de IA bajos o agotados y Radar PRO salen **juntos en un solo
