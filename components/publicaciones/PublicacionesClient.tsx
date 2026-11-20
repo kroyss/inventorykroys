@@ -15,10 +15,12 @@ interface Fila {
   thumbnail: string | null; sku: string | null; cuenta: string; variantes: number; editada_at: string | null
   // Fase 4 (18-11): avisos de la fila (lib/avisosPublicaciones.ts); solo vienen los que el usuario puede ver.
   sin_vincular: boolean; sin_peso: boolean; promo: string[] | null   // promo: nombres de las campañas
+  // 20-11 (mig. 192, lib/visitasML.ts): visitas y ventas de los últimos 30 días (null = todavía no se trajeron).
+  visitas_30d: number | null; ventas_30d: number | null; poca_venta: boolean
   stock: null | { nivel: 'vende' | 'stock'; code: string; disponible: number
                   pubs: { item_id: string; variante_id: string | null; variante: string | null; ml: number | null; queda: number; reactivar: boolean }[] }
 }
-type Aviso = 'stock' | 'vincular' | 'peso' | 'promo'
+type Aviso = 'stock' | 'vincular' | 'peso' | 'promo' | 'visitas'
 interface Respuesta {
   filas: Fila[]; total: number; todas: number; porPagina: number; cuentas: { id: number; nickname: string }[]
   avisos: Partial<Record<Aviso, number>>; puedeIgualar: boolean
@@ -133,6 +135,11 @@ export default function PublicacionesClient() {
                     <span className="block text-sm text-neutral-900 truncate">{f.titulo}</span>
                     <span className="block text-xs text-neutral-500">
                       {f.item_id} · {f.cuenta}{f.sku ? ` · SKU ${f.sku}` : ''}{f.variantes && !r.puedeIgualar ? ` · ${f.variantes} variantes` : ''}
+                      {f.visitas_30d != null && (
+                        <span className="num" title={`En los últimos 30 días: ${f.visitas_30d.toLocaleString('es-VE')} visitas y ${(f.ventas_30d ?? 0).toLocaleString('es-VE')} ventas`}>
+                          {' · '}{f.visitas_30d.toLocaleString('es-VE')} visitas/mes
+                        </span>
+                      )}
                       {f.editada_at && <span className="ml-1 text-sky-700">· editada aquí</span>}
                     </span>
                   </span>
@@ -204,6 +211,7 @@ export default function PublicacionesClient() {
 
 const AVISOS_UI: { k: Aviso; t: string }[] = [
   { k: 'stock', t: 'Stock distinto' }, { k: 'vincular', t: 'Sin vincular' }, { k: 'peso', t: 'Sin peso' }, { k: 'promo', t: 'En promo' },
+  { k: 'visitas', t: 'Muchas visitas, pocas ventas' },
 ]
 const ETQ = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-4 whitespace-nowrap'
 
@@ -276,6 +284,13 @@ function AvisosFila({ f, vincular, envios, onCambio }: {
           className={`${ETQ} border-lime-200 bg-lime-50 text-lime-800 hover:border-lime-300`}>
           En promo{f.promo.length > 1 && <span className="num">· {f.promo.length}</span>}
         </Link>
+      )}
+      {/* 20-11 (mig. 192): mucha gente la mira y casi nadie compra → revisar precio, fotos o título. */}
+      {f.poca_venta && f.visitas_30d != null && (
+        <span className={`${ETQ} border-violet-200 bg-violet-50 text-violet-800`}
+          title={`${f.visitas_30d.toLocaleString('es-VE')} visitas y ${(f.ventas_30d ?? 0).toLocaleString('es-VE')} ventas en 30 días: mucha gente la mira y casi nadie compra. Revisa el precio, las fotos o el título.`}>
+          Muchas visitas, pocas ventas<span className="num">· {(f.ventas_30d ?? 0).toLocaleString('es-VE')} {f.ventas_30d === 1 ? 'venta' : 'ventas'}</span>
+        </span>
       )}
       {msg && <span className={`text-[11px] ${msg.startsWith('✓') ? 'text-emerald-700' : 'text-red-600'}`}>{msg}</span>}
     </div>

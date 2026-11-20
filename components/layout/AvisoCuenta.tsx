@@ -4,6 +4,7 @@ import { DIAS_PRUEBA } from '@/lib/cuenta'
 import { corteQueLeToca } from '@/lib/fundadoresCorte'
 import { textoCorte } from '@/lib/fundadoresCortes'
 import AvisoCorte from './AvisoCorte'
+import type { ItemAviso } from './AvisosLista'
 
 // Aviso arriba de todas las pantallas sobre la cuenta de la organización (lib/cuenta.ts):
 //  - prueba esperando conexión (migración 067): "tus días empiezan al conectar ML" (el número solo a
@@ -38,11 +39,12 @@ function AvisoPagoEnRevision() {
   )
 }
 
-export default async function AvisoCuenta({ organizacionId, esAdmin }: { organizacionId: number; esAdmin: boolean }) {
+/** 20-11: devuelve el aviso (o null) para el recuadro «Avisos de tu cuenta» (AvisosArriba): de estos sale uno solo a la vez. */
+export async function avisoCuenta(organizacionId: number, esAdmin: boolean): Promise<ItemAviso | null> {
   // Plazo de su corte de Fundadores sin MercadoLibre (lib/fundadoresCortes.ts): reemplaza al aviso de abajo.
   const corte = await corteQueLeToca(organizacionId).catch(() => null)
   // El texto de la fecha sale del servidor (el navegador podría escribir la hora distinto y no coincidir).
-  if (corte) return <AvisoCorte hasta={corte} corto={textoCorte(corte)} largo={textoCorte(corte, true)} esAdmin={esAdmin} />
+  if (corte) return { id: 'corte', nivel: 'rojo', orden: 10, nodo: <AvisoCorte hasta={corte} corto={textoCorte(corte)} largo={textoCorte(corte, true)} esAdmin={esAdmin} /> }
   const { rows: [o] } = await dbGlobal().query(
     `SELECT estado, fundador, prueba_dias, to_char(prueba_hasta, 'YYYY-MM-DD') AS hasta,
             prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan,
@@ -55,39 +57,39 @@ export default async function AvisoCuenta({ organizacionId, esAdmin }: { organiz
   if (o?.estado === 'activo' && o.plan_hasta) {
     const q = Number(o.plan_quedan)
     if (q < 0 || q > AVISAR_DESDE) return null
-    if (o.en_revision) return <AvisoPagoEnRevision />
-    return <AvisoVence que="plan" hasta={o.plan_hasta} quedan={q} esAdmin={esAdmin} />
+    if (o.en_revision) return { id: 'revision', nivel: 'verde', orden: 45, nodo: <AvisoPagoEnRevision /> }
+    return { id: 'vence', nivel: q <= 1 ? 'rojo' : 'ambar', orden: q <= 1 ? 15 : 40, nodo: <AvisoVence que="plan" hasta={o.plan_hasta} quedan={q} esAdmin={esAdmin} /> }
   }
   if (!o || o.estado !== 'prueba' || !o.hasta) return null
   const quedan = Number(o.quedan)
 
   // Esperando conexión, salvo que ya pasaron los días de espera (los días corren solos).
   if (o.prueba_dias != null && quedan >= o.prueba_dias) {
-    return (
+    return { id: 'conectar', nivel: 'ambar', orden: 35, nodo: (
       <div className="bg-lime-50 border-b border-lime-200 text-lime-900 text-center text-sm py-2 px-4">
         {o.fundador ? <>Tus <b>{o.prueba_dias} días gratis de Fundador</b></> : <>Tus <b>días gratis</b></>} empiezan cuando conectes tu primera cuenta de MercadoLibre
         {quedan - o.prueba_dias <= 3 ? <> (si no, empiezan solos {quedan - o.prueba_dias === 0 ? 'hoy' : `en ${quedan - o.prueba_dias} día${quedan - o.prueba_dias === 1 ? '' : 's'}`})</> : null}.{' '}
         {esAdmin && <Link href="/conectar" className="underline font-semibold whitespace-nowrap">Conectar ahora →</Link>}
       </div>
-    )
+    ) }
   }
   if (quedan < 0) return null
   if (quedan > AVISAR_DESDE) {
     const total = o.fundador ? DIAS_PRUEBA.fundador : DIAS_PRUEBA.normal
     // Recién empezados (hoy o ayer): confirmación en verde.
     if (quedan >= total - 1) {
-      return (
+      return { id: 'empezo', nivel: 'verde', orden: 60, nodo: (
         <div className="bg-lime-50 border-b border-lime-200 text-lime-900 text-center text-sm py-2 px-4">
           ✓ ¡Listo! {o.fundador ? <>Tus <b>{total} días gratis de Fundador</b> ya empezaron</> : <>Tu <b>prueba gratis</b> ya empezó</>}: va hasta el <b>{ddmm(o.hasta)}</b>.
         </div>
-      )
+      ) }
     }
-    return (
+    return { id: 'prueba', nivel: 'gris', orden: 70, nodo: (
       <div className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 text-center text-xs py-1.5 px-4">
         {o.fundador ? 'Prueba gratis de Fundador' : 'Prueba gratis'}: quedan <b className="num">{quedan} días</b> (hasta el {ddmm(o.hasta)}).
       </div>
-    )
+    ) }
   }
-  if (o.en_revision) return <AvisoPagoEnRevision />
-  return <AvisoVence que="prueba" hasta={o.hasta} quedan={quedan} esAdmin={esAdmin} />
+  if (o.en_revision) return { id: 'revision', nivel: 'verde', orden: 45, nodo: <AvisoPagoEnRevision /> }
+  return { id: 'vence', nivel: quedan <= 1 ? 'rojo' : 'ambar', orden: quedan <= 1 ? 15 : 40, nodo: <AvisoVence que="prueba" hasta={o.hasta} quedan={quedan} esAdmin={esAdmin} /> }
 }

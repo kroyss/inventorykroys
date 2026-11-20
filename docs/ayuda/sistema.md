@@ -32,6 +32,24 @@ Está organizado en **espacios**, cada uno con su propio menú:
 
 Lo que no es de ningún espacio (Usuarios, Aprendizaje, Novedades) está en todos.
 
+**Inicio de Automatizaciones** (el primer botón del menú de Automatizaciones):
+- **Primeros pasos** (20-11-2026; arriba, solo para quien conecta las cuentas de ML): una lista corta que se marca sola.
+  Lo único **necesario** es **Conectar tu cuenta de MercadoLibre** (sin eso no se traen preguntas, mensajes ni ventas);
+  lo demás es **opcional** (se puede trabajar a mano solo con la cuenta conectada): **Completar Mi IA** (dice cuántos
+  temas faltan), **Prender las respuestas automáticas** (Modo Seguro o Total) y **Recibir avisos por Telegram**. Cada
+  paso tiene su botón y un librito 📖 que abre su parte del manual. **Comprendo, ocultar** la quita para toda la
+  empresa y no vuelve a salir (sin ML conectado no se puede ocultar). Con todo hecho, se va sola.
+- **Pendiente ahora**: lo que espera hoy (preguntas sin responder, mensajes sin leer, etc.) y abajo todas las
+  herramientas agrupadas. En la tarjeta **Preguntas con IA** sale una línea chica con **cómo te fue en 7 días**:
+  cuántas respondiste, el **tiempo típico** (la mitad se respondió en menos de eso; ↓ verde si fue más rápido que la
+  semana anterior, ↑ ámbar si más lento) y qué parte respondió la IA sola. Si no hubo preguntas, no sale.
+
+**Avisos de tu cuenta** (20-11-2026, arriba de todas las pantallas): el vencimiento de la prueba o del plan, el pago en
+revisión, una cuenta de ML desconectada, los créditos de IA bajos o agotados y Radar PRO salen **juntos en un solo
+recuadro**: se ve el más importante con su botón y debajo **«Ver N avisos más»** despliega el resto. Los **rojos**
+(cuenta vencida o cortada, ML desconectada, créditos agotados, vence hoy o mañana) **siempre se ven**. Cada aviso sale
+en las mismas condiciones de siempre.
+
 **Nada se publica solo sin que lo decidas:** el sistema propone (respuestas, calificaciones, mensajes) y tú
 revisas, salvo en lo que tú mismo prendas como automático (respuestas automáticas, calificación automática,
 mensaje al comprador nuevo, recordatorios de pago).
@@ -522,12 +540,18 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   - **Sin peso** (Venezuela): su producto no tiene peso. Lleva a **Pesos y envío gratis**.
   - **En promo** (Venezuela): está en una promoción (según la última lectura de Promociones). Al pasar el cursor dice
     en qué campañas; al tocarla abre **Promociones** buscando esa publicación.
+  - **Muchas visitas, pocas ventas** (20-11-2026): al menos 100 visitas en los últimos 30 días y menos de 1 venta cada
+    100 visitas. Mucha gente la mira y casi nadie compra: revisa el precio, las fotos o el título. Al pasar el cursor dice
+    cuántas visitas y ventas tuvo.
+  **Visitas:** debajo del título de cada publicación sale **«N visitas/mes»** (las de los últimos 30 días). Se traen de
+  MercadoLibre **una vez al día**; las ventas salen de las ventas de ML que ya tiene el sistema. Las recién publicadas
+  o las que todavía no se leyeron no muestran el número.
   **Al día:** la lista es una copia del catálogo de ML (se relee sola **cada hora**, junto con la revisión de stock, o ya con
   **↻ Actualizar** (arriba, junto a Novedades)). Cuando llega una venta nueva, se relee al momento **solo la publicación vendida** (su stock y
   si ML la pausó al quedar en 0) y con esa misma lectura quedan al día Mis publicaciones, Stock vs inventario y
   **Automatizaciones → Stock** (cada lectura de ML se aprovecha para todas). Lo que cambies directo en ML sin vender
   aparece en la próxima relectura. Al abrir una publicación, el editor la lee en vivo.
-  Arriba, los filtros con su número (**Stock distinto · Sin vincular · Sin peso · En promo**) muestran solo lo que hay
+  Arriba, los filtros con su número (**Stock distinto · Sin vincular · Sin peso · En promo · Muchas visitas, pocas ventas**) muestran solo lo que hay
   que arreglar. Cada etiqueta sale solo si tienes permiso para esa pantalla. Arriba a la derecha: **Vincular** y
   **Pesos y envío gratis** (con lo que falta: publicaciones activas con stock sin producto, el mismo número que el filtro «Sin vincular»; al pasar el cursor, cuántos colores/modelos) y **Textos de descripción**. Tocar la fila abre
   el editor (ver abajo).
@@ -1434,7 +1458,8 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   **Menos de $3** (Venezuela), cada uno con su arreglo en lote.
 - **Mis publicaciones** (Publicaciones): cada fila con su estado (**Activa · Pausar** / **Pausada · Activar**; también
   en lote) y etiquetas solo si algo pide atención (**Stock distinto** dice la diferencia y abre Stock vs inventario,
-  **Sin vincular**, **Sin peso**, **En promo** con sus campañas) y filtros con esas. **«N disp. ✎»** / **«N variantes»**
+  **Sin vincular**, **Sin peso**, **En promo** con sus campañas, **Muchas visitas, pocas ventas**) y filtros con esas;
+  debajo del título, **N visitas/mes** (últimos 30 días, se traen una vez al día). **«N disp. ✎»** / **«N variantes»**
   abren Cambiar stock (un cuadro por variante, directo a ML). Tocar una abre el editor; lo
   guardado va directo a ML y los cambios en lote van por la cola.
 - **Promociones:** campañas de ML, qué publicaciones entran y hasta dónde bajar; antes de entrar, la rentabilidad al

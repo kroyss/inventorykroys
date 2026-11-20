@@ -14,6 +14,7 @@ import type { Pool } from 'pg'
 import { mlFetch, leerItems } from '@/lib/ml'
 import { idsDe, CAMPOS_ITEM, guardarAlertas } from '@/lib/alertasStock'
 import { guardarPregunta, type PreguntaML } from '@/lib/preguntas'
+import { actualizarVisitas } from '@/lib/visitasML'
 
 export const HORAS_CATALOGO = 6
 const DIAS_MOVIMIENTO = 90
@@ -167,6 +168,9 @@ export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = 
     await guardarAlertas(db, conexionId, leidas as Parameters<typeof guardarAlertas>[2]).catch(e => console.error('[catalogo] alertas', e))
   }
   await cerrarPasadaCatalogo(db, conexionId, inicio, sinLeer)
+  // 20-11 (mig. 192): una vez por día, las visitas de 30 días de cada publicación (Inventario → Publicaciones).
+  // Solo en la pasada automática (cron): el botón «Actualizar desde ML» no espera por esto.
+  if (!forzar) await actualizarVisitas(db, conexionId).catch(e => console.error('[catalogo] visitas', e instanceof Error ? e.message : e))
   return n
 }
 

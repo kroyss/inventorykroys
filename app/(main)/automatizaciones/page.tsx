@@ -64,7 +64,7 @@ export default async function AutomatizacionesPage() {
     <div>
       <PageHeader title="Automatiza" subtitle="Lo que pasa en MercadoLibre, atendido desde aquí: preguntas, mensajes, despachos, guías y calificaciones"
         actions={ml && !sinCuentas ? <CuentasConectadas cuentas={cuentas} esAdmin={puede(u, 'ml_cuentas')} /> : undefined} />
-      <InicioAutomatizaciones grupos={grupos} sinCuentas={sinCuentas} esAdmin={puede(u, 'ml_cuentas')} />
+      <InicioAutomatizaciones grupos={grupos} sinCuentas={sinCuentas} esAdmin={puede(u, 'ml_cuentas')} guia={ml && puede(u, 'ml_cuentas')} />
     </div>
   )
 }

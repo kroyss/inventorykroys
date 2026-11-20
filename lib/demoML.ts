@@ -104,6 +104,15 @@ export async function mlDemo<T>(db: Pool, conexionId: number, ruta: string, init
   if (p[0] === 'packs') throw noExiste(camino)
 
   // ── Publicaciones ───────────────────────────────────────────────────────
+  // 20-11 (mig. 192, lib/visitasML.ts): visitas de 30 días, inventadas pero fijas por publicación (siempre las mismas).
+  if (p[0] === 'items' && p[1] === 'visits') {
+    const ids = (qs.get('ids') ?? '').split(',').filter(Boolean)
+    return r(ids.map(id => {
+      let h = 0
+      for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+      return { item_id: id, total_visits: 40 + h % 460 }
+    }))
+  }
   if (p[0] === 'items' && p[1]) {
     const item = p[1]
     const prod = productoDemo(item)
