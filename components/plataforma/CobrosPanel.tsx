@@ -142,8 +142,8 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }:
         {d.ingresos && (
           <div className="grid grid-cols-3 gap-2 text-center">
             {([['Cobrado este mes', usd(d.ingresos.mes)], ['Pagos este mes', String(d.ingresos.pagos_mes)], ['Mes anterior', usd(d.ingresos.anterior)]] as const).map(([t, v]) => (
-              <div key={t} className="rounded-lg bg-neutral-50 px-2 py-2">
-                <p className="text-lg font-semibold tabular-nums text-neutral-900">{v}</p>
+              <div key={t} className="rounded-lg bg-neutral-50 px-1 py-2">
+                <p className="whitespace-nowrap text-base font-semibold tabular-nums text-neutral-900 sm:text-lg">{v}</p>
                 <p className="text-[11px] text-neutral-500">{t}</p>
               </div>
             ))}
