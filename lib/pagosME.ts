@@ -275,3 +275,25 @@ export function bancoReceptor(bancos: { ruta: string; valor: string }[]): string
   const b = bancos.find(x => /seller|receiv|recep|destin|recipient|benefic|vendedor|payee|to_bank|target/i.test(x.ruta))
   return b?.valor.trim().slice(0, 80) || null
 }
+
+// ── Seguimiento de órdenes (migración 191, 20-11-2026) ─────────────────────────────────────────────────────────────
+
+/** Cuenta de MercadoEnvíos de un perfil (nombre del portal que manda la extensión); si todavía no se sabe, el perfil. */
+export async function cuentaDePerfil(db: Pool, perfil: string, cuenta?: string | null): Promise<string> {
+  if (cuenta) return cuenta
+  const { rows: [l] } = await db.query(`SELECT cuenta FROM me_latidos WHERE perfil = $1`, [perfil])
+  return (l?.cuenta as string | null) || perfil
+}
+
+/** Versión de la extensión que manda `x-version` (1.4.1+). Las anteriores no la mandan → [0,0,0]. */
+export function versionExtension(req: NextRequest): number[] {
+  const v = (req.headers.get('x-version') ?? '').trim()
+  return /^\d+(\.\d+){0,3}$/.test(v) ? v.split('.').map(Number) : [0, 0, 0]
+}
+export const versionAlMenos = (v: number[], min: number[]) => {
+  for (let i = 0; i < min.length; i++) { const a = v[i] ?? 0; if (a !== min[i]) return a > min[i] }
+  return true
+}
+
+/** Saltadas que vuelven a revisarse en la próxima traída (las demás, p. ej. sin número de venta, no tienen arreglo). */
+export const MOTIVOS_SEGUIMIENTO = ['sin_pago_ni_guia', 'no_leida']

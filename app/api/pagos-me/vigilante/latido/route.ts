@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
-import { autenticarVigilante, PEDIDO_VIGENTE_MIN, SQL_PERFIL_PENDIENTE } from '@/lib/pagosME'
+import { autenticarVigilante, cuentaDePerfil, PEDIDO_VIGENTE_MIN, SQL_PERFIL_PENDIENTE, versionAlMenos, versionExtension } from '@/lib/pagosME'
 
 /** Sin una lectura buena de este perfil en estos días, se lee completo (7 días). */
 const COMPLETA_SI_NO_HAY_DIAS = 3
@@ -8,6 +8,10 @@ const COMPLETA_SI_NO_HAY_DIAS = 3
 const MAX_REVISAR = 200
 /** Margen hacia atrás de la fecha de corte (reloj del portal vs el nuestro, órdenes creadas mientras se leía). */
 const MARGEN_CORTE_MIN = 30
+/** 1.4.1: margen hacia atrás del último aviso leído (avisos publicados mientras se leía). */
+const MARGEN_AVISOS_MIN = 10
+/** 1.4.1: cada cuánto, como máximo, una lectura de la lista (barrido) además de los avisos. */
+const BARRIDO_CADA_H = 20
 
 /**
  * POST /api/pagos-me/vigilante/latido (clave del vigilante + x-perfil) → cada ~1 min desde la extensión.
@@ -46,34 +50,73 @@ export async function POST(req: NextRequest) {
     // y sin guía o al revés): la extensión las pide de a una (/orders/{id}/, ~10 KB). Lo que ya tenía pago y guía no se
     // vuelve a bajar. Lectura completa (7 días: las órdenes vencen a los 7) si no hubo una lectura buena en 3 días.
     // `desde` (la de la 1.3.9) ya no se manda: la 1.3.9 lee siempre completo (lenta pero no pierde nada).
+    // 20-11 (mig. 191): las pendientes salen de la lista de SEGUIMIENTO (me_seguimiento), no solo de la última traída:
+    // la 1.4.0 dejaba caer las que estaban en la última página leída pero eran más viejas que el corte (las marcaba
+    // vistas y no las pedía aparte) y se perdían para siempre (venta 2000019671715396). Ahora quedan anotadas hasta que
+    // llegan con pago y guía o vencen (7 días). Si una se mandó a revisar y no volvió (caida_at, la marca el fin), el
+    // corte se corre hasta su fecha: así la lista la procesa (esas páginas ya se leían igual: no cuesta más).
+    // 1.4.1 (x-version): en vez de la lista lee los AVISOS del portal («Tienes un nuevo pago», 50 por página, ~15 KB)
+    // desde el último leído; `revisar` = solo las que tienen algo a medias o no se pudieron leer. Una vez cada
+    // BARRIDO_CADA_H (o sin avisos leídos todavía) hace además la lectura corta de siempre con todas las pendientes.
     let corte: string | null = null
     let revisar: string[] = []
+    let avisos: { desde: string; hasta: string } | null = null
+    let barrido = false
     if (p) {
+      const conAvisos = versionAlMenos(versionExtension(req), [1, 4, 1])
+      const cuenta = await cuentaDePerfil(a.db, a.perfil)
+      // Fuera las vencidas en el portal y las que ya llegaron completas.
+      await a.db.query(
+        `DELETE FROM me_seguimiento s WHERE s.cuenta = $1 AND (COALESCE(s.fecha_orden, s.creado_at) < NOW() - INTERVAL '7 days'
+           OR EXISTS (SELECT 1 FROM me_pagos m WHERE m.venta IN (s.orden, COALESCE(s.venta, ''))
+                      AND m.guia_path IS NOT NULL AND m.comprobante_path IS NOT NULL))`, [cuenta])
       const { rows: [u] } = await a.db.query(
-        `SELECT id, pedido_at - make_interval(mins => $2) AS corte, r->'saltadas' AS saltadas
+        `SELECT id, pedido_at, pedido_at - make_interval(mins => $2) AS corte
          FROM me_pedidos, LATERAL (SELECT resultados->$1::text AS r) x
          WHERE pedido_at > NOW() - make_interval(days => $3) AND r->>'ok' = 'true' AND r->>'modo' IN ('completa', 'corta')
          ORDER BY pedido_at DESC LIMIT 1`,
         [a.perfil, MARGEN_CORTE_MIN, COMPLETA_SI_NO_HAY_DIAS])
-      // Con la lista de saltadas llena (500, el tope que guarda fin) puede faltar alguna: completa.
-      if (u?.corte && !(Array.isArray(u.saltadas) && u.saltadas.length >= 500)) {
-        const ids = new Set<string>()
-        for (const x of (Array.isArray(u.saltadas) ? u.saltadas : []) as { orden?: string; motivo?: string; fecha?: string }[]) {
-          if (!x?.orden || !['sin_pago_ni_guia', 'no_leida'].includes(x.motivo ?? '')) continue
-          if (x.fecha && Date.parse(x.fecha) < Date.now() - 7 * 864e5) continue   // ya vencida en el portal
-          ids.add(String(x.orden))
-        }
-        // Traídas a medias (pago sin guía o guía sin pago) de esta cuenta en la ventana: la otra mitad puede llegar.
-        const { rows: medias } = await a.db.query(
-          `SELECT p.venta FROM me_pagos p
-           WHERE p.creado_at > NOW() - INTERVAL '7 days' AND (p.guia_path IS NULL OR p.comprobante_path IS NULL)
-             AND p.cuenta = (SELECT cuenta FROM me_latidos WHERE perfil = $1)
-           LIMIT 300`, [a.perfil])
-        for (const m of medias) if (/^\d{10,}$/.test(m.venta)) ids.add(m.venta)
-        if (ids.size <= MAX_REVISAR) { corte = new Date(u.corte).toISOString(); revisar = [...ids] }
+      const { rows: seg } = await a.db.query(
+        `SELECT orden, motivo, fecha_orden, caida_at FROM me_seguimiento WHERE cuenta = $1
+         ORDER BY fecha_orden DESC NULLS LAST LIMIT 1000`, [cuenta])
+      // Traídas a medias (pago sin guía o guía sin pago) de esta cuenta en la ventana: la otra mitad puede llegar.
+      const { rows: medias } = await a.db.query(
+        `SELECT p.venta FROM me_pagos p
+         WHERE p.creado_at > NOW() - INTERVAL '7 days' AND (p.guia_path IS NULL OR p.comprobante_path IS NULL)
+           AND p.cuenta = $1
+         LIMIT 300`, [cuenta])
+      const mediasIds = medias.map(m => String(m.venta)).filter(v => /^\d{10,}$/.test(v))
+
+      if (conAvisos) {
+        const { rows: [c] } = await a.db.query(
+          `SELECT r->>'avisos_hasta' AS hasta
+           FROM me_pedidos, LATERAL (SELECT resultados->$1::text AS r) x
+           WHERE pedido_at > NOW() - make_interval(days => $2) AND r->>'ok' = 'true' AND r->>'avisos_hasta' IS NOT NULL
+           ORDER BY pedido_at DESC LIMIT 1`, [a.perfil, COMPLETA_SI_NO_HAY_DIAS])
+        const hasta = c?.hasta ? Date.parse(c.hasta) : NaN
+        const barridoReciente = !!u && new Date(u.pedido_at).getTime() > Date.now() - BARRIDO_CADA_H * 3600e3
+        if (Number.isFinite(hasta) && barridoReciente) {
+          avisos = { desde: new Date(hasta - MARGEN_AVISOS_MIN * 60e3).toISOString(), hasta: new Date(hasta).toISOString() }
+          const ids = new Set<string>(mediasIds)
+          for (const s of seg) if (s.motivo === 'no_leida' || s.caida_at) ids.add(String(s.orden))
+          revisar = [...ids].slice(0, MAX_REVISAR)
+        } else barrido = true
       }
+      if (!avisos && u?.corte) {
+        const ids = new Set<string>([...seg.map(s => String(s.orden)), ...mediasIds])
+        // Con más pendientes que esto sale más barato leer la lista completa (corte null).
+        if (ids.size <= MAX_REVISAR) {
+          let c = new Date(u.corte).getTime()
+          for (const s of seg) if (s.caida_at && s.fecha_orden) c = Math.min(c, new Date(s.fecha_orden).getTime() - 60e3)
+          corte = new Date(c).toISOString()
+          revisar = [...ids]
+        }
+      }
+      if (revisar.length) await a.db.query(
+        `UPDATE me_seguimiento SET enviada_pedido = $2 WHERE cuenta = $1 AND orden = ANY($3::text[])`,
+        [cuenta, p.id, revisar])
     }
-    return NextResponse.json({ pedido: p ? Number(p.id) : null, pesos, corte, revisar })
+    return NextResponse.json({ pedido: p ? Number(p.id) : null, pesos, corte, revisar, avisos, barrido })
   } catch (err) {
     return apiError(err)
   }

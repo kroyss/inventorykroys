@@ -8,6 +8,7 @@ const num = z.number().finite().nullish().transform(v => v ?? null)
 
 const Body = z.object({
   cuenta: txt(80),
+  orden_me: txt(60),   // 1.4.1: id de la orden en el portal (en un paquete puede no ser el número de venta)
   orden: z.object({
     venta: z.string().regex(/^\d{6,20}$/),
     estado_me: txt(30), fecha_orden: txt(40),
@@ -59,6 +60,8 @@ export async function POST(req: NextRequest) {
       [o.venta, b.cuenta ?? a.perfil, o.estado_me, o.fecha_orden, o.total_orden, o.total_orden_usd, o.metodo_pago,
        o.banco_emisor, receptor, o.referencia, o.fecha_pago, o.monto_pagado, o.envio_metodo,
        o.envio_opcion, o.carrier, o.guia, guiaPath, compPath, o.bancos?.length ? JSON.stringify(o.bancos) : null])
+    // 20-11 (mig. 191): ya guardada, sale del seguimiento de pendientes (si quedó a medias, sigue por me_pagos).
+    await a.db.query(`DELETE FROM me_seguimiento WHERE orden IN ($1, COALESCE($2, '')) OR venta = $1`, [o.venta, b.orden_me ?? null])
 
     // Completada en MercadoEnvíos y todavía sin imprimir aquí (28-10): se despachó por otro lado (Mercasist, guía
     // impresa a mano en el portal…). Se destilda con una nota para que no se imprima ni se reporte dos veces; al

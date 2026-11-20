@@ -149,7 +149,7 @@ function duracion(s: number) {
 
 /** «leyendo órdenes 40 de ~120 · faltan ~30 s» (extensión 1.3.9). */
 function textoAvance(a: AvanceCuenta) {
-  const que = a.fase === 'leyendo' ? (a.modo === 'corta' ? 'leyendo órdenes nuevas' : 'leyendo órdenes')
+  const que = a.fase === 'leyendo' ? (a.modo === 'avisos' ? 'leyendo avisos de pago' : a.modo === 'corta' ? 'leyendo órdenes nuevas' : 'leyendo órdenes')
     : a.fase === 'revisando' ? 'revisando las que esperaban pago'
     : a.fase === 'bajando' ? 'bajando guías y pagos' : 'leyendo pesos'
   const cuantas = a.total ? `${a.hechas} de ${a.fase === 'leyendo' ? '~' : ''}${a.total}` : a.hechas ? `${a.hechas}` : ''
@@ -186,7 +186,7 @@ function TraidaME({ t }: { t: EstadoTraida }) {
               : !c.hecho ? (c.lenta && corre ?<span className="text-amber-700">⟳ tarda más de lo normal: {AYUDA_TRABADA}</span>
                 : <span className={corre ? 'text-neutral-400' : 'text-red-700'}>{corre ? `⟳ trabajando… · lleva ${duracion(lleva)}` : `no respondió: ${AYUDA_TRABADA}`}</span>)
               : !c.ok ? <span className="text-red-700">⚠ {ERROR_CUENTA[c.error ?? ''] ?? c.error ?? 'error'}</span>
-              : <span>✓ {c.modo === 'corta' ? `${c.nuevas ? `${c.nuevas} nuevas` : 'nada nuevo'}` : `${c.vistas} órdenes${c.nuevas ? ` · ${c.nuevas} nuevas` : ''}`}{c.segundos != null ? ` · en ${duracion(c.segundos)}` : ''}</span>}
+              : <span>✓ {c.modo === 'corta' || c.modo === 'avisos' ? `${c.nuevas ? `${c.nuevas} nuevas` : 'nada nuevo'}` : `${c.vistas} órdenes${c.nuevas ? ` · ${c.nuevas} nuevas` : ''}`}{c.segundos != null ? ` · en ${duracion(c.segundos)}` : ''}</span>}
             {c.hecho && c.ok && c.pesos === true && <span className="text-emerald-700">· pesos ✓</span>}
             {c.hecho && c.ok && c.pesos === false && <span className="text-red-700">· ⚠ no se pudieron leer los pesos</span>}
           </li>

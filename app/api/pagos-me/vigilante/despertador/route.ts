@@ -25,9 +25,11 @@ export async function POST(req: NextRequest) {
       `INSERT INTO me_latidos (perfil, visto_at) VALUES ($1, NOW())
        ON CONFLICT (empresa_id, perfil) DO UPDATE SET visto_at = NOW()`, [a.perfil])
     const { rows: [p] } = await a.db.query(
-      `SELECT id, resultados, pedido_at < NOW() - make_interval(mins => $2) AS viejo FROM me_pedidos
+      `SELECT id, resultados, pedido_at < NOW() - make_interval(mins => $2) AS viejo,
+              ARRAY(SELECT k FROM jsonb_each(avance) e(k, v) WHERE (v->>'at')::timestamptz > NOW() - make_interval(mins => $3)) AS leyendo
+       FROM me_pedidos
        WHERE pedido_at > NOW() - make_interval(mins => $1)
-       ORDER BY id DESC LIMIT 1`, [PEDIDO_VIGENTE_MIN, ESPERA_VIVOS_MIN])
+       ORDER BY id DESC LIMIT 1`, [PEDIDO_VIGENTE_MIN, ESPERA_VIVOS_MIN, VIVO_MIN])
     if (!p) return NextResponse.json({ pedido: null, hechos: [] })
     // 19-11 (el dueño): el despertador es RESPALDO del navegador. «Hecho» = el perfil leyó bien (ok); si respondió con
     // error, cuenta como pendiente mientras le queden intentos. Si todos los perfiles de la empresa ya leyeron
@@ -47,7 +49,10 @@ export async function POST(req: NextRequest) {
     // la extensión lo toma sola, y abrir otra ventana del portal en ese mismo perfil cortaba la lectura en curso
     // («Frame with ID 0 was removed» / «Failed to fetch»: SolucionesMC, Chrome abierto todo el día en la PC remota).
     // Se despiertan solo los perfiles dormidos; los vivos van en `hechos` para que el script no los abra.
-    const vivos = faltan.filter(x => x.vivo).map(x => x.perfil as string)
+    // 20-11 (el dueño): también cuenta como vivo el perfil que ya está LEYENDO este pedido (mandó avance hace poco),
+    // aunque su latido venga atrasado: Chrome estaba abierto y la extensión lo tomó sola. Así nunca hay dos navegadores.
+    const leyendo = new Set<string>((p.leyendo ?? []) as string[])
+    const vivos = faltan.filter(x => x.vivo || leyendo.has(x.perfil)).map(x => x.perfil as string)
     if (perfiles.length && faltan.length === vivos.length) return NextResponse.json({ pedido: null, hechos: [] })
     // Sin perfiles conocidos (todavía ninguno dio señal) o con alguno dormido: se le pasa el pedido para esos.
     return NextResponse.json({ pedido: Number(p.id), hechos: [...hechos, ...vivos] })
