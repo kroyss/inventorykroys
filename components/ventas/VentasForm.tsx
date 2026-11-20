@@ -1,4 +1,5 @@
 'use client'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Sale, InventoryItem, Country } from '@/lib/types'
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
@@ -545,10 +546,10 @@ Revísala en el detalle que se abre ahora.`)
                 {filtered.map(p => (
                   <div key={p.product_id} onClick={() => addItem(p)}
                     className="px-3 py-2 hover:bg-sky-50 cursor-pointer text-sm flex justify-between border-b last:border-0">
-                    <div>
+                    <div className="flex min-w-0 items-center gap-2"><FotoProducto id={p.product_id} nombre={p.name} tam="xs" /><span>
                       <span className="font-mono text-xs text-neutral-400 mr-2">{p.code}</span>
                       {p.name}
-                    </div>
+                    </span></div>
                     <div className="text-neutral-500 text-xs">
                       stock {p.quantity} · ${money(p.sale_price || p.final_price_usd)}
                     </div>
@@ -577,8 +578,10 @@ Revísala en el detalle que se abre ahora.`)
                     return (
                     <tr key={idx} className="border-t">
                       <td className="px-3 py-2">
+                        <div className="flex items-center gap-2"><FotoProducto id={it.product_id} nombre={it.product_name} tam="xs" /><div className="min-w-0">
                         <div className="text-xs text-neutral-400 font-mono">{it.product_code}</div>
                         <div>{it.product_name}</div>
+                        </div></div>
                       </td>
                       <td className="px-2 py-1 align-top">
                         <NumberInput int min={1} value={it.quantity}

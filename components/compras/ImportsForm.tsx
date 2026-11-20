@@ -1,4 +1,5 @@
 'use client'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import { useCallback, useEffect, useState } from 'react'
 import type { ImportOrder, Supplier } from '@/lib/types'
 import { Combobox } from '@/components/ui/Combobox'
@@ -203,10 +204,10 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
                 {filtered.map(p => (
                   <div key={p.id} onClick={() => addItem(p)}
                     className="px-3 py-2 hover:bg-sky-50 cursor-pointer text-sm border-b last:border-0 flex justify-between gap-2">
-                    <span className="truncate">
+                    <span className="flex min-w-0 items-center gap-2"><FotoProducto id={p.id} nombre={p.name} tam="xs" /><span className="truncate">
                       <span className="font-mono text-xs text-neutral-400 mr-2">{p.code}</span>
                       {p.name}
-                    </span>
+                    </span></span>
                     {(p.base_cost ?? 0) > 0 && (
                       <span className="text-neutral-400 whitespace-nowrap">${fmt(p.base_cost!)}</span>
                     )}
@@ -232,8 +233,10 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
                   {items.map((it, idx) => (
                     <tr key={idx} className="border-t">
                       <td className="px-3 py-2">
+                        <div className="flex items-center gap-2"><FotoProducto id={it.product_id} nombre={it.product_name} tam="xs" /><div className="min-w-0">
                         <div className="text-xs text-neutral-400 font-mono">{it.product_code}</div>
                         <div>{it.product_name}</div>
+                        </div></div>
                       </td>
                       <td className="px-2 py-1">
                         <NumberInput int min={1} value={it.quantity}

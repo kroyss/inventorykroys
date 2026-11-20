@@ -17,6 +17,7 @@ export async function GET(_: NextRequest) {
           COALESCE(
             JSON_AGG(
               JSON_BUILD_OBJECT(
+                'id',       p.id,
                 'code',     p.code,
                 'name',     p.name,
                 'quantity', poi.quantity,
@@ -41,6 +42,7 @@ export async function GET(_: NextRequest) {
           COALESCE(
             JSON_AGG(
               JSON_BUILD_OBJECT(
+                'id',       p.id,
                 'code',     p.code,
                 'name',     p.name,
                 'quantity', ioi.quantity,

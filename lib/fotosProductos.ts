@@ -6,7 +6,6 @@ import type { Pool } from 'pg'
 import path from 'path'
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
 import { randomBytes } from 'crypto'
-import { sinEnteraVieja } from '@/lib/vinculoEntero'
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR ?? './uploads'
 const DIR = path.join(UPLOAD_DIR, 'productos')
@@ -16,13 +15,17 @@ export async function fotosProductos(db: Pick<Pool, 'query'>): Promise<Record<nu
   // 13-11 (rapidez): UNA pasada (DISTINCT ON por producto) en vez de un LATERAL por producto: con RLS el LATERAL recorría
   // todo el catálogo para cada producto (2–3,7 s con 500 productos); así ~13 ms. SUBSTRING(item_id FROM 4) = el número
   // sin MLV/MCO (índice idx_ml_catalogo_num).
+  // 20-11: el filtro del vínculo viejo entero (lib/vinculoEntero.ts) va como UNA lista de publicaciones con variantes
+  // vinculadas (con_var) en vez de un NOT EXISTS por fila: misma regla, sin recorrer los vínculos por cada uno con RLS.
   const { rows } = await db.query(`
-    WITH ml AS (
+    WITH con_var AS (
+      SELECT DISTINCT split_part(ml_code, ':', 1) AS num FROM product_ml_codes WHERE is_active AND ml_code LIKE '%:%'),
+    ml AS (
       SELECT DISTINCT ON (m.product_id) m.product_id,
              COALESCE((SELECT v->>'foto' FROM jsonb_array_elements(c.variantes) v WHERE v->>'id' = split_part(m.ml_code, ':', 2)), c.thumbnail) AS url
       FROM product_ml_codes m
       JOIN ml_catalogo c ON SUBSTRING(c.item_id FROM 4) = split_part(m.ml_code, ':', 1)
-      WHERE m.is_active AND ${sinEnteraVieja('m')}
+      WHERE m.is_active AND (m.ml_code LIKE '%:%' OR split_part(m.ml_code, ':', 1) NOT IN (SELECT num FROM con_var))
       ORDER BY m.product_id, c.estado = 'active' DESC, c.disponible DESC, c.item_id)
     SELECT p.id, CASE WHEN p.foto_path IS NOT NULL THEN '/api/products/' || p.id || '/foto?v=' || floor(extract(epoch FROM p.foto_at))::bigint
                       ELSE ml.url END AS url

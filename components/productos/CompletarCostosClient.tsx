@@ -1,4 +1,5 @@
 'use client'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from '@/components/ui/Link'
 import { Cargando, EmptyState, PageHeader, money } from '@/components/ui'
@@ -93,7 +94,7 @@ export default function CompletarCostosClient() {
               const parte = totalVendido > 0 ? Math.round(f.vendido_30d / totalVendido * 100) : 0
               return (
                 <li key={f.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
-                  <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5"><FotoProducto id={f.id} nombre={f.name} /><div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-neutral-900" title={f.name}>{f.name}</p>
                     <p className="mt-0.5 text-[11px] text-neutral-400">
                       {f.code} · precio {plata(f.precio)}
@@ -102,7 +103,7 @@ export default function CompletarCostosClient() {
                         : ' · sin ventas en 30 días'}
                       {f.ventas_estimadas > 0 && <> · <span className="text-amber-700">{f.ventas_estimadas} {f.ventas_estimadas === 1 ? 'venta' : 'ventas'} por corregir</span></>}
                     </p>
-                  </div>
+                  </div></div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <label className="flex items-center gap-1 text-[11px] text-neutral-500">Costo
                       <input value={valor(f)} inputMode="decimal" aria-label={`Costo de ${f.name}`}

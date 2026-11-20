@@ -1,4 +1,5 @@
 'use client'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import { useEffect, useMemo, useState } from 'react'
 import Link from '@/components/ui/Link'
 import { useRouter } from 'next/navigation'
@@ -288,7 +289,7 @@ export default function MargenesClient({ initialProducts, categories }: {
                       disabled={!nuevo} />
                   </td>
                   <td className="px-2 py-1.5">
-                    <span className="font-mono text-xs text-neutral-400 mr-1.5">{r.p.code}</span>{r.p.name}
+                    <span className="flex items-center gap-2"><FotoProducto id={r.p.id} nombre={r.p.name} tam="xs" /><span><span className="font-mono text-xs text-neutral-400 mr-1.5">{r.p.code}</span>{r.p.name}</span></span>
                   </td>
                   <td className="px-2 py-1.5 text-right text-xs text-neutral-500">
                     {r.p.weight_kg != null ? `${r.p.weight_kg} kg` : <span title="Sin peso: usa el umbral global">—</span>}

@@ -521,9 +521,12 @@ export default function InventarioClient({ initialItems, acceso, country, etique
             {/* header */}
             <div className="px-5 py-4 border-b border-neutral-100 shrink-0">
               <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="font-bold text-neutral-900 text-lg leading-tight">{selected.name}</h2>
-                  <p className="text-xs font-mono text-neutral-400 mt-0.5">{selected.code}</p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <FotoProducto id={selected.product_id} nombre={selected.name} tam="md" />
+                  <div className="min-w-0">
+                    <h2 className="font-bold text-neutral-900 text-lg leading-tight">{selected.name}</h2>
+                    <p className="text-xs font-mono text-neutral-400 mt-0.5">{selected.code}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={selected.status} label={STATUS_LABEL[selected.status]} />

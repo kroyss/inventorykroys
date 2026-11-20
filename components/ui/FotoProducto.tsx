@@ -9,13 +9,21 @@ import { Ventana } from '@/components/ui/Ventana'
 let pedido: Promise<void> | null = null
 let pedidoAt = 0
 let fotos: Record<number, string> | null = null
+let fallos = 0
 const avisar = new Set<() => void>()
 
 function cargar() {
   // Si falla (sesión recién abierta, deploy a medias) NO se guarda el vacío: la próxima pantalla lo vuelve a pedir.
+  // 20-11 (el dueño: Reportes → Inventario con todo en «Sin foto»): además se reintenta sola a los 3, 10 y 30 s; antes
+  // un solo fallo dejaba la página entera en gris hasta cambiar de pantalla.
   if (!pedido) { pedidoAt = Date.now(); pedido = fetch('/api/products/fotos').then(r => (r.ok ? r.json() : Promise.reject(r.status)))
-    .then((d: Record<number, string>) => { fotos = d; avisar.forEach(f => f()) })
-    .catch(() => { pedido = null; if (!fotos) { fotos = {}; avisar.forEach(f => f()) } }) }
+    .then((d: Record<number, string>) => { fallos = 0; fotos = d; avisar.forEach(f => f()) })
+    .catch(() => {
+      pedido = null
+      if (!fotos) { fotos = {}; avisar.forEach(f => f()) }
+      const espera = [3_000, 10_000, 30_000][fallos++]
+      if (espera) setTimeout(() => { if (!pedido) cargar() }, espera)
+    }) }
   return pedido
 }
 const suscribir = (f: () => void) => { avisar.add(f); cargar(); return () => { avisar.delete(f) } }

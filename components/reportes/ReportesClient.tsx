@@ -443,7 +443,7 @@ function InTransitReport({ rows, tipo, setTipo, importaciones }: any) {
                     {o.items.map((i: any, k: number) => (
                       <tr key={k} className="border-t border-neutral-50">
                         <td className="px-3 py-1.5">
-                          <span className="font-mono text-xs text-neutral-400 mr-2">{i.code}</span>{i.name}
+                          <span className="flex items-center gap-2"><FotoProducto id={i.id} nombre={i.name} tam="xs" /><span><span className="font-mono text-xs text-neutral-400 mr-2">{i.code}</span>{i.name}</span></span>
                         </td>
                         <td className="px-3 py-1.5 text-right">{i.quantity}</td>
                         <td className="px-3 py-1.5 text-right text-green-600">{i.received}</td>

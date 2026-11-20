@@ -1010,8 +1010,10 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   cuando quieras desde **Aprendizaje → Manuales → Manual de Inventario → «Ver la guía de Primeros pasos»**. Al
   completar todo sale «Listo» con la recomendación y **Cerrar guía**. Los productos creados a mano también cuentan
   para el paso 2 (no hace falta importarlos desde ML).
-- **Fotos de los productos:** cada producto muestra su foto en Productos, Inventario, Compras, Importaciones y Ventas
-  (al tocarla se ve grande). Sale sola de la publicación de ML vinculada (si es una variante, la foto de ese color o
+- **Fotos de los productos:** cada producto muestra su foto en Productos, Inventario (lista y panel del producto),
+  Compras e Importaciones (lista de órdenes, detalle y al cargar la orden), Ventas (lista y al cargar la venta),
+  Reportes (Inventario, En tránsito, Conteos, Stock), Completar costos, Márgenes y MercadoEnvíos (al tocarla se ve grande).
+  Si la carga de fotos falla, se reintenta sola a los pocos segundos. Sale sola de la publicación de ML vinculada (si es una variante, la foto de ese color o
   modelo; si está en varias publicaciones, la activa con más stock). En la ficha del producto: **Cambiar foto** (o
   **Subir foto**) pone una tuya, y **Usar la de MercadoLibre** vuelve a la de ML. Sin foto: cuadro gris «Sin foto».
   Las hojas impresas (recepción y conteo) no llevan fotos.

@@ -1,4 +1,5 @@
 'use client'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import ElegirPesoML from './ElegirPesoML'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -185,7 +186,7 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
               return (
                 <tr key={p.id} className="border-b border-neutral-50 hover:bg-neutral-50">
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500">{p.code}</td>
-                  <td className="px-3 py-2 max-w-[16rem] truncate" title={p.name}>{p.name}</td>
+                  <td className="px-3 py-2 max-w-[16rem]" title={p.name}><span className="flex items-center gap-2"><FotoProducto id={p.id} nombre={p.name} tam="xs" /><span className="truncate">{p.name}</span></span></td>
                   <td className="px-2 py-2 text-right">
                     {p.peso_origen === 'ml' ? (
                       <span className="whitespace-nowrap" title="Peso del portal de MercadoEnvíos: se actualiza solo">

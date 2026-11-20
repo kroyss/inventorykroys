@@ -724,7 +724,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                     {o.items.map((i, k) => (
                       <span key={i.id}>
                         {k > 0 && <span className="text-neutral-300"> · </span>}
-                        {i.product_name} <span className="text-neutral-400">x{i.quantity}</span>
+                        <FotoProducto id={i.product_id} nombre={i.product_name} tam="xs" className="mr-1 inline-block align-middle" />{i.product_name} <span className="text-neutral-400">x{i.quantity}</span>
                       </span>
                     ))}
                     {o.notes && <span className="text-neutral-500 italic"> · {o.notes}</span>}
