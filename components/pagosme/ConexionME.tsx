@@ -6,7 +6,7 @@ import EstadoVigilante, { type DatosVigilante } from './EstadoVigilante'
 
 /** Programa para la PC (tools/vigilante-pagos-me/instalador → public/descargas). */
 // Con la versión en el enlace (23-10): Cloudflare guarda los .exe hasta 4 h; así cada versión nueva se baja al momento.
-export const DESCARGA_PROGRAMA = '/descargas/InstalarPagosME.exe?v=1.3.7'
+export const DESCARGA_PROGRAMA = '/descargas/InstalarPagosME.exe?v=1.3.8'
 
 export default function VigilanteConConexion({ d, isAdmin, desdeML, onCambio, abiertoInicial = false }: {
   d: DatosVigilante & { vigilante: { clave?: boolean }; avanzado?: boolean }
