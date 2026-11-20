@@ -98,7 +98,8 @@ function textoFechas(a: string, b: string) {
 }
 
 /** El valor de hoy, escrito al final de la línea de color (la única cifra sobre el gráfico). 20-11: si el eje sigue
- *  hasta el fin del período, también «cerró $X» al final de la gris (en cuánto terminó el período anterior). */
+ *  hasta el fin del período, también el monto al final de la gris, en gris (en cuánto terminó el período anterior;
+ *  el dueño: la palabra «cerró» sobra, se sobreentiende). */
 const valorAlFinal: Plugin<'line'> = {
   id: 'valorAlFinal',
   afterDatasetsDraw(c) {
@@ -117,7 +118,7 @@ const valorAlFinal: Plugin<'line'> = {
     const datosGris = c.data.datasets[1]?.data as number[] | undefined
     if (gris?.length && datosGris && i < gris.length - 1) {
       const fin = gris[gris.length - 1]
-      const t = `cerró $${money0(Number(datosGris[datosGris.length - 1] ?? 0))}`
+      const t = `$${money0(Number(datosGris[datosGris.length - 1] ?? 0))}`
       ctx.font = '500 11px Inter, system-ui, sans-serif'
       const wg = ctx.measureText(t).width
       ctx.fillStyle = '#737373'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.textBaseline = 'middle'
@@ -174,7 +175,8 @@ function Delta({ ahora, antes, fmt = (n: number) => n.toLocaleString('es-VE'), c
 }
 const fmtMonto = (n: number) => `$${money0(n)}`
 
-export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, reportes = false, ajustes = false, inicial }: {
+export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, reportes = false, ajustes = false, despachos = false, inicial }: {
+  despachos?: boolean        // 20-11: módulo y permiso de Despachos → chip «Por despachar» (como el del empleado)
   inicial?: { summary: Summary | null; chart: ChartData | null }   // 12-11: lo que ya vino en el HTML (lib/inicial.ts)
   country: Country; bonos: boolean; puedeTasas: boolean
   ajustes?: boolean        // 19-11: puede entrar a Ajustes (la píldora de la tasa lleva ahí)
@@ -197,8 +199,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
   const [fechasAbiertas, setFechasAbiertas] = useState(false)
   // Mientras llega el período nuevo, el gráfico anterior queda a media luz (no salta ni se vacía).
   const [cargandoGrafico, setCargandoGrafico] = useState(false)
-  const [caen, setCaen] = useState<number | null>(null)
-  const conCayendo = reportes && analisisStock
+  const [porDespachar, setPorDespachar] = useState<number | null>(null)
 
   const conSummary = !!inicial?.summary
   useEffect(() => {
@@ -219,16 +220,15 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
     return () => { vivo = false }
   }, [period, dateFrom, dateTo])
 
-  // «Se están cayendo» (regla de Reportes → Stock): va con los pendientes; se pide después de abrir.
+  // «Por despachar» (con Despachos): ventas procesadas a las que les falta la guía; el mismo conteo del empleado.
   useEffect(() => {
-    if (!conCayendo) return
+    if (!despachos) return
     let vivo = true
-    const t = setTimeout(() => {
-      fetch('/api/reports/stock-analysis').then(r => r.ok ? r.json() : Promise.reject())
-        .then(j => { if (vivo) setCaen((j.declive ?? []).length) }).catch(() => {})
-    }, 300)
-    return () => { vivo = false; clearTimeout(t) }
-  }, [conCayendo])
+    fetch('/api/sales?pageSize=1').then(r => r.ok ? r.json() : Promise.reject())
+      .then(j => { if (vivo) setPorDespachar(j?.counts?.PROCESADA ?? 0) })
+      .catch(() => { if (vivo) setPorDespachar(0) })
+    return () => { vivo = false }
+  }, [despachos])
 
   // Acumulados: lo que llevas hasta cada día (este período) y lo que llevabas el período anterior a esa misma altura.
   const serie = useMemo(() => {
@@ -329,17 +329,21 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
   const ant = chart?.anterior
   const contra = CONTRA[period]
 
-  // ── Pendientes (19-11): nombres cortos, por urgencia; el detalle va en el title. ──
+  // ── Pendientes. 20-11 (el dueño: «como admin casi no les hago clic»): chip = TAREA DEL DÍA que se termina (Por
+  // confirmar, Borradores, Por despachar). Lo que es estado del inventario (sin stock, reponer, stock bajo) o análisis
+  // (en caída, remate) no baja nunca a 0 y tapaba a lo importante: va en UNA línea gris debajo, con un solo enlace a
+  // Inventario → Reponer (o a Inventario si la empresa no tiene Reponer). En camino es dato, va en esa línea. ──
   const pendientes: Pendiente[] = [
     ...(porConfirmar ? [{ label: 'Por confirmar', n: pc.datos ? pendientesPorConfirmar(pc.datos) : null, tono: 'atencion' as const, href: '/ventas?vista=confirmar', ayuda: 'Ventas de MercadoLibre que todavía no registraste' }] : []),
-    { label: 'Sin stock', n: summary.no_stock, tono: 'problema', href: '/inventario?estado=SIN_STOCK', ayuda: 'Productos activos en 0' },
-    ...(analisisStock ? [{ label: 'Reponer', n: summary.reposicion_count, tono: 'atencion' as const, href: '/inventario/reponer?sub=reposicion', ayuda: 'Lo que tienes no alcanza para lo que tarda en llegar' }] : []),
-    { label: 'Stock bajo', n: summary.low_stock_alerts, tono: 'atencion', href: '/inventario?estado=BAJO', ayuda: 'Por debajo del mínimo' },
     { label: 'Borradores', n: summary.pending_sales, tono: 'atencion', href: '/ventas?estado=BORRADOR', ayuda: 'Ventas sin terminar de cargar' },
-    ...(conCayendo ? [{ label: 'En caída', n: caen, tono: 'atencion' as const, href: '/inventario/reponer?sub=declive', ayuda: 'Se están cayendo: venden la mitad o menos que en los 4 meses anteriores' }] : []),
-    ...(analisisStock ? [{ label: 'Remate', n: summary.remate_count, tono: 'atencion' as const, href: '/inventario/reponer?sub=remate', ayuda: 'Para remate: tienes stock y casi no se venden' }] : []),
-    ...(etapas ? [{ label: 'En camino', n: summary.in_transit, tono: 'info' as const, href: '/reportes?tab=transito', ayuda: 'Compras e importaciones que todavía no llegan' }] : []),
+    ...(despachos ? [{ label: 'Por despachar', n: porDespachar, tono: 'atencion' as const, href: '/despachos', ayuda: 'Ventas procesadas: falta generar la guía en Despachos' }] : []),
   ]
+  const stockTxt = [
+    summary.no_stock > 0 && `${summary.no_stock.toLocaleString('es-VE')} sin stock`,
+    analisisStock && summary.reposicion_count > 0 && `${summary.reposicion_count.toLocaleString('es-VE')} por reponer`,
+    !analisisStock && summary.low_stock_alerts > 0 && `${summary.low_stock_alerts.toLocaleString('es-VE')} con stock bajo`,
+  ].filter(Boolean) as string[]
+  const enCamino = etapas && summary.in_transit > 0 ? summary.in_transit : 0
 
 
   return (
@@ -351,6 +355,20 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 sm:flex-nowrap">
         <div className="order-2 min-w-0 basis-full sm:order-1 sm:flex-1 sm:basis-auto">
           <Pendientes items={pendientes} titulo={false} />
+          {(stockTxt.length > 0 || enCamino > 0) && (
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-neutral-500">
+              {stockTxt.length > 0 && <>
+                <span>Inventario: <span className="num">{stockTxt.join(' · ')}</span></span>
+                <Link href={analisisStock ? '/inventario/reponer?sub=reposicion' : '/inventario?estado=SIN_STOCK'}
+                  className="font-medium text-sky-700 hover:underline">{analisisStock ? 'Ver en Reponer →' : 'Ver en Inventario →'}</Link>
+              </>}
+              {enCamino > 0 && <>
+                {stockTxt.length > 0 && <span className="text-neutral-300" aria-hidden>·</span>}
+                <Link href="/reportes?tab=transito" className="hover:text-neutral-800 hover:underline">
+                  <span className="num">{enCamino}</span> compra{enCamino === 1 ? '' : 's'} en camino</Link>
+              </>}
+            </p>
+          )}
         </div>
         <div className="order-1 flex w-full flex-wrap items-center justify-between gap-2 sm:order-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end sm:justify-start">
           <div className="flex items-center gap-2 sm:order-1">

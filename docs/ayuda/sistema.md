@@ -967,11 +967,11 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   **+ Nueva venta** / **+ Nueva compra** y debajo la tasa en una **píldora chica** (VE): **BCV · Paralelo · Dif. %** (diferencial = cuánto más cara está la paralela;
   al pasar el mouse, el detalle con exceso y fecha; quien entra a Ajustes la toca y va ahí) y, con Descuento ML, otra
   píldora **Desc. ML %**. A la izquierda, **Pendientes** (bajan a una segunda fila si hay muchos)
-  (sin título): botones chicos con el número, solo los que
-  tienen algo, por urgencia (Por confirmar, Sin stock, **Reponer**, Stock bajo, **Borradores**, **En caída** —se están
-  cayendo: venden la mitad o menos que en los 4 meses anteriores—, **Remate** —tienes stock y casi no se venden—, **En
-  camino** —compras—; al pasar el mouse dice qué es cada uno); cada uno lleva a su lista y lo que está en 0 sale en una
-  línea gris «Al día: …». Si no hay nada: «Nada pendiente hoy». Después el bono
+  (sin título): botones chicos con el número, solo las **tareas del día** que tienen algo (desde el 20-11-2026): **Por
+  confirmar**, **Borradores** y, con Despachos, **Por despachar**; cada uno lleva a su lista y lo que está en 0 sale en una
+  línea gris «Al día: …». Si no hay nada: «Nada pendiente hoy». Debajo, una **línea gris de inventario**: «Inventario: N
+  sin stock · N por reponer · Ver en Reponer →» (sin Reponer: «N con stock bajo · Ver en Inventario →») y «N compras en
+  camino» (lleva a Reportes → En tránsito). En caída y Remate ya no salen en el Inicio: están en Inventario → Reponer. Después el bono
   (si lo tienes) y el panel **Cómo va tu negocio**, con los botones **Hoy / Mes / Trim. / Año / Fechas…** (Fechas… abre
   desde/hasta y **Aplicar**; elegidas, el botón muestra el rango, p. ej. «1–20 nov»), que **mandan
   sobre todo lo de abajo** (no sobre los pendientes), siempre contra el período anterior (Hoy = ayer a esta hora; Mes =
@@ -984,7 +984,8 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   la línea queda plana), con dos pestañas, **Ventas** (línea azul) y **Ganancia** (línea naranja), y la **línea gris** =
   cuánto llevabas el período anterior a la misma altura (Mes = mes pasado a la fecha; Hoy = ayer, por hora; Año = año
   pasado, por mes). Con Hoy / Mes / Año el eje llega al **fin del período** (23 h, último día del mes, diciembre): tu
-  línea termina en hoy y la gris sigue hasta el final con **«cerró $X»** (en cuánto terminó el período anterior: tu meta).
+  línea termina en hoy y la gris sigue hasta el final con su monto en gris (en cuánto terminó el período anterior: tu meta;
+  en la leyenda, «cerró $X»).
   Si la de color va por encima de la gris, vas mejor que antes. Arriba, la leyenda con el total de cada
   línea; al final de la línea, el valor de hoy. Al pasar el dedo o el mouse: lo que llevabas ese día, lo del período
   anterior, la diferencia (▲▼) y lo de ese día solo. Al cambiar el período, el gráfico anterior queda a media luz hasta
@@ -1462,10 +1463,11 @@ mi información, es seguro, comparten mis datos, mi contraseña la ven.
 Junto al título de cada sección hay una **ⓘ**: al tocarla se abre (o se cierra) un resumen corto de cómo funciona esa
 pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuario ese permiso. Lo que dice cada una:
 
-- **Inicio:** **Pendientes** = solo lo que tiene algo (lo demás, «Al día»); En caída = se están cayendo. El período (Hoy/Mes/Trim./Año/fechas) cambia
+- **Inicio:** **Pendientes** = solo las tareas del día que tienen algo (lo demás, «Al día»); el stock va en la línea gris de abajo. El período (Hoy/Mes/Trim./Año/fechas) cambia
   todo lo de abajo, contra el período anterior (**Fechas…** abre desde/hasta). **Te quedó** = ganancia; gráfico
   **acumulado** con pestañas Ventas | Ganancia: color = lo que llevas, gris = lo que llevabas el período anterior a la
-  misma fecha; «cerró $X» = en cuánto terminó el período anterior. **Ventas registradas** = las procesadas en Ventas (las de ML van abajo por cuenta). «antes N» = cuánto
+  misma fecha; el monto al final de la gris = en cuánto terminó el período anterior. **Pendientes** = tareas del día
+  (Por confirmar, Borradores, Por despachar); el inventario va en la línea gris de abajo. **Ventas registradas** = las procesadas en Ventas (las de ML van abajo por cuenta). «antes N» = cuánto
   era antes, cuando la base es chica. **Diferencial** = cuánto más cara está la tasa paralela que la oficial.
 - **Ventas:** **Por confirmar** = ventas de MercadoLibre que faltan registrar (verificas el pago y «Registrar venta»
   descuenta del inventario). **Traer pagos y ventas** trae al instante las nuevas (con Pagos ME también pagos y guías,
