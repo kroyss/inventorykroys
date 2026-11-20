@@ -105,11 +105,14 @@ export default function AccionesInicio({ cfg, stock }: { cfg: AccionesInicioConf
       )}
       {(stockTxt.length > 0 || cfg.tasa) && (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 pt-0.5">
-          <p className="flex flex-wrap items-center gap-x-2 text-xs text-neutral-500">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500 sm:gap-x-3">
             {stockTxt.length > 0 && <>
-              <span>Inventario: <span className="num">{stockTxt.join(' · ')}</span></span>
+              {/* Mismo ancho de título que las filas Ventas / Compras: las tres se leen alineadas. */}
+              <span className="w-16 shrink-0 font-medium sm:w-[4.5rem]">Inventario</span>
+              <span className="num text-neutral-600">{stockTxt.join(' · ')}</span>
               <Link href={cfg.reponer ? '/inventario/reponer?sub=reposicion' : '/inventario?estado=SIN_STOCK'}
-                className="font-medium text-sky-700 hover:underline">{cfg.reponer ? 'Ver en Reponer →' : 'Ver en Inventario →'}</Link>
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-2.5 py-0.5 font-medium text-neutral-700 shadow-sm transition hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-900">
+                {cfg.reponer ? 'Ver en Reponer' : 'Ver en Inventario'}<span aria-hidden className="text-neutral-400">→</span></Link>
             </>}
           </p>
           {cfg.tasa && <RateBar {...cfg.tasa} />}
