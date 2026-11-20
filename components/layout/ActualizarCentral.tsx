@@ -112,7 +112,12 @@ export default function ActualizarCentral({ grupos }: { grupos: Grupo[] }) {
       setLineas(l => ({ ...l, [g]: { estado: 'error', msg: d?.error ?? 'No se pudo actualizar. Prueba de nuevo en un rato.' } }))
       return
     }
-    if (g === 'pagosme' && d.pedido && !d.omitido) { await leer(); seguirME(); return }
+    if (g === 'pagosme' && d.pedido && !d.omitido) {
+      // 20-11 (el dueño): igual que desde Por confirmar, el aviso de tareas de abajo muestra la traída al momento
+      // (antes no se enteraba hasta recargar la página).
+      try { window.dispatchEvent(new Event('cola-ml')) } catch { /* sin ventana */ }
+      await leer(); seguirME(); return
+    }
     setLineas(l => ({ ...l, [g]: d.ok ? { estado: 'ok' } : { estado: 'error', msg: (d.errores ?? []).join(' · ') || 'Hubo un error' } }))
     await leer()
     avisar(g)
