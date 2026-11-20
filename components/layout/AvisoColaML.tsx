@@ -11,7 +11,7 @@
 import { comun } from '@/lib/comun'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/ui/Link'
-import { AYUDA_TRABADA, type AvanceCuenta, type EstadoTraida } from '@/lib/meTraida'
+import { AYUDA_EXTENSION_TRABADA, AYUDA_SIN_SENAL, AYUDA_TRABADA, textoErrorME, type AvanceCuenta, type EstadoTraida } from '@/lib/meTraida'
 
 interface Lote { id: number; tipo: string; titulo: string; estado: string; total: number; ok: number; sin_cambio: number
   saltadas: number; errores: number; pendientes: number }
@@ -138,8 +138,6 @@ export default function AvisoColaML() {
   )
 }
 
-const ERROR_CUENTA: Record<string, string> = { sin_sesion: 'sin sesión de MercadoEnvíos en la PC' }
-
 /** 75 → «1 min 15 s»; 40 → «40 s». */
 function duracion(s: number) {
   if (s < 60) return `${s} s`
@@ -183,9 +181,13 @@ function TraidaME({ t }: { t: EstadoTraida }) {
           <li key={c.perfil} className="flex flex-wrap gap-x-1.5">
             <b className="text-neutral-800 truncate max-w-[10rem]">{c.nombre}</b>
             {!c.hecho && c.avance && corre ? <span className="text-neutral-500">⟳ {textoAvance(c.avance)} · lleva {duracion(lleva)}</span>
-              : !c.hecho ? (c.lenta && corre ?<span className="text-amber-700">⟳ tarda más de lo normal: {AYUDA_TRABADA}</span>
-                : <span className={corre ? 'text-neutral-400' : 'text-red-700'}>{corre ? `⟳ trabajando… · lleva ${duracion(lleva)}` : `no respondió: ${AYUDA_TRABADA}`}</span>)
-              : !c.ok ? <span className="text-red-700">⚠ {ERROR_CUENTA[c.error ?? ''] ?? c.error ?? 'error'}</span>
+              // 20-11 (el dueño): no decir «trabajando» cuando nadie está leyendo: Chrome vivo que no toma el pedido
+              // (extensión trabada) o Chrome sin señal.
+              : !c.hecho ? (c.lenta && corre ? <span className="text-amber-700">⚠ {AYUDA_EXTENSION_TRABADA}</span>
+                : c.sin_senal && corre ? <span className="text-amber-700">⚠ {AYUDA_SIN_SENAL}</span>
+                : <span className={corre ? 'text-neutral-400' : 'text-red-700'}>{corre ? `⟳ trabajando… · lleva ${duracion(lleva)}`
+                    : `no respondió: ${c.lenta ? AYUDA_EXTENSION_TRABADA : c.sin_senal ? AYUDA_SIN_SENAL : AYUDA_TRABADA}`}</span>)
+              : !c.ok ? <span className="text-red-700">⚠ {textoErrorME(c.error)}</span>
               : <span>✓ {c.modo === 'corta' || c.modo === 'avisos' ? `${c.nuevas ? `${c.nuevas} nuevas` : 'nada nuevo'}` : `${c.vistas} órdenes${c.nuevas ? ` · ${c.nuevas} nuevas` : ''}`}{c.segundos != null ? ` · en ${duracion(c.segundos)}` : ''}</span>}
             {c.hecho && c.ok && c.pesos === true && <span className="text-emerald-700">· pesos ✓</span>}
             {c.hecho && c.ok && c.pesos === false && <span className="text-red-700">· ⚠ no se pudieron leer los pesos</span>}

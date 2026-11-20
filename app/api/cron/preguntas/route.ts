@@ -22,6 +22,7 @@ import { desactivarNoReponer } from '@/lib/noReponer'
 import { corteFundadores } from '@/lib/fundadoresCorte'
 import { vigilarCampanas } from '@/lib/promocionesML'
 import { procesarColaML } from '@/lib/colaML'
+import { cuadrePagosME } from '@/lib/cuadrePagosME'
 import type { Country } from '@/lib/types'
 
 // Cron de preguntas (crontab del VPS, cada minuto, con CRON_SECRET):
@@ -227,6 +228,15 @@ export async function GET(req: NextRequest) {
           console.error('[limpieza despachos]', e.id, err instanceof Error ? err.message : err)
         }
       }
+    }
+    // Cuadre de Pagos ME (20-11, lib/cuadrePagosME.ts): una vez al día desde las 21 h de Venezuela (ya pasaron las traídas).
+    const horaVE = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Caracas', hour: 'numeric', hourCycle: 'h23' }).format(new Date()))
+    if (horaVE >= 21 && process.env.APP_ENV !== 'staging') {
+      const { rowCount: toca } = await dbGlobal().query(
+        `INSERT INTO plataforma_ajustes (key, value) VALUES ('cuadre_pagos_me_at', NOW()::text)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+         WHERE plataforma_ajustes.value::timestamptz < NOW() - INTERVAL '20 hours'`)
+      if (toca) await cuadrePagosME().catch(err => console.error('[cuadre pagos me]', err instanceof Error ? err.message : err))
     }
   })
   return NextResponse.json({ ok: true, resultado })

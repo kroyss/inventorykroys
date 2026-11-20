@@ -9,7 +9,7 @@ import VigilanteConConexion, { CodigoConexion, DESCARGA_PROGRAMA } from './Conex
 import { type PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from './PagoME'
 import PorConfirmar, { usePorConfirmar } from '@/components/ventas/PorConfirmar'
-import { AYUDA_TRABADA } from '@/lib/meTraida'
+import { AYUDA_EXTENSION_TRABADA, AYUDA_SIN_SENAL, AYUDA_TRABADA, textoErrorME } from '@/lib/meTraida'
 
 type Filtro = 'pendiente' | 'valido' | 'invalido' | 'todos'
 interface Resultado { ok: boolean; cuenta: string | null; vistas: number; nuevas: number; error: string | null; at: string }
@@ -187,6 +187,7 @@ export default function PagosMEClient({ isAdmin, inicial = null, conexion = fals
           {!conexion && <li>Verifica cada pago contra el banco, uno por uno o con <b className={B}>Comprobar con el banco</b> (subes el estado de cuenta).</li>}
           <li>Las guías de las ventas pagadas pasan solas a <b className={B}>Despachos</b>.</li>
           <li>La línea de arriba dice si la PC está lista y cómo salió la última traída. <b className={B}>⚙ Conexión</b>: agregar cuentas, el programa, la extensión y conectar la PC.</li>
+          <li>Si una cuenta no toma la traída, el aviso dice qué hacer: <b className={B}>extensión trabada</b> (recarga la pestaña de MercadoEnvíos con F5 o cierra y abre ese Chrome) o <b className={B}>Chrome sin señal</b> (ábrelo y revisa que el Asistente diga «Conectado»). No uses la pestaña de MercadoEnvíos mientras trae.</li>
         </>}
         actions={<>
           {conexion && <Link href="/ventas?vista=confirmar" className="btn-secondary text-sm whitespace-nowrap">Ir a Por confirmar →</Link>}
@@ -206,7 +207,7 @@ export default function PagosMEClient({ isAdmin, inicial = null, conexion = fals
 
       {/* La caja grande de la traída solo cuando hay que mirarla (trayendo, falla, incompleta); si salió bien va en la línea. */}
       {pedido && datos && (despertador || perfiles.length > 0) && !traidaCompleta(datos) && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML}
-        pcPrendida={!!despertador?.conectado} />}
+        pcPrendida={!!despertador?.conectado} vivos={perfiles.filter(l => l.conectado).map(l => l.perfil)} />}
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
       {aviso && <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">{aviso}</div>}
@@ -378,9 +379,11 @@ export default function PagosMEClient({ isAdmin, inicial = null, conexion = fals
 }
 
 /** Cómo terminó la última traída, bien a la vista: trayendo / listo (ya puede despachar) / con problemas. */
-function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML, pcPrendida }: {
+function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML, pcPrendida, vivos = [] }: {
   pedido: NonNullable<Datos['vigilante']['pedido']>; perfiles: string[]; nombre: (perfil: string) => string
   trabajando: boolean; desdeML: boolean; pcPrendida: boolean
+  /** Perfiles cuyo Chrome da señal ahora (20-11): si no respondieron, la extensión quedó trabada (no es la luz). */
+  vivos?: string[]
 }) {
   const res = Object.entries(pedido.resultados)
   const faltan = perfiles.filter(p => !pedido.resultados[p])
@@ -392,7 +395,7 @@ function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML, pcPrendid
   const detalle = res.map(([perfil, r]) => (
     <span key={perfil} className="mr-3 whitespace-nowrap">
       <b>{nombre(perfil) !== perfil ? nombre(perfil) : (r.cuenta ?? perfil)}</b>{' '}
-      {r.ok ? `${r.nuevas} nuevas (${r.vistas} revisadas)` : <span className="text-red-700">{ERROR_PERFIL[r.error ?? ''] ?? r.error ?? 'error'}</span>}
+      {r.ok ? `${r.nuevas} nuevas (${r.vistas} revisadas)` : <span className="text-red-700">{ERROR_PERFIL[r.error ?? ''] ?? textoErrorME(r.error)}</span>}
     </span>
   ))
   const caja = (c: string, titulo: ReactNode, cuerpo?: ReactNode) => (
@@ -410,12 +413,18 @@ function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML, pcPrendid
   if (res.length === 0 && pcPrendida && perfiles.length === 0) return caja('bg-amber-50 border-amber-200 text-amber-900',
     <>⚠️ La PC está prendida, pero ningún perfil de Chrome tiene el Asistente de envíos conectado.</>,
     'Abre Chrome en el perfil de tu cuenta de MercadoLibre, agrega el Asistente y escribe el código (pasos 3 y 4 de arriba). Después toca "Traer pagos y guías".')
+  // 20-11 (el dueño, caso Ainy): la PC SÍ estaba prendida (Chrome o programa dan señal) y ninguna cuenta tomó la traída:
+  // decir «¿apagada o sin luz?» confundía. Chrome vivo = extensión trabada; solo el programa vivo = Chrome no abrió.
+  if (res.length === 0 && perfiles.length > 0 && (vivos.length > 0 || pcPrendida)) return caja('bg-amber-50 border-amber-200 text-amber-900',
+    <>⚠️ La traída {origen} de {cuando} no se hizo: la PC está prendida, pero {vivos.length ? 'la extensión no tomó la traída' : 'Chrome no respondió'}.</>,
+    <>{perfiles.map(p => <span key={p} className="mr-3"><b>{nombre(p)}</b>: {vivos.includes(p) ? AYUDA_EXTENSION_TRABADA : AYUDA_SIN_SENAL}.</span>)}
+      {' '}No se pierde nada: después dale a "Traer pagos y guías".</>)
   if (res.length === 0) return caja('bg-amber-50 border-amber-200 text-amber-900',
     <>⚠️ La traída {origen} de {cuando} no se hizo: la PC no respondió (¿apagada o sin luz?).</>,
     'No se pierde nada: cuando la prendas, dale a "Traer pagos y guías" y trae todo lo que faltaba.')
   if (fallas.length || faltan.length) return caja('bg-red-50 border-red-200 text-red-900',
     <>❌ La traída de {cuando} quedó incompleta: revisa antes de despachar.</>,
-    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{nombre(p)}</b> no respondió: {AYUDA_TRABADA}.</span>)}</>)
+    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{nombre(p)}</b> no respondió: {vivos.includes(p) ? AYUDA_EXTENSION_TRABADA : AYUDA_TRABADA}.</span>)}</>)
   // Completa y sin errores (18-11): va en la línea de estado, no en una caja.
   return null
 }

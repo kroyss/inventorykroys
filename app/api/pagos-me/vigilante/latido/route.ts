@@ -101,7 +101,8 @@ export async function POST(req: NextRequest) {
         const desde = Number.isFinite(hasta) ? Math.max(sieteDias, hasta - MARGEN_AVISOS_MIN * 60e3) : sieteDias
         avisos = { desde: new Date(desde).toISOString(), hasta: Number.isFinite(hasta) ? new Date(hasta).toISOString() : null }
         const ids = new Set<string>(mediasIds)
-        for (const s of seg) if (s.motivo === 'no_leida' || s.caida_at) ids.add(String(s.orden))
+        // 'cuadre' (20-11): ventas de ML que el cuadre diario no encontró en ninguna lectura: se piden por su número.
+        for (const s of seg) if (s.motivo === 'no_leida' || s.motivo === 'cuadre' || s.caida_at) ids.add(String(s.orden))
         revisar = [...ids].slice(0, MAX_REVISAR)
       }
       if (!avisos && u?.corte) {
