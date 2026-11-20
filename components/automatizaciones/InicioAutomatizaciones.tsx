@@ -17,7 +17,7 @@ function LineaSemana({ s }: { s: { actual: Semana; anterior: Semana } }) {
     : null
   const pctIA = Math.round(a.porIA / a.respondidas * 100)
   return (
-    <p className="mt-2 text-xs text-neutral-500 num" title="Últimos 7 días: preguntas respondidas · tiempo típico de respuesta (la mitad se respondió en menos de eso) · cuántas respondió la IA sola.">
+    <p className="mt-1 truncate text-xs text-neutral-500 num" title="Últimos 7 días: preguntas respondidas · tiempo típico de respuesta (la mitad se respondió en menos de eso) · cuántas respondió la IA sola.">
       7 días: {a.respondidas.toLocaleString('es-VE')} respondidas
       {a.mediana != null && <> · típico {a.mediana < 1 ? '< 1 min' : textoMinutos(a.mediana)}{flecha}</>}
       {pctIA > 0 && <> · {pctIA} % IA</>}
