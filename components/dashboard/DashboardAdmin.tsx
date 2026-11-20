@@ -59,8 +59,11 @@ const LAVADO: Record<Metrica, [string, string]> = { ventas: ['rgba(42,120,214,0.
 
 const money = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const money0 = (n: number) =>
-  Number(n).toLocaleString('de-DE', { maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 })
+// Bajo $1.000 con sus 2 decimales ($556,20, no $556,2); los enteros sin decimales ($0, $30).
+const money0 = (n: number) => {
+  const dec = Math.abs(n) >= 1000 || Number.isInteger(Math.round(n * 100) / 100) ? 0 : 2
+  return Number(n).toLocaleString('de-DE', { minimumFractionDigits: dec, maximumFractionDigits: dec })
+}
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
