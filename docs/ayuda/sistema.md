@@ -36,8 +36,10 @@ Lo que no es de ningún espacio (Usuarios, Aprendizaje, Novedades) está en todo
 - **Primeros pasos** (20-11-2026; arriba, solo para quien conecta las cuentas de ML): una lista corta que se marca sola.
   Lo único **necesario** es **Conectar tu cuenta de MercadoLibre** (sin eso no se traen preguntas, mensajes ni ventas);
   lo demás es **opcional** (se puede trabajar a mano solo con la cuenta conectada): **Completar Mi IA** (dice cuántos
-  temas faltan), **Prender las respuestas automáticas** (Modo Seguro o Total) y **Recibir avisos por Telegram**. Cada
-  paso tiene su botón y un librito 📖 que abre su parte del manual. **Comprendo, ocultar** la quita para toda la
+  temas faltan), **Prender las respuestas automáticas** (Modo Seguro o Total) y **Recibir avisos por Telegram**. Se ve
+  **un paso a la vez** («Paso 2 de 4», empieza en el primero pendiente): las flechas **‹ ›** (o los puntos de la barra)
+  pasan al anterior o al siguiente, así se salta un opcional. Cada paso tiene su botón y un librito 📖 que abre su
+  parte del manual. **Comprendo, ocultar** la quita para toda la
   empresa y no vuelve a salir (sin ML conectado no se puede ocultar). Con todo hecho, se va sola.
 - **Pendiente ahora**: lo que espera hoy (preguntas sin responder, mensajes sin leer, etc.) y abajo todas las
   herramientas agrupadas. En la tarjeta **Preguntas con IA** sale una línea chica con **cómo te fue en 7 días**:
