@@ -168,7 +168,7 @@ function Precio({ p, umbral }: { p: Pregunta; umbral: number | null }) {
   const ref = precioUSD(p)
   const bajo = umbral !== null && ref !== null && ref < umbral
   return (
-    <span className="inline-flex items-center gap-1.5" title="Precio en MercadoLibre ahora (con la promoción, si hay)">
+    <span className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5" title="Precio en MercadoLibre ahora (con la promoción, si hay)">
       <span className={`font-semibold num ${bajo ? 'text-amber-800 bg-amber-50 ring-1 ring-inset ring-amber-200 rounded-full px-2 py-0.5' : 'text-neutral-800'}`}>
         {simbolo}{usd(p.item_precio)}{bajo && ` · menos de $${umbral}`}
       </span>
