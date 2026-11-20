@@ -820,13 +820,13 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
 
       {!verOpciones && p.unidades > 1 && <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700" title="Pack o combo: cada venta descuenta esta cantidad">trae {p.unidades} u.</span>}
 
-      <div className="w-28 text-xs">
+      <div className="w-24 text-xs sm:w-28">
         <div className="text-neutral-400">En ML</div>
         <div className="tabular-nums text-neutral-800">
           {p.ml_disponible ?? '—'} {p.estado === 'paused' ? <span className="text-amber-700">· pausada</span> : p.estado === 'active' ? <span className="text-neutral-400">· activa</span> : null}
         </div>
       </div>
-      <div className="w-36 text-xs">
+      <div className="w-28 text-xs sm:w-36">
         <div className="text-neutral-400">Quedará</div>
         {asignar ? (
           <label className="flex items-center gap-1 text-neutral-500">poner
