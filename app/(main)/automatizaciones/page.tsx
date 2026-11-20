@@ -32,7 +32,7 @@ export default async function AutomatizacionesPage() {
       items: [
         { href: '/preguntas', titulo: 'Preguntas con IA', icono: 'preguntas', activa: ml, aviso: 'preguntas', urgente: true,
           pendiente: 'sin responder',
-          texto: 'Las preguntas de todas tus cuentas en una bandeja. La IA propone la respuesta con tu publicación, tu stock y tus respuestas de siempre; tú publicas.' },
+          texto: 'Las de todas tus cuentas en una bandeja. La IA responde con tu publicación, tu stock y tus respuestas de siempre.' },
         { href: '/alertas-stock', titulo: 'Stock', icono: 'stock', activa: stock, aviso: 'alertas',
           pendiente: 'agotadas',
           texto: 'Lo que vendiste en los últimos 30 días y ya se agotó o está por agotarse en tus cuentas (por variante). Se revisa sola cada hora.' },
