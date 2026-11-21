@@ -971,9 +971,10 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   su lista:
   - **Ventas:** Por confirmar · Por despachar (con Despachos lleva ahí; sin Despachos, «Procesadas» o «Por descargar») ·
     Borradores.
-  - **Compras** (con compras por etapas y permiso de Compras): Por finalizar · Compras en camino · Importaciones en camino
-    con sus cajas (punto gris = dato, no tarea). El **+** sale con permiso de crear compras; con importaciones abre el
-    menú Compra local / Importación.
+  - **Compras** (con permiso de Compras): con **compras por etapas**, Por finalizar · Compras en camino · Importaciones
+    en camino con sus cajas (punto gris = dato, no tarea). Con **compras básicas** la compra nace finalizada, así que no
+    hay pendientes: la columna dice **Al día** y el **+** es **Entró mercancía**. El **+** sale con permiso de crear
+    compras; con importaciones abre el menú Compra local (o Entró mercancía) / Importación.
   - **Inventario:** Sin stock · Por reponer (sin Reponer: Stock bajo), con punto gris porque es el estado del stock.
     En caída y Remate están en Inventario → Reponer.
   - Si una columna no tiene nada: **✓ Al día**.

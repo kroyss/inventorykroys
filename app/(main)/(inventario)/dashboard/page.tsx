@@ -37,7 +37,8 @@ export default async function DashboardPage() {
     porConfirmar,
     despachos: tieneModulo(u, 'despachos') && puede(u, 'ver_despachos'),
     verificarPagos: country !== 'VE' || tieneModulo(u, 'verificar_pagos'),
-    compras: tieneModulo(u, 'compras_etapas') && puede(u, 'ver_compras'),
+    compras: puede(u, 'ver_compras'),          // 21-11: con o sin etapas (sin etapas = «Entró mercancía», sin pendientes)
+    comprasEtapas: tieneModulo(u, 'compras_etapas'),
     comprasEditar: puede(u, 'compras_editar'),
     importaciones,
     inventario: puede(u, 'ver_inventario'),
