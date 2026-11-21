@@ -57,7 +57,9 @@ marcado es donde estás). El **Radar** se abre desde el menú de tu cuenta (arri
 revisión, una cuenta de ML desconectada, los créditos de IA bajos o agotados y Radar PRO salen **juntos en un solo
 recuadro**: se ve el más importante con su botón y debajo **«Ver N avisos más»** despliega el resto. Los **rojos**
 (cuenta vencida o cortada, ML desconectada, créditos agotados, vence hoy o mañana) **siempre se ven**. Cada aviso sale
-en las mismas condiciones de siempre.
+en las mismas condiciones de siempre. Las **ofertas** (la prueba de Inventario, Radar PRO) comparten un mismo lugar y
+**rotan** cada pocos segundos, con un fundido (se detienen al pasar el mouse); en el celular sale una distinta en cada
+visita. Si hay un aviso de tu cuenta a la vista, las ofertas quedan en «Ver más»: siempre ves **una sola franja**.
 
 **Nada se publica solo sin que lo decidas:** el sistema propone (respuestas, calificaciones, mensajes) y tú
 revisas, salvo en lo que tú mismo prendas como automático (respuestas automáticas, calificación automática,
@@ -120,6 +122,20 @@ está: **verde** todo al día, **amarillo** algo viejo. Abre un panel con cada c
   mayor. Si eliges uno mayor, en verde **«Con <plan> ganas:»** y cuánto más al mes (con tu escalón, ciclo y descuento).
   Con tu plan elegido, abajo sale la invitación al plan siguiente (**¿Pasas a…?**, con lo que suma y **Ver <plan>**);
   los planes «Próximamente» no se ofrecen. **Mejorar mi plan** también muestra lo que ganas.
+- **Prueba de Inventario 15 días** (21-11-2026; por ahora solo para algunas cuentas que ya pagan): arriba sale
+  **«Nuevo · Prueba Inventario 15 días gratis»** con **Probar gratis** (solo al administrador). Se abre una ventana con
+  lo que incluye, hasta cuándo es gratis y cuánto pagarías si sigues; **Activar prueba gratis** la prende al instante
+  y te lleva a Inicio de Inventario, con **Primeros pasos** (importar tus productos desde ML, costos, stock). Todo lo
+  demás sigue igual (Pagos ME queda en Automatiza y además en Ventas → Por confirmar). Es **una sola vez** y **siempre
+  15 días**. Mientras corre, arriba una línea gris con los días que quedan (y en Mi plan); **3 días antes** el aviso
+  pasa a ámbar con el monto para pasar a Completo, y llega una línea en tu resumen diario de Telegram. **Para seguir:**
+  Mi plan → **Mejorar mi plan** → Completo: pagas la diferencia entre tu plan y Completo **solo por los días que le
+  quedan a tu plan, contados desde que termina la prueba** (pagar antes no te quita días gratis), con tu descuento
+  (Fundador −30 %, que no se suma con el trimestral; o trimestral −10 %). En tu próxima renovación pagas Completo.
+  **Si no sigues**, al día siguiente del fin se apaga solo y vuelves a Automatiza como antes; tus datos (productos,
+  movimientos) se guardan 60 días: si pasas a Completo en ese tiempo, vuelve todo. **Si tu plan vence durante la
+  prueba** y no lo renuevas, se pausa toda la cuenta como siempre (datos guardados); si lo renuevas, la prueba sigue
+  hasta su fecha, o renuévalo directamente en Completo para quedarte con Inventario.
 - **Cuenta solo del Radar:** si te registraste desde radar.elcomerciantedigital.com, tu cuenta entra solo al
   Radar; si intentas entrar al Sistema te lo indica. Para usar el Sistema, escríbenos.
 - **Radar mensual (solo Radar):** el registro del Radar está siempre abierto. Desde el 18-11-2026 el registro invita a **probarlo
@@ -199,7 +215,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      escalón y el precio. Si ya tienes plan, el escalón solo sube o baja cuando tus dos últimos meses quedan en otro
      escalón. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
      los últimos 90 días, así que no hace falta esperar un mes).
-     El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres (el **Completo** sale en gris como «Próximamente»: todavía no se puede contratar).
+     El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres (el **Completo** sale en gris como «Próximamente»: todavía no se puede contratar, salvo
+     en las cuentas a las que se les ofreció la prueba de Inventario).
      Puedes elegir **mensual** o **trimestral (−10%)**: cada opción muestra el precio por mes y, en el trimestral, cuánto
      pagas cada 3 meses y cuánto ahorras. Los regalos del primer plan (créditos de IA y 1 mes de Radar PRO) salen juntos
      en un recuadro. Debajo puedes marcar **Sumar Radar PRO** para los meses que no cubre el regalo. El **Resumen** muestra

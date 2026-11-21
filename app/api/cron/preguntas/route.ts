@@ -10,6 +10,7 @@ import { mensajeAlComprar } from '@/lib/mensajeAlComprar'
 import { responderAlInstante } from '@/lib/automaticasAhora'
 import { procesarMensajesIA } from '@/lib/mensajesIAPrueba'
 import { vencerPlanes } from '@/lib/planesCuenta'
+import { vencerPruebasInventario } from '@/lib/pruebaInventario'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
 import { generarFichasPendientes } from '@/lib/fichasIA'
 import { iaConfigurada } from '@/lib/ia'
@@ -109,6 +110,13 @@ export async function GET(req: NextRequest) {
       if (r) console.log('[planes vencidos]', r)
     } catch (err) {
       console.error('[planes vencidos]', err instanceof Error ? err.message : err)
+    }
+    // Prueba de Inventario (mig. 193): el día después del fin, sin plan Completo, se apaga el módulo (datos guardados).
+    try {
+      const r = await vencerPruebasInventario()
+      if (r) console.log('[prueba inventario vencida]', r)
+    } catch (err) {
+      console.error('[prueba inventario vencida]', err instanceof Error ? err.message : err)
     }
     for (const e of sincronizadas.filter(x => x.stock)) {
       try {

@@ -60,10 +60,11 @@ export function ganaAlSubir(desde: string | null | undefined, hacia: string): st
   return PLANES.slice(a + 1, b + 1).flatMap(p => p.incluye).map(sinParentesis)
 }
 /** El plan inmediatamente superior que se puede contratar (no «Próximamente»), o null. */
-export function planSiguiente(desde: string | null | undefined): Plan['id'] | null {
+export function planSiguiente(desde: string | null | undefined, disponibles?: readonly string[]): Plan['id'] | null {
   const a = PLANES.findIndex(p => p.id === desde)
   const sig = a >= 0 ? PLANES[a + 1] : undefined
-  return sig && !PLANES_PROXIMAMENTE.includes(sig.id) ? sig.id : null
+  // 21-11 (mig. 193): `disponibles` = los planes que ESA cuenta puede contratar (Completo con la oferta de Inventario).
+  return sig && (disponibles ? disponibles.includes(sig.id) : !PLANES_PROXIMAMENTE.includes(sig.id)) ? sig.id : null
 }
 
 /** Escalones por ventas al mes (todas tus cuentas, sin canceladas): precio en USD de cada plan y créditos de IA de

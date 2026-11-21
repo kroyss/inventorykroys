@@ -139,7 +139,9 @@ export function desglosePlan(plan: string, escalon: number, ciclo: 'mensual' | '
   return l
 }
 
-export interface Mejora { plan: Plan['id']; nombre: string; monto: number; dias: number; lineas: Linea[] }
+export interface Mejora { plan: Plan['id']; nombre: string; monto: number; dias: number; lineas: Linea[]
+  /** Desde qué día se cobra (hoy, o el fin de la prueba de Inventario si pasa a Completo durante ella: mig. 193). */
+  desde: string }
 
 /** Pasar a un plan más caro a mitad de período: diferencia por mes × días que quedan / 30, con el descuento del plan. */
 export function calcularMejora(actual: string, nuevo: Plan['id'], escalon: number, ciclo: string | null, fundador: boolean, hoy: string, hasta: string): Mejora | null {
@@ -155,7 +157,18 @@ export function calcularMejora(actual: string, nuevo: Plan['id'], escalon: numbe
   const lineas: Linea[] = [{ texto: `Diferencia ${nombrePlan(actual)} → ${nombrePlan(nuevo)}: ${fmt(pn)} − ${fmt(pa)} = ${fmt(dif)}/mes`, usd: dif }]
   if (d) lineas.push({ texto: nombreDescuento(fundador, d), usd: r2(mes - dif) })
   lineas.push({ texto: `Solo los ${dias} días que le quedan al plan (hasta el ${ddmm(hasta)}) de 30`, usd: r2(monto - mes) })
-  return { plan: nuevo, nombre: nombrePlan(nuevo), monto, dias, lineas }
+  return { plan: nuevo, nombre: nombrePlan(nuevo), monto, dias, lineas, desde: hoy }
+}
+
+/** 21-11 (mig. 193): la mejora a Completo durante la prueba de Inventario se cobra desde que la prueba termina (pagar
+ *  antes no le quita días gratis). Si la prueba termina después del plan, no hay mejora: renueva en Completo. */
+function mejoraDesde(o: { plan: string; escalon: number | string; ciclo: string | null; fundador: boolean; plan_hasta: string; inventario_prueba_hasta?: string | null },
+  nuevo: Plan['id'], hoy: string): Mejora | null {
+  const fin = o.inventario_prueba_hasta
+  const desde = nuevo === 'completo' && fin && fin > hoy ? fin : hoy
+  const m = calcularMejora(o.plan, nuevo, Number(o.escalon), o.ciclo, !!o.fundador, desde, o.plan_hasta)
+  if (m && desde > hoy) m.lineas[m.lineas.length - 1].texto = `Desde que termina tu prueba de Inventario (${ddmm(desde)}) hasta el ${ddmm(o.plan_hasta)}: ${m.dias} días de 30`
+  return m
 }
 
 // ── Situación de la cuenta ("Mi plan") ───────────────────────────────────────────────────────────────────────────
@@ -191,6 +204,10 @@ export interface SituacionPlan {
   radarProCompra: { precio: number; desde: string; hasta: string } | null
   /** Planes más caros a los que puede pasar ahora pagando la diferencia (plan activo). */
   mejoras: Mejora[]
+  /** Planes que puede contratar (21-11, mig. 193): Completo solo con la oferta de Inventario o su prueba; el resto lo ve «Próximamente». */
+  disponibles: Plan['id'][]
+  /** Fin de su prueba de Inventario (YYYY-MM-DD) o null. */
+  inventarioPruebaHasta: string | null
   /** 09-11 (mig. 159): la organización tiene SOLO el Radar (se registró en el Radar): Mi plan ofrece el Radar mensual. */
   soloRadar: boolean
   /** Radar mensual: hasta cuándo lo tiene y lo que costaría 1 mes pagado hoy (a continuación del vigente). */
@@ -207,6 +224,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     `SELECT nombre, estado, fundador, plan, escalon, ciclo, to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta,
             to_char(prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta,
             to_char(radar_mes_hasta, 'YYYY-MM-DD') AS radar_mes_hasta,
+            inventario_oferta, to_char(inventario_prueba_hasta, 'YYYY-MM-DD') AS inventario_prueba_hasta,
             (SELECT bool_and(modulos <@ ARRAY['radar', 'radar_dia']::text[] AND cardinality(modulos) > 0) FROM empresas WHERE organizacion_id = organizaciones.id) AS solo_radar
      FROM organizaciones WHERE id = $1`, [orgId])
   if (!o) throw new Error('Organización no encontrada')
@@ -231,7 +249,10 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     extrasMes: montoPlan(p.id, escalon, 'mensual', false, cuentasExtra).extras,
     desc: { mensual: montoPlan(p.id, escalon, 'mensual', !!o.fundador).descuento, trimestral: montoPlan(p.id, escalon, 'trimestral', !!o.fundador).descuento },
   }))
-  const planSugerido = (conPlan && PLANES.some(p => p.id === o.plan) && !PLANES_PROXIMAMENTE.includes(o.plan) ? o.plan : 'automatizaciones') as Plan['id']
+  // 21-11 (mig. 193): Completo se abre para quien tiene la oferta de Inventario, su prueba o ya lo paga.
+  const conCompleto = !!o.inventario_oferta || !!o.inventario_prueba_hasta || o.plan === 'completo'
+  const disponibles = PLANES.map(p => p.id).filter(id => !PLANES_PROXIMAMENTE.includes(id) || (id === 'completo' && conCompleto))
+  const planSugerido = (conPlan && disponibles.includes(o.plan) ? o.plan : 'automatizaciones') as Plan['id']
   const activo = estado === 'activo' && conPlan && !!o.plan_hasta && o.plan_hasta >= hoy
   const proDesde = o.radar_pro_hasta && o.radar_pro_hasta >= hoy ? o.radar_pro_hasta : hoy
   const inicioPlan = [o.plan_hasta, o.estado === 'prueba' ? o.prueba_hasta : null, hoy]
@@ -249,8 +270,8 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     // trimestral) y siempre se ofrece al elegir o renovar el plan.
     radarPro: { precio: RADAR_PRO.precio, regalo: !o.radar_pro_hasta },
     radarProCompra: activo && planConRadar(o.plan) ? { precio: RADAR_PRO.precio, desde: proDesde, hasta: sumarMeses(proDesde, 1) } : null,
-    mejoras: activo ? PLANES.filter(p => !PLANES_PROXIMAMENTE.includes(p.id)).map(p => calcularMejora(o.plan, p.id, Number(o.escalon), o.ciclo, !!o.fundador, hoy, o.plan_hasta))
-      .filter((m): m is Mejora => !!m) : [],
+    mejoras: activo ? disponibles.map(id => mejoraDesde(o, id, hoy)).filter((m): m is Mejora => !!m) : [],
+    disponibles, inventarioPruebaHasta: o.inventario_prueba_hasta ?? null,
     inicioPlan,
     soloRadar: !!o.solo_radar,
     radarMes: radarMesDe(o.radar_mes_hasta, hoy),
@@ -298,6 +319,7 @@ export async function reportarCobro(orgId: number, userId: number, r: Reporte) {
   if (!s.conectadas && r.tipo !== 'radar_mes') throw new ErrorCobro('Primero conecta tu cuenta de MercadoLibre: el plan se calcula con sus ventas.')
   // El monto lo calcula el servidor (nunca el que manda la pantalla).
   const cicloPlan = s.ciclo === 'trimestral' ? 'trimestral' : 'mensual'
+  if ((r.tipo === 'plan' || r.tipo === 'upgrade') && !s.disponibles.includes(r.plan)) throw new ErrorCobro('Ese plan estará disponible próximamente: elige otro.')
   let f: { plan: string; escalon: number; ciclo: 'mensual' | 'trimestral'; radar: boolean; extras: number; usd: number; detalle: Detalle }
   if (r.tipo === 'radar_mes') {
     // 09-11 (mig. 159): Radar mensual (solo Radar, PRO todos los días). El precio es el del día que lo reporta.
@@ -323,7 +345,7 @@ export async function reportarCobro(orgId: number, userId: number, r: Reporte) {
     const u = s.mejoras.find(x => x.plan === r.plan)
     if (!u) throw new ErrorCobro('Ese cambio de plan no está disponible ahora.')
     f = { plan: u.plan, escalon: s.escalon!, ciclo: cicloPlan, radar: false, extras: 0, usd: u.monto,
-      detalle: { lineas: u.lineas, desde: currentDate(), hasta: s.vence } }
+      detalle: { lineas: u.lineas, desde: u.desde, hasta: s.vence } }
   } else {
     // 12-11 (el dueño): Radar PRO se ofrece SIEMPRE al pagar el plan (1er mes de regalo, los demás pagados). Lo aplica
     // aprobarCobro (k.radar_pro, a continuación del regalo).
@@ -429,6 +451,10 @@ async function modulosDelPlan(client: PoolClient, org: number, plan: Plan['id'])
          ARRAY(SELECT x FROM unnest(modulos) x WHERE x <> ALL($2::text[])) || $3::text[]) m),
        ia_limite_mes = COALESCE(ia_limite_mes, 100), ia_saldo_desde = COALESCE(ia_saldo_desde, NOW())
      WHERE organizacion_id = $1`, [org, [...MODULOS_CONTROLADOS], [...MODULOS_PLAN[plan]]])
+  // 21-11 (mig. 193): Completo trae Inventario. No se agrega a MODULOS_CONTROLADOS (bajar de plan no lo quita aquí: lo
+  // apaga lib/pruebaInventario.ts solo en las cuentas que lo tuvieron por la prueba; la propia y las internas no se tocan).
+  if (plan === 'completo') await client.query(
+    `UPDATE empresas SET modulos = ARRAY(SELECT DISTINCT unnest(modulos || ARRAY['inventario']::text[])) WHERE organizacion_id = $1`, [org])
 }
 
 export async function aprobarCobro(id: number, por: number) {

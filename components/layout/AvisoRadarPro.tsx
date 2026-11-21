@@ -13,5 +13,5 @@ export async function avisoRadarPro(organizacionId: number): Promise<ItemAviso |
     [organizacionId]).catch(() => ({ rows: [] }))
   if (!o) return null
   // Se cierra con su ✕ hasta el próximo fin de semana (la misma llave que lee el recuadro para no contarlo).
-  return { id: 'radar', nivel: 'info', orden: 80, cerrar: `radarpro:${o.sabado}`, nodo: <AvisoRadarProBarra semana={o.sabado} url="/api/radar/entrar" /> }
+  return { id: 'radar', nivel: 'info', orden: 80, oferta: true, cerrar: `radarpro:${o.sabado}`, nodo: <AvisoRadarProBarra semana={o.sabado} url="/api/radar/entrar" /> }
 }
