@@ -638,12 +638,13 @@ quedan separadas solas. Borrar un texto no cambia nada en ML.
 Trae **solos** los pagos de MercadoEnvíos (con su comprobante) y las **guías**, desde el portal de MercadoEnvíos,
 para que verifiques los pagos de corrido y despaches.
 
-**Dónde se verifica (18-11):** **sin inventario**, en Pagos ME (pestaña Ventas). **Con inventario** (y acceso a Ventas),
-en **Ventas → Por confirmar**: es la misma lista, así que no se repite; Pagos ME pasa a ser **«Conexión Pagos ME»** (menú
-de tu cuenta): la PC, las cuentas, el programa y el **Historial de pagos**. En Por confirmar, **⚙ Conexión** se
-despliega ahí mismo (agregar cuenta, programa, extensión, conectar la PC) sin salir de la lista. Si entras a
-/pagos-me por un enlace viejo, te lleva a Por confirmar. Si apagas o prendes el inventario no se pierde nada: los pagos y lo
-ya verificado son los mismos, solo cambia dónde se ven.
+**Dónde se verifica (21-11): una lista, dos puertas.** **Sin inventario**, en Pagos ME (pestaña Ventas). **Con
+inventario**, la MISMA lista está en dos lugares: en **Pagos ME** (menú de Automatiza, como siempre) y en **Ventas → Por
+confirmar**. Lo que hagas en uno aparece en el otro. En Pagos ME, **Registrar venta** abre ahí mismo el formulario de
+Ventas (sin cambiar de espacio): la venta queda en Ventas y se descuenta del stock. La primera vez sale un aviso que lo
+explica. (Solo la empresa que registra sus ventas en el sistema —módulo de Despachos desde Ventas— tiene la lista
+únicamente en Ventas, con Pagos ME como «Conexión Pagos ME» en el menú de la cuenta.) Si apagas o prendes el inventario
+no se pierde nada: los pagos y lo ya verificado son los mismos.
 
 **Línea de estado (arriba, en Pagos ME y en Por confirmar):** una sola línea con la PC (● verde = en espera, naranja = el
 despertador no corre pero Chrome sí, rojo = sin señal), sus cuentas, y **«✓ traído hh:mm · N nuevos»** si la última
@@ -1274,9 +1275,9 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   ve: «Registrar venta» verifica y procesa de una vez; solo aparece si alguna quedó ahí con «Verificar pago».
   **Verificar el pago de un toque:** toca el chip azul «Pago por verificar · Bs …» → «✓ Sí, verificado» (o «✗ Inválido»):
   queda verificado como cuando cuadra con el banco y el botón pasa a «Registrar venta»; «deshacer» lo vuelve atrás.
-  Con Inventario, los pagos de Pagos ME se verifican **solo aquí** (Pagos ME queda como «Conexión Pagos ME», en el menú
-  de tu cuenta): arriba sale la línea de estado de la PC y **⚙ Conexión** se despliega aquí mismo. Se toca **Registrar
-  venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).
+  Con Inventario, los pagos de Pagos ME se verifican aquí **o en Pagos ME** (es la misma lista): arriba sale la línea de
+  estado de la PC y **⚙ Conexión** se despliega aquí mismo. Se toca **Registrar venta** (no está «Ya la despaché por
+  fuera», porque no descontaría el stock).
   **Ir a Despachos →** (arriba, junto a «Comprobar con el banco»; en Venezuela con Despachos): salta directo a imprimir
   las guías sin pasar por el menú.
   Abajo de la lista: **Vencidas** = ventas de más de N días (el plazo de «no concretada» de Calificaciones) sin pago y

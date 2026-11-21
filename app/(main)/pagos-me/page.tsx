@@ -35,5 +35,8 @@ export default async function PagosMEPage({ searchParams }: { searchParams: Prom
         'Las guías de las ventas pagadas pasan solas a Despachos.']} />
   }
   // 12-11 (rapidez): la primera carga viene en el HTML (mismo GET de la API).
-  return <PagosMEClient inicial={await deApi(pagosME, '/api/pagos-me?estado=pendiente')} isAdmin={puede(session!.user, 'pagos_me_config')} conexion={conexion} />
+  // 21-11: con inventario, «Registrar venta» abre aquí el formulario de Ventas (quien tiene permiso de Ventas).
+  const u = session!.user
+  return <PagosMEClient inicial={await deApi(pagosME, '/api/pagos-me?estado=pendiente')} isAdmin={puede(u, 'pagos_me_config')} conexion={conexion}
+    registrar={llevaInventario(u) && puede(u, 'ver_ventas') ? { country: u.country, procesaDirecto: u.country === 'VE' && !tieneModulo(u, 'verificar_pagos') } : null} />
 }

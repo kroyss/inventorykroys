@@ -69,7 +69,7 @@ const S: Record<string, Sugerencia[]> = {
   ],
   '/pagos-me': [
     { pregunta: '¿Dónde verifico los pagos si llevo inventario?',
-      respuesta: 'En **Ventas → Por confirmar**: es la misma lista. Pagos ME queda como **Conexión Pagos ME** (menú de tu cuenta o **⚙ Conexión** en Por confirmar) para la PC, las cuentas y el **Historial de pagos**.' },
+      respuesta: 'Aquí mismo, como siempre, o en **Ventas → Por confirmar**: es la misma lista, lo que hagas en uno aparece en el otro. Con inventario, **Registrar venta** abre aquí el formulario de la venta y descuenta el stock.' },
     { pregunta: '¿Cómo verifico un pago rápido?',
       respuesta: 'Toca el chip azul **Pago por verificar · Bs …** y elige **✓ Sí, verificado** (o **✗ Inválido**). Queda verificado como cuando cuadra con el banco y el botón pasa a **Registrar venta**. Si te equivocaste, toca **deshacer**.' },
     { pregunta: '¿Cómo conecto MercadoEnvíos?', video: 'Conéctate con Mercadoenvios',
