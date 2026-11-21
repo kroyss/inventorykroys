@@ -32,6 +32,11 @@ Está organizado en **espacios**, cada uno con su propio menú:
 
 Lo que no es de ningún espacio (Usuarios, Aprendizaje, Novedades) está en todos.
 
+**Cambiar de espacio** (21-11-2026): junto al logo, un interruptor de dos partes **Inventario | Automatiza** (solo si la
+empresa tiene los dos). El espacio donde estás va marcado con su nombre; el otro, con su ícono y su **número de
+pendientes** (en rojo preguntas, mensajes y negativas; en gris lo que puede esperar). Un clic cambia; al pasar el mouse
+dice cuál es. El **Radar** se abre desde el menú de tu cuenta (arriba a la derecha): **Radar ↗**.
+
 **Inicio de Automatizaciones** (el primer botón del menú de Automatizaciones):
 - **Primeros pasos** (20-11-2026; arriba, solo para quien conecta las cuentas de ML): una lista corta que se marca sola.
   Lo único **necesario** es **Conectar tu cuenta de MercadoLibre** (sin eso no se traen preguntas, mensajes ni ventas);

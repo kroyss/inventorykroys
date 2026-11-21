@@ -37,7 +37,7 @@ export default async function Navbar() {
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2 xl:gap-4">
 
-        <EspacioSwitcher automatizaciones={conAutomatizaciones} inventario={modulos.includes('inventario')} modulos={modulos} radarUrl={conRadar ? '/api/radar/entrar' : null} />
+        <EspacioSwitcher automatizaciones={conAutomatizaciones} inventario={modulos.includes('inventario')} modulos={modulos} />
 
         <NavLinks role={role} permisos={session?.user.permisos ?? []} country={country} modulos={session?.user.modulos ?? []} />
 
