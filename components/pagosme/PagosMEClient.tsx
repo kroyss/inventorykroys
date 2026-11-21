@@ -533,14 +533,14 @@ function AvisoConInventario() {
   if (visto) return null
   const cerrar = () => { try { localStorage.setItem('aviso:pagosme_inventario', '1') } catch { /* nada */ } setVisto(true) }
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-3 text-sm text-sky-900">
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-3 text-sm text-sky-900 sm:flex-nowrap">
       <span aria-hidden className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-600 text-[11px] font-bold text-white">i</span>
-      <p className="min-w-0 flex-1 leading-snug">
+      <p className="min-w-0 flex-1 basis-[calc(100%-2rem)] leading-snug sm:basis-auto">
         <b className="font-semibold">Ahora con Inventario:</b> al tocar <b className="font-semibold">Registrar venta</b> la venta queda en
         Ventas y se descuenta del stock. Es la misma lista que ves en <Link href="/ventas?vista=confirmar" className="underline underline-offset-2">Ventas → Por confirmar</Link>:
         lo que hagas aquí aparece allá.
       </p>
-      <button type="button" onClick={cerrar} className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100">Entendido</button>
+      <button type="button" onClick={cerrar} className="ml-6 shrink-0 rounded-md px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100 sm:ml-0">Entendido</button>
     </div>
   )
 }
