@@ -331,7 +331,7 @@ export default function DashboardAdmin({ country, bonos, reportes = false, accio
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3 sm:px-5">
           <div>
             <h2 id="neg-t" className="font-semibold text-neutral-900">Cómo va tu negocio</h2>
-            <p className="text-xs text-neutral-500">El período elegido cambia todo lo de esta página, salvo los pendientes.</p>
+            <p className="text-xs text-neutral-500">El período elegido cambia todo lo de esta página, salvo «Para hoy».</p>
           </div>
           {/* 20-11: Hoy / Mes / Trim. / Año y «Fechas…», que abre las dos fechas solo cuando se necesitan. */}
           <div className="relative flex flex-wrap items-center gap-1.5" role="group" aria-label="Período">
