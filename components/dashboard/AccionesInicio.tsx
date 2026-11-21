@@ -144,12 +144,15 @@ function BotonMas({ etiqueta, href, onClick, abierto }: { etiqueta: string; href
 function Columna({ titulo, href, items, boton }: { titulo: string; href: string; items: Item[]; boton?: React.ReactNode }) {
   const cargando = items.some(i => i.n == null)
   const conAlgo = items.filter(i => (i.n ?? 0) > 0)
+  const alDia = !cargando && conAlgo.length === 0
   return (
     <div className="min-w-0 px-4 py-3 sm:px-5">
       <div className="mb-1.5 flex h-7 items-center justify-between gap-2">
         <Link href={href} className="group/t inline-flex items-center gap-0.5 text-sm font-medium text-neutral-800 hover:text-neutral-950">
           {titulo}<span aria-hidden className="text-neutral-400 transition-transform group-hover/t:translate-x-0.5">›</span>
         </Link>
+        {/* Celular: «Al día» en la línea del título (las columnas van una debajo de otra: no gasta una fila). */}
+        {alDia && <span className="mr-auto ml-2 sm:hidden"><AlDia /></span>}
         {boton}
       </div>
       {conAlgo.length > 0 ? (
@@ -176,11 +179,17 @@ function Columna({ titulo, href, items, boton }: { titulo: string; href: string;
           <div className="h-5 w-3/4 animate-pulse rounded bg-neutral-100" />
         </div>
       ) : (
-        <p className="flex items-center gap-1.5 py-1 text-[13px] text-emerald-700">
-          <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">✓</span>
-          Al día
-        </p>
+        <p className="hidden py-1 sm:block"><AlDia /></p>
       )}
     </div>
+  )
+}
+
+function AlDia() {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[13px] text-emerald-700">
+      <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">✓</span>
+      Al día
+    </span>
   )
 }

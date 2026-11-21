@@ -60,7 +60,8 @@ export default function EspacioSwitcher({ automatizaciones, inventario, modulos 
             className={`group relative flex h-8 items-center gap-1.5 rounded-md text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${
               activo ? 'bg-white px-2.5 text-neutral-900 shadow-sm' : 'px-2 text-neutral-500 hover:bg-white/70 hover:text-neutral-800'}`}>
             <Icono de={o.id} />
-            {activo && <span>{NOMBRES[o.id]}</span>}
+            {/* En el celular solo los íconos (el marcado dice dónde estás): con el selector de empresa no entraba. */}
+            {activo && <span className="hidden sm:inline">{NOMBRES[o.id]}</span>}
             {!activo && urgente && <span aria-hidden className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-neutral-100" />}
             {!activo && (
               <span role="tooltip" className="pointer-events-none absolute left-1/2 top-full z-30 mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-neutral-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-sm transition-opacity delay-100 group-hover:opacity-100 group-focus-visible:opacity-100">
