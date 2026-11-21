@@ -14,6 +14,7 @@ import NovedadesCard from './NovedadesCard'
 import AprendizajePanel from './AprendizajePanel'
 import AdopcionPanel, { type FiltroUso, type ResumenCobro } from './AdopcionPanel'
 import PlanCliente from './PlanCliente'
+import InventarioCliente from './InventarioCliente'
 import SoportePanel from './SoportePanel'
 import { PanelPagos } from './CobrosPanel'
 import Segmentos from './Segmentos'
@@ -516,6 +517,12 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                   d={{ organizacion_id: sel.organizacion_id, fundador: sel.fundador, estado: sel.estado, plan: sel.plan, escalon: sel.escalon,
                     ciclo: sel.ciclo, plan_hasta: sel.plan_hasta, radar_pro_hasta: sel.radar_pro_hasta, radar_mes_hasta: sel.radar_mes_hasta ?? null,
                     empresas: empresas.filter(x => x.organizacion_id === sel.organizacion_id).map(x => ({ id: x.id, nombre: x.nombre })) }}
+                  onCambio={msg => { setError(null); setAviso(msg); cargar() }} onError={msg => { setAviso(null); setError(msg) }} />
+              </section>
+
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Prueba de Inventario</h3>
+                <InventarioCliente key={sel.organizacion_id} organizacionId={sel.organizacion_id}
                   onCambio={msg => { setError(null); setAviso(msg); cargar() }} onError={msg => { setAviso(null); setError(msg) }} />
               </section>
 

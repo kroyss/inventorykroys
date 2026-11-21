@@ -5,7 +5,7 @@
 // `acceso`: entra desde /renovar (cuenta vencida, sin sesión) con el acceso firmado de /api/mi-plan/entrar.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CobroFila, SituacionPlan } from '@/lib/cobros'
-import { PLANES_PROXIMAMENTE, RECARGAS_IA, pierdeAlBajar, ganaAlSubir, planSiguiente } from '@/lib/planes'
+import { RECARGAS_IA, pierdeAlBajar, ganaAlSubir, planSiguiente } from '@/lib/planes'
 import QueEsRadar from './QueEsRadar'
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
@@ -115,7 +115,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const base = (s.plan ?? 'automatizaciones') as string
   const pierde = pierdeAlBajar(base, op.id)
   const gana = ganaAlSubir(base, op.id)
-  const sig = op.id === base ? planSiguiente(base) : null
+  const sig = op.id === base ? planSiguiente(base, s.disponibles) : null
   const opSig = sig ? s.opciones.find(o => o.id === sig) : undefined
   const opBase = s.opciones.find(o => o.id === base)
   const mej = s.mejoras.find(m => m.plan === mejora) ?? s.mejoras[0]
@@ -194,6 +194,13 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${dias! <= 3 ? 'bg-amber-100 text-amber-900' : 'bg-neutral-100 text-neutral-600'}`}>{textoDias}</span>
         )}
         {s.fundador && <span className="text-xs bg-lime-100 text-lime-800 rounded-full px-2.5 py-0.5 font-semibold">Fundador −30%</span>}
+        {/* 21-11 (mig. 193): la prueba de Inventario corriendo; para seguir, «Mejorar mi plan» → Completo. */}
+        {s.inventarioPruebaHasta && s.plan !== 'completo' && s.inventarioPruebaHasta >= hoyLocal() && (
+          <span className="basis-full text-xs text-sky-900">
+            📦 Prueba de Inventario hasta el <b>{ddmm(s.inventarioPruebaHasta)}</b>.
+            {s.mejoras.some(m => m.plan === 'completo') ? ' Para seguir con él, «Mejorar mi plan» → Completo: pagas desde que termina la prueba.' : ' Para seguir con él, renueva tu plan en Completo.'}
+          </span>
+        )}
       </section>
 
       {/* Último pago */}
@@ -320,7 +327,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             ) : (
               <div className="grid gap-2 sm:grid-cols-3">
                 {s.opciones.map(o => {
-                  const pronto = PLANES_PROXIMAMENTE.includes(o.id)
+                  const pronto = !s.disponibles.includes(o.id)   // 21-11: Completo se abre con la oferta de Inventario
                   return (
                   <button key={o.id} type="button" disabled={pronto} onClick={() => { setPlan(o.id) }} aria-disabled={pronto}
                     className={`relative text-left rounded-xl border-2 px-3 py-2.5 transition ${pronto ? 'cursor-not-allowed border-neutral-200 bg-neutral-50 opacity-60' : plan === o.id ? 'border-sky-500 bg-sky-50 ring-2 ring-sky-100' : 'border-neutral-200 hover:border-neutral-300'}`}>

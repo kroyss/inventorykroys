@@ -11,6 +11,7 @@
 // terminar); cada cosa se avisa UNA vez (avisos_enviados); varias juntas van en un solo mensaje.
 // Primero solo la organización de la plataforma; a los demás cuando se prenda en Plataforma.
 // Lo llama el cron de preguntas (cada minuto). Tablas: migración 089.
+import { lineaTelegramInventario } from '@/lib/pruebaInventario'
 import type { Pool } from 'pg'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
@@ -692,6 +693,9 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
   const pend = await pendienteAhora(db, e, d, disp)
   const prueba = d.role === 'admin' ? await finDePrueba(e.id) : null
   if (prueba) pend.unshift(prueba)
+  // Prueba de Inventario (mig. 193): desde 3 días antes, una línea en este mismo resumen (no un mensaje aparte).
+  const inv = d.role === 'admin' && e.organizacion_id ? await lineaTelegramInventario(e.organizacion_id).catch(() => null) : null
+  if (inv) pend.unshift(inv)
   lineas.push('', '<b>Pendiente hoy</b>', ...(pend.length ? pend : ['Nada pendiente. Todo al día 👌']))
   // Dueño de la plataforma (2026-10-16): los clientes cuya prueba vence en 3 días o venció hace poco, y si a
   // ellos les llega el aviso (admin con Telegram y resumen prendido). Una sola vez: en la empresa VE.
