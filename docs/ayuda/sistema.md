@@ -36,7 +36,8 @@ Lo que no es de ningún espacio (Usuarios, Aprendizaje, Novedades) está en todo
 empresa tiene los dos). El espacio donde estás va marcado con su nombre; el otro, con su ícono. Si Automatiza tiene
 algo **urgente** (preguntas, mensajes o calificaciones negativas) lleva un **punto rojo**; lo que puede esperar (guías,
 despachos, por calificar) no se marca aquí: tiene su número adentro, en cada menú. Un clic cambia; al pasar el mouse
-dice cuál es y, si hay algo urgente, qué («Automatiza: 2 preguntas, 1 mensaje»). El **Radar** se abre desde el menú de tu cuenta (arriba a la derecha): **Radar ↗**.
+dice cuál es y, si hay algo urgente, qué («Automatiza: 2 preguntas, 1 mensaje»). En el celular se ven solo los dos íconos (el
+marcado es donde estás). El **Radar** se abre desde el menú de tu cuenta (arriba a la derecha): **Radar ↗**.
 
 **Inicio de Automatizaciones** (el primer botón del menú de Automatizaciones):
 - **Primeros pasos** (20-11-2026; arriba, solo para quien conecta las cuentas de ML): una lista corta que se marca sola.
