@@ -71,8 +71,7 @@ function Rotador({ items }: { items: ItemAviso[] }) {
   // 21-11 (el dueño: «si abro la oferta y cambia sola a Radar, me quita la pantalla que estaba leyendo»): se pausa con el
   // mouse encima, con el foco adentro y, sobre todo, mientras haya una VENTANA abierta dentro del aviso (se cierra
   // solo con su ✕ / «Ahora no»). Un clic en el texto de la ventana no reactiva la rotación.
-  // El foco se mira en el momento (al cerrarse la ventana, el navegador no avisa que el foco se fue).
-  const encima = useRef(false)
+  // Mouse y foco se miran en el momento (al cerrarse la ventana debajo del puntero, el navegador no avisa que se fueron).
   const caja = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -89,7 +88,7 @@ function Rotador({ items }: { items: ItemAviso[] }) {
     if (quieto || items.length < 2) return
     const t = setInterval(() => {
       const c = caja.current
-      if (encima.current || document.hidden || (c && (c.contains(document.activeElement) || c.querySelector('[role="dialog"]')))) return
+      if (document.hidden || (c && (c.matches(':hover') || c.contains(document.activeElement) || c.querySelector('[role="dialog"]')))) return
       setI(v => (v + 1) % items.length)
     }, CADA_MS)
     return () => clearInterval(t)
@@ -98,8 +97,7 @@ function Rotador({ items }: { items: ItemAviso[] }) {
   const actual = i % items.length
   if (items.length === 1) return <div>{items[0].nodo}</div>
   return (
-    <div ref={caja} className="relative grid" aria-roledescription="carrusel"
-      onMouseEnter={() => { encima.current = true }} onMouseLeave={() => { encima.current = false }}>
+    <div ref={caja} className="relative grid" aria-roledescription="carrusel">
       {items.map((it, k) => (
         <div key={it.id} aria-hidden={k !== actual} inert={k !== actual}
           className={`col-start-1 row-start-1 transition-opacity duration-500 ease-out motion-reduce:transition-none ${k === actual ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
