@@ -122,7 +122,7 @@ está: **verde** todo al día, **amarillo** algo viejo. Abre un panel con cada c
   mayor. Si eliges uno mayor, en verde **«Con <plan> ganas:»** y cuánto más al mes (con tu escalón, ciclo y descuento).
   Con tu plan elegido, abajo sale la invitación al plan siguiente (**¿Pasas a…?**, con lo que suma y **Ver <plan>**);
   los planes «Próximamente» no se ofrecen. **Mejorar mi plan** también muestra lo que ganas.
-- **Prueba de Inventario 15 días** (21-11-2026; por ahora solo para algunas cuentas que ya pagan): arriba sale
+- **Prueba de Inventario 15 días** (21-11-2026; por ahora solo para algunas cuentas que ya pagan, se la damos nosotros): arriba sale
   **«Nuevo · Prueba Inventario 15 días gratis»** con **Probar gratis** (solo al administrador). Se abre una ventana con
   lo que incluye, hasta cuándo es gratis y cuánto pagarías si sigues; **Activar prueba gratis** la prende al instante
   y te lleva a Inicio de Inventario, con **Primeros pasos** (importar tus productos desde ML, costos, stock). Todo lo
@@ -215,8 +215,9 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      escalón y el precio. Si ya tienes plan, el escalón solo sube o baja cuando tus dos últimos meses quedan en otro
      escalón. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
      los últimos 90 días, así que no hace falta esperar un mes).
-     El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres (el **Completo** sale en gris como «Próximamente»: todavía no se puede contratar, salvo
-     en las cuentas a las que se les ofreció la prueba de Inventario).
+     El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres. **Completo** (21-11) trae Inventario: al confirmarse el pago se prende solo y
+     aparece el interruptor **Inventario | Automatiza** junto al logo; si después renuevas con un plan menor, Inventario se
+     apaga (tus datos se guardan).
      Puedes elegir **mensual** o **trimestral (−10%)**: cada opción muestra el precio por mes y, en el trimestral, cuánto
      pagas cada 3 meses y cuánto ahorras. Los regalos del primer plan (créditos de IA y 1 mes de Radar PRO) salen juntos
      en un recuadro. Debajo puedes marcar **Sumar Radar PRO** para los meses que no cubre el regalo. El **Resumen** muestra
