@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent } from 'react'
 import { TELEGRAM_SOPORTE } from '@/lib/cuenta'
 import type { Marca } from '@/lib/marca'
 import { eventoPixel, iniciarPixel } from '@/lib/metaPixel'
+import { LineaLegal } from '@/components/legal/PaginaLegal'
 
 // Prueba gratis de 15 días (26-10, app/registro/page.tsx → POST /api/registro). Mismo formato que la entrada:
 // panel negro de marca a la izquierda y el formulario a la derecha. Al crear la cuenta entra sola y va al inicio,
@@ -184,6 +185,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
               className="w-full bg-lime-400 text-neutral-950 py-2.5 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {loading ? 'Creando tu cuenta…' : 'Empezar mi prueba gratis'}
             </button>
+            <LineaLegal accion="Al crear tu cuenta" className="text-center" />
           </form>
 
           <p className="text-sm text-neutral-500 mt-6">Al terminar la prueba eliges tu plan · <a href="/precios" className="font-medium text-lime-700 underline underline-offset-2">Ver planes</a></p>

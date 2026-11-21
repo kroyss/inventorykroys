@@ -319,6 +319,8 @@ export default async function InicioPage() {
 
       <footer className="border-t border-neutral-200 py-6 text-center text-xs text-neutral-400">
         © {anio} El Comerciante Digital · <a href={LOGIN} className="hover:text-neutral-700">Entrar</a>
+        {' · '}<a href="https://app.elcomerciantedigital.com/terminos" className="hover:text-neutral-700">Términos</a>
+        {' · '}<a href="https://app.elcomerciantedigital.com/privacidad" className="hover:text-neutral-700">Privacidad</a>
       </footer>
     </div>
   )

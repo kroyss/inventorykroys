@@ -245,6 +245,8 @@ export default async function PreciosPage() {
 
       <footer className="border-t border-neutral-200 py-6 text-center text-xs text-neutral-400">
         © {anio} El Comerciante Digital · <a href={INICIO} className="hover:text-neutral-700">Inicio</a> · <a href="/login" className="hover:text-neutral-700">Entrar</a>
+        {' · '}<a href="/terminos" className="hover:text-neutral-700">Términos</a>
+        {' · '}<a href="/privacidad" className="hover:text-neutral-700">Privacidad</a>
       </footer>
     </div>
   )

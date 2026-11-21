@@ -3,6 +3,7 @@ import {
   COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, cifrasRadar, portadaSerie, PRECIO_DESPUES, TEMAS, TELEGRAM_DESPEGUE, CASO_FINAL,
 } from '@/lib/despegue'
 import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/DespegueCliente'
+import { LineaLegal } from '@/components/legal/PaginaLegal'
 
 export const metadata = {
   title: 'Programa Despegue',
@@ -313,11 +314,14 @@ export default async function DespeguePage() {
           No prometemos una cantidad de ventas: eso depende de tu producto, tu capital y tu trabajo. Lo que sí te damos es el
           método que a nosotros nos funcionó y acompañamiento real durante 8 semanas.
         </p>
+        <LineaLegal accion="Al escribirnos para apartar tu cupo" className="mx-auto max-w-2xl text-center" />
       </main>
 
       <footer className="border-t border-neutral-200 py-6 text-center text-xs text-neutral-400">
         <a href={COMUNIDAD_TELEGRAM} target="_blank" rel="noreferrer" className="font-medium text-neutral-500 hover:text-neutral-800">Comunidad de Vendedores en Telegram</a>
         <span className="mx-2">·</span>© {anio} El Comerciante Digital
+        <span className="mx-2">·</span><a href="https://app.elcomerciantedigital.com/terminos" className="hover:text-neutral-700">Términos</a>
+        <span className="mx-2">·</span><a href="https://app.elcomerciantedigital.com/privacidad" className="hover:text-neutral-700">Privacidad</a>
       </footer>
 
       {/* En celular, el botón siempre a mano (la mayoría entra desde el teléfono). */}
