@@ -68,7 +68,12 @@ export default function AvisosLista({ items }: { items: ItemAviso[] }) {
 function Rotador({ items }: { items: ItemAviso[] }) {
   const [i, setI] = useState(0)
   const [quieto, setQuieto] = useState(true)      // hasta saber si se puede mover (celular / reducir movimiento)
-  const pausa = useRef(false)
+  // 21-11 (el dueño: «si abro la oferta y cambia sola a Radar, me quita la pantalla que estaba leyendo»): se pausa con el
+  // mouse encima, con el foco adentro y, sobre todo, mientras haya una VENTANA abierta dentro del aviso (se cierra
+  // solo con su ✕ / «Ahora no»). Mouse y foco van por separado: un clic en el texto no reactiva la rotación.
+  const encima = useRef(false)
+  const foco = useRef(false)
+  const caja = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let mover = false
@@ -82,16 +87,20 @@ function Rotador({ items }: { items: ItemAviso[] }) {
 
   useEffect(() => {
     if (quieto || items.length < 2) return
-    const t = setInterval(() => { if (!pausa.current) setI(v => (v + 1) % items.length) }, CADA_MS)
+    const t = setInterval(() => {
+      if (encima.current || foco.current || caja.current?.querySelector('[role="dialog"]') || document.hidden) return
+      setI(v => (v + 1) % items.length)
+    }, CADA_MS)
     return () => clearInterval(t)
   }, [quieto, items.length])
 
   const actual = i % items.length
   if (items.length === 1) return <div>{items[0].nodo}</div>
   return (
-    <div className="relative grid" aria-roledescription="carrusel"
-      onMouseEnter={() => { pausa.current = true }} onMouseLeave={() => { pausa.current = false }}
-      onFocusCapture={() => { pausa.current = true }} onBlurCapture={() => { pausa.current = false }}>
+    <div ref={caja} className="relative grid" aria-roledescription="carrusel"
+      onMouseEnter={() => { encima.current = true }} onMouseLeave={() => { encima.current = false }}
+      onFocusCapture={() => { foco.current = true }}
+      onBlurCapture={e => { foco.current = !!caja.current && caja.current.contains(e.relatedTarget as Node | null) }}>
       {items.map((it, k) => (
         <div key={it.id} aria-hidden={k !== actual} inert={k !== actual}
           className={`col-start-1 row-start-1 transition-opacity duration-500 ease-out motion-reduce:transition-none ${k === actual ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
