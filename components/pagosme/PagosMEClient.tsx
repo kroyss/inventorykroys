@@ -9,6 +9,8 @@ import VigilanteConConexion, { CodigoConexion, DESCARGA_PROGRAMA } from './Conex
 import { type PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from './PagoME'
 import PorConfirmar, { usePorConfirmar } from '@/components/ventas/PorConfirmar'
+import VentasForm from '@/components/ventas/VentasForm'
+import type { Country, InventoryItem, Sale } from '@/lib/types'
 import { AYUDA_EXTENSION_TRABADA, AYUDA_SIN_SENAL, AYUDA_TRABADA, textoErrorME } from '@/lib/meTraida'
 
 type Filtro = 'pendiente' | 'valido' | 'invalido' | 'todos'
@@ -43,7 +45,21 @@ const ERROR_PERFIL: Record<string, string> = {
 
 /** `conexion` (18-11): con inventario y Ventas, la lista de pagos por confirmar vive en Ventas → Por confirmar; aquí queda
  *  la conexión (PC, cuentas, programa) y el historial de pagos. Sin inventario, esta pantalla ES la lista. */
-export default function PagosMEClient({ isAdmin, inicial = null, conexion = false }: { isAdmin: boolean; inicial?: unknown; conexion?: boolean }) {
+export default function PagosMEClient({ isAdmin, inicial = null, conexion = false, registrar = null }: {
+  isAdmin: boolean; inicial?: unknown; conexion?: boolean
+  /** 21-11: con inventario y permiso de Ventas, «Registrar venta» abre aquí el formulario de Ventas (sin ir a otro espacio). */
+  registrar?: { country: Country; procesaDirecto: boolean } | null
+}) {
+  const [form, setForm] = useState<{ numero: string | null; editing: Sale | null } | null>(null)
+  const [productos, setProductos] = useState<InventoryItem[] | null>(null)
+  // Los productos del formulario se piden al abrirlo (la lista de pagos no los necesita).
+  const abrirForm = async (f: { numero: string | null; editing: Sale | null }) => {
+    if (!productos) {
+      const rows: InventoryItem[] = await fetch('/api/sales/products', { cache: 'no-store' }).then(r => r.json()).catch(() => [])
+      setProductos(Array.isArray(rows) ? rows : [])
+    }
+    setForm(f)
+  }
   const [filtro, setFiltro] = useState<Filtro>('pendiente')
   const [datos, setDatos] = useState<Datos | null>(null)
   const [marcados, setMarcados] = useState<Set<number>>(new Set())
@@ -234,16 +250,29 @@ export default function PagosMEClient({ isAdmin, inicial = null, conexion = fals
       )}
       {/* Con inventario y SIN acceso a Ventas (18-11): la misma lista que Por confirmar, aquí. Con acceso a Ventas, la lista
           vive allá (esta pantalla es la conexión). */}
+      {conLista && vista === 'ventas' && datos.conInventario && registrar && <AvisoConInventario />}
       {conLista && vista === 'ventas' && datos.conInventario && (
         <PorConfirmar datos={pc.datos} onRecargar={pc.cargar} enPagosME
-          onConfirmar={n => { window.location.href = `/ventas?vista=confirmar&registrar=${n}` }}
+          onConfirmar={n => { if (registrar) abrirForm({ numero: n, editing: null }); else window.location.href = `/ventas?vista=confirmar&registrar=${n}` }}
           onVerificarPago={async (id, v) => {
             const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ids: [id], verificacion: v }) }).catch(() => null)
             if (!r?.ok) setError('No se pudo guardar la verificación')
             await Promise.all([pc.cargar(), cargar()])
           }}
-          onVerificarCargada={() => { window.location.href = '/ventas?vista=confirmar' }} />
+          onVerificarCargada={async id => {
+            if (!registrar) { window.location.href = '/ventas?vista=confirmar'; return }
+            // Ya cargada con pago: la MISMA venta en Editar venta (como en Ventas → Por confirmar).
+            const fresh: Sale | null = await fetch(`/api/sales/${id}`).then(r => r.json()).catch(() => null)
+            if (fresh?.id) abrirForm({ numero: null, editing: fresh })
+          }} />
+      )}
+      {form && registrar && productos && (
+        <VentasForm editing={form.editing} products={productos} country={registrar.country} procesaDirecto={registrar.procesaDirecto}
+          numeroInicial={form.editing ? undefined : form.numero ?? undefined}
+          onClose={() => setForm(null)}
+          onSaved={() => { setForm(null); pc.cargar(); cargar() }}
+          onContinue={() => { setForm(null); pc.cargar(); cargar() }} />
       )}
 
       {(!conLista || vista === 'historial') && <>
@@ -490,4 +519,28 @@ function ComprobanteImgOPdf({ url }: { url: string }) {
   if (esPdf) return <iframe src={url} title="Comprobante" className="w-full h-[60vh] rounded-lg border bg-white" />
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={url} alt="Comprobante de pago" onError={() => setEsPdf(true)} className="w-full rounded-lg border" />
+}
+
+/** 21-11: la primera vez que se ve la lista con inventario, qué cambia al registrar (se cierra y no vuelve). */
+function AvisoConInventario() {
+  const [visto, setVisto] = useState(true)
+  useEffect(() => {
+    let v = true
+    try { v = localStorage.getItem('aviso:pagosme_inventario') === '1' } catch { /* sin almacenamiento: no se muestra */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- se lee del navegador después de montar
+    setVisto(v)
+  }, [])
+  if (visto) return null
+  const cerrar = () => { try { localStorage.setItem('aviso:pagosme_inventario', '1') } catch { /* nada */ } setVisto(true) }
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-3 text-sm text-sky-900">
+      <span aria-hidden className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-600 text-[11px] font-bold text-white">i</span>
+      <p className="min-w-0 flex-1 leading-snug">
+        <b className="font-semibold">Ahora con Inventario:</b> al tocar <b className="font-semibold">Registrar venta</b> la venta queda en
+        Ventas y se descuenta del stock. Es la misma lista que ves en <Link href="/ventas?vista=confirmar" className="underline underline-offset-2">Ventas → Por confirmar</Link>:
+        lo que hagas aquí aparece allá.
+      </p>
+      <button type="button" onClick={cerrar} className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100">Entendido</button>
+    </div>
+  )
 }
