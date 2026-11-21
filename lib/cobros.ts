@@ -167,7 +167,7 @@ function mejoraDesde(o: { plan: string; escalon: number | string; ciclo: string 
   const fin = o.inventario_prueba_hasta
   const desde = nuevo === 'completo' && fin && fin > hoy ? fin : hoy
   const m = calcularMejora(o.plan, nuevo, Number(o.escalon), o.ciclo, !!o.fundador, desde, o.plan_hasta)
-  if (m && desde > hoy) m.lineas[m.lineas.length - 1].texto = `Desde que termina tu prueba de Inventario (${ddmm(desde)}) hasta el ${ddmm(o.plan_hasta)}: ${m.dias} días de 30`
+  if (m && desde > hoy) m.lineas[m.lineas.length - 1].texto = `Solo los ${m.dias} días desde que termina tu prueba de Inventario (${ddmm(desde)}) hasta el ${ddmm(o.plan_hasta)}, de 30`
   return m
 }
 
