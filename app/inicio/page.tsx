@@ -40,7 +40,7 @@ function Icono({ d, className = 'h-5 w-5' }: { d: string; className?: string }) 
 }
 
 // 15-11 (el dueño): textos al día (la IA ya responde sola, rentabilidad en vez de margen) y lo que faltaba; máximo 6
-// puntos por tarjeta. `etiqueta`: el aviso de la tarjeta (Inventario en Completo, «Próximamente» hasta que se abra).
+// puntos por tarjeta. `etiqueta`: el aviso de la tarjeta (Inventario en Completo, abierto desde el 21-11).
 const HACEMOS: { t: string; i: string; d: string; x: string[]; etiqueta?: string }[] = [
   { t: 'Automatizaciones', i: I.rayo, d: 'Lo que te quita el día, resuelto en un solo lugar para todas tus cuentas y tu equipo.',
     x: ['La IA responde tus preguntas sola, con los datos de tu negocio', 'Mensajes de tus ventas y seguimiento de cada cliente',
@@ -48,7 +48,7 @@ const HACEMOS: { t: string; i: string; d: string; x: string[]; etiqueta?: string
         'Reportador: cada comprador recibe su guía en segundos', 'Avisos de stock y de todo por Telegram'] },
   { t: 'Pagos MercadoEnvíos', i: I.pago, etiqueta: 'Nuevo', d: 'Los pagos y las guías del portal llegan solos, listos para verificar.',
     x: ['Pagos y comprobantes traídos solos', 'Comprobación con tu estado de cuenta del banco', 'Las guías pasan directo a despachos'] },
-  { t: 'Inventario', i: I.caja, etiqueta: 'Plan Completo · Próximamente', d: 'Tu stock, tus ventas y tus ganancias al día, sin cuaderno ni Excel.',
+  { t: 'Inventario', i: I.caja, etiqueta: 'Plan Completo', d: 'Tu stock, tus ventas y tus ganancias al día, sin cuaderno ni Excel.',
     x: ['Ventas, compras y stock con aviso de reposición', 'Rentabilidad real después de comisión, envío y cambio',
         'Publicaciones y promociones en lote, en un clic', 'Top de vendidos y sugerencias de compra para los próximos meses'] },
   { t: 'Radar de Oportunidades', i: I.radar, d: 'Qué se vende en MercadoLibre Venezuela, a qué precio real y qué está creciendo.',

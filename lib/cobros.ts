@@ -204,7 +204,7 @@ export interface SituacionPlan {
   radarProCompra: { precio: number; desde: string; hasta: string } | null
   /** Planes más caros a los que puede pasar ahora pagando la diferencia (plan activo). */
   mejoras: Mejora[]
-  /** Planes que puede contratar (21-11, mig. 193): Completo solo con la oferta de Inventario o su prueba; el resto lo ve «Próximamente». */
+  /** Planes que puede contratar (sin los «Próximamente»; 21-11: Completo abierto a todos). */
   disponibles: Plan['id'][]
   /** Fin de su prueba de Inventario (YYYY-MM-DD) o null. */
   inventarioPruebaHasta: string | null
@@ -249,7 +249,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     extrasMes: montoPlan(p.id, escalon, 'mensual', false, cuentasExtra).extras,
     desc: { mensual: montoPlan(p.id, escalon, 'mensual', !!o.fundador).descuento, trimestral: montoPlan(p.id, escalon, 'trimestral', !!o.fundador).descuento },
   }))
-  // 21-11 (mig. 193): Completo se abre para quien tiene la oferta de Inventario, su prueba o ya lo paga.
+  // 21-11 (mig. 193): con un plan en «Próximamente», igual lo puede contratar quien tiene la oferta de Inventario, su prueba o ya lo paga.
   const conCompleto = !!o.inventario_oferta || !!o.inventario_prueba_hasta || o.plan === 'completo'
   const disponibles = PLANES.map(p => p.id).filter(id => !PLANES_PROXIMAMENTE.includes(id) || (id === 'completo' && conCompleto))
   const planSugerido = (conPlan && disponibles.includes(o.plan) ? o.plan : 'automatizaciones') as Plan['id']
@@ -455,6 +455,12 @@ async function modulosDelPlan(client: PoolClient, org: number, plan: Plan['id'])
   // apaga lib/pruebaInventario.ts solo en las cuentas que lo tuvieron por la prueba; la propia y las internas no se tocan).
   if (plan === 'completo') await client.query(
     `UPDATE empresas SET modulos = ARRAY(SELECT DISTINCT unnest(modulos || ARRAY['inventario']::text[])) WHERE organizacion_id = $1`, [org])
+  // Baja de Completo a otro plan: si alguna vez pagó Completo, el Inventario era del plan y se apaga (datos guardados).
+  // Un Inventario dado a mano en Plataforma (sin pago de Completo) y las cuentas internas no se tocan.
+  else await client.query(
+    `UPDATE empresas e SET modulos = array_remove(e.modulos, 'inventario') FROM organizaciones o
+     WHERE e.organizacion_id = $1 AND o.id = $1 AND NOT o.interna AND 'inventario' = ANY(e.modulos)
+       AND EXISTS (SELECT 1 FROM organizacion_pagos p WHERE p.organizacion_id = $1 AND p.plan = 'completo')`, [org])
 }
 
 export async function aprobarCobro(id: number, por: number) {
