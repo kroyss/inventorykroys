@@ -70,9 +70,9 @@ function Rotador({ items }: { items: ItemAviso[] }) {
   const [quieto, setQuieto] = useState(true)      // hasta saber si se puede mover (celular / reducir movimiento)
   // 21-11 (el dueño: «si abro la oferta y cambia sola a Radar, me quita la pantalla que estaba leyendo»): se pausa con el
   // mouse encima, con el foco adentro y, sobre todo, mientras haya una VENTANA abierta dentro del aviso (se cierra
-  // solo con su ✕ / «Ahora no»). Mouse y foco van por separado: un clic en el texto no reactiva la rotación.
+  // solo con su ✕ / «Ahora no»). Un clic en el texto de la ventana no reactiva la rotación.
+  // El foco se mira en el momento (al cerrarse la ventana, el navegador no avisa que el foco se fue).
   const encima = useRef(false)
-  const foco = useRef(false)
   const caja = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -88,7 +88,8 @@ function Rotador({ items }: { items: ItemAviso[] }) {
   useEffect(() => {
     if (quieto || items.length < 2) return
     const t = setInterval(() => {
-      if (encima.current || foco.current || caja.current?.querySelector('[role="dialog"]') || document.hidden) return
+      const c = caja.current
+      if (encima.current || document.hidden || (c && (c.contains(document.activeElement) || c.querySelector('[role="dialog"]')))) return
       setI(v => (v + 1) % items.length)
     }, CADA_MS)
     return () => clearInterval(t)
@@ -98,9 +99,7 @@ function Rotador({ items }: { items: ItemAviso[] }) {
   if (items.length === 1) return <div>{items[0].nodo}</div>
   return (
     <div ref={caja} className="relative grid" aria-roledescription="carrusel"
-      onMouseEnter={() => { encima.current = true }} onMouseLeave={() => { encima.current = false }}
-      onFocusCapture={() => { foco.current = true }}
-      onBlurCapture={e => { foco.current = !!caja.current && caja.current.contains(e.relatedTarget as Node | null) }}>
+      onMouseEnter={() => { encima.current = true }} onMouseLeave={() => { encima.current = false }}>
       {items.map((it, k) => (
         <div key={it.id} aria-hidden={k !== actual} inert={k !== actual}
           className={`col-start-1 row-start-1 transition-opacity duration-500 ease-out motion-reduce:transition-none ${k === actual ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
