@@ -18,7 +18,9 @@ export interface AccionesInicioConfig {
   porConfirmar: boolean      // cuentas de ML + ver_ventas
   despachos: boolean         // módulo + permiso Despachos: «Por despachar» lleva ahí
   verificarPagos: boolean    // sin él (Inventario simple) lo procesado se llama «Procesadas»
-  compras: boolean           // ver_compras + módulo compras_etapas: fila Compras
+  compras: boolean           // ver_compras: columna Compras (21-11: también con Compras básicas)
+  comprasEtapas: boolean     // módulo compras_etapas: hay pendientes (por finalizar, en camino). Sin él la compra nace
+                             // finalizada («Entró mercancía»): la columna queda «Al día» con su «+»
   comprasEditar: boolean     // compras_editar: «+ Nueva compra»
   importaciones: boolean
   inventario: boolean        // ver_inventario: línea gris
@@ -46,13 +48,13 @@ export default function AccionesInicio({ cfg, stock }: { cfg: AccionesInicioConf
   }, [cfg.ventas])
 
   useEffect(() => {
-    if (!cfg.compras) return
+    if (!cfg.compras || !cfg.comprasEtapas) return
     let vivo = true
     fetch('/api/dashboard/reception-counts').then(r => r.ok ? r.json() : Promise.reject()).then(c => {
       if (vivo) setRecv(c && typeof c.local === 'number' ? c : { local: 0, imports: 0, imports_boxes: 0, por_finalizar: 0 })
     }).catch(() => { if (vivo) setRecv({ local: 0, imports: 0, imports_boxes: 0, por_finalizar: 0 }) })
     return () => { vivo = false }
-  }, [cfg.compras])
+  }, [cfg.compras, cfg.comprasEtapas])
 
   // Lo procesado sigue en Despachos (ahí se generan las guías); sin Despachos, en Ventas.
   const nombreProcesadas = cfg.despachos || (cfg.country === 'VE' && cfg.verificarPagos) ? 'Por despachar' : !cfg.verificarPagos ? 'Procesadas' : 'Por descargar'
@@ -62,7 +64,7 @@ export default function AccionesInicio({ cfg, stock }: { cfg: AccionesInicioConf
     { k: 'borr', label: 'Borradores', n: ventas?.borrador ?? null, href: '/ventas?estado=BORRADOR', ayuda: 'Ventas sin terminar de cargar' },
   ]
   // Cada uno filtra por los MISMOS estados que cuenta /api/dashboard/reception-counts.
-  const itemsCompras: Item[] = [
+  const itemsCompras: Item[] = !cfg.comprasEtapas ? [] : [
     { k: 'fin', label: 'Por finalizar', n: recv?.por_finalizar ?? null, href: '/compras?tab=local&estado=RECIBIDA,PARCIAL', ayuda: 'Compras recibidas que falta cerrar (locales e importaciones)' },
     { k: 'loc', label: 'Compras en camino', n: recv?.local ?? null, href: '/compras?tab=local&estado=EN_CAMINO', ayuda: 'Compras locales en camino', info: true },
     ...(cfg.importaciones ? [{ k: 'imp', label: recv && recv.imports_boxes > 0 ? `Importaciones en camino · ${n0(recv.imports_boxes)} cajas` : 'Importaciones en camino', n: recv?.imports ?? null, href: '/compras?tab=import&estado=EN_CAMINO', ayuda: 'Importaciones en camino', info: true }] : []),
@@ -76,6 +78,8 @@ export default function AccionesInicio({ cfg, stock }: { cfg: AccionesInicioConf
       : [{ k: 'baj', label: 'Stock bajo', n: stock.low_stock_alerts, href: '/inventario?estado=BAJO', ayuda: 'Por debajo del mínimo', info: true }]),
   ] : [{ k: 'sin', label: 'Sin stock', n: null, href: '', ayuda: '' }]
 
+  // Sin etapas, crear una compra es registrar lo que ya llegó: el botón lo dice así, como en Compras.
+  const nuevaCompra = cfg.comprasEtapas ? 'Nueva compra' : 'Entró mercancía'
   const columnas = [cfg.ventas, cfg.compras, cfg.inventario].filter(Boolean).length
   if (!columnas && !cfg.tasa) return null
   const gridCls = columnas === 3 ? 'sm:grid-cols-3' : columnas === 2 ? 'sm:grid-cols-2' : ''
@@ -94,13 +98,13 @@ export default function AccionesInicio({ cfg, stock }: { cfg: AccionesInicioConf
           )}
           {cfg.compras && (
             <Columna titulo="Compras" href="/compras" items={itemsCompras} boton={cfg.comprasEditar ? (
-              !cfg.importaciones ? <BotonMas etiqueta="Nueva compra" href="/compras?new=1" /> : (
+              !cfg.importaciones ? <BotonMas etiqueta={nuevaCompra} href="/compras?new=1" /> : (
                 <div className="relative">
-                  <BotonMas etiqueta="Nueva compra" abierto={compraMenu} onClick={() => setCompraMenu(v => !v)} />
+                  <BotonMas etiqueta={nuevaCompra} abierto={compraMenu} onClick={() => setCompraMenu(v => !v)} />
                   {compraMenu && <>
                     <div className="fixed inset-0 z-10" onClick={() => setCompraMenu(false)} />
                     <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg">
-                      <Link href="/compras?new=1" className="block px-3 py-2 text-sm hover:bg-neutral-50">Compra local</Link>
+                      <Link href="/compras?new=1" className="block px-3 py-2 text-sm hover:bg-neutral-50">{cfg.comprasEtapas ? 'Compra local' : 'Entró mercancía'}</Link>
                       <Link href="/compras?tab=import&new=1" className="block border-t border-neutral-100 px-3 py-2 text-sm hover:bg-neutral-50">Importación</Link>
                     </div>
                   </>}
