@@ -384,9 +384,18 @@ const SOLO_SALUDO = /^((hola|holis|buenas|buenos|buen|dias|dia|tardes|noches|sal
 
 /** Para lo último que escribió el comprador: qué se le respondió a mensajes parecidos en
  *  otras ventas (la primera respuesta del vendedor dentro de los 3 días). Hasta 3, sin repetir. */
-export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3): Promise<{ consulta: string | null; sugerencias: Sugerencia[] }> {
+// 21-11 (el dueño, medición de Mensajes): opciones apagadas por defecto.
+//   hasta = la conversación y los ejemplos solo hasta ese momento (medir sin ver el futuro);
+//   sinIA = de lo que mandó la propia IA (27 % de las «respuestas del vendedor» desde el 11-11) quedan como ejemplo solo
+//           las que salieron bien: fuera las marcadas Mal, la frase de escape y las que el equipo tuvo que completar;
+//   porPaso = primero los ejemplos del mismo paso de la venta (con o sin guía de MercadoEnvíos): un «Listo» antes de pagar
+//             no se contesta igual que después de la guía.
+export interface OpcionesSugerencias { hasta?: string; sinIA?: boolean; porPaso?: boolean }
+const GUIA_ML = 'n[uú]mero de gu[ií]a para tu env[ií]o'
+export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3, opciones: OpcionesSugerencias = {}): Promise<{ consulta: string | null; sugerencias: Sugerencia[] }> {
+  const hasta = opciones.hasta ? new Date(Date.parse(opciones.hasta) + 1000).toISOString() : null
   const { rows } = await db.query(
-    `SELECT propio, texto FROM ml_mensajes WHERE pack_id = $1 ORDER BY fecha DESC LIMIT 10`, [pack])
+    `SELECT propio, texto FROM ml_mensajes WHERE pack_id = $1 AND ($2::timestamptz IS NULL OR fecha <= $2) ORDER BY fecha DESC LIMIT 10`, [pack, hasta])
   const ultimos: string[] = []
   for (const m of rows) { if (m.propio) break; ultimos.unshift(m.texto) }
   const consulta = ultimos.join(' ').trim().slice(0, 500)
@@ -396,6 +405,11 @@ export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3): Pr
   if (SOLO_SALUDO.test(consulta.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^a-z ]/g, ' ').trim())) {
     return { consulta, sugerencias: [] }
   }
+  // Paso de ESTA conversación: ¿ya llegó el aviso de guía de ML?
+  const paso = opciones.porPaso
+    ? (await db.query(`SELECT EXISTS (SELECT 1 FROM ml_mensajes WHERE pack_id = $1 AND ($2::timestamptz IS NULL OR fecha <= $2) AND texto ~* $3) AS g`,
+        [pack, hasta, GUIA_ML])).rows[0]?.g === true
+    : null
   const { rows: pares } = await db.query(
     // Parecido = se escribe parecido (trigramas) o comparte al menos 2 palabras en español con lo
     // que escribió el comprador ("llega/llegó", "guía"…); primero las que comparten más.
@@ -407,10 +421,24 @@ export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3): Pr
      JOIN LATERAL (
        SELECT texto FROM ml_mensajes r
        WHERE r.pack_id = b.pack_id AND r.propio AND r.fecha > b.fecha AND r.fecha < b.fecha + INTERVAL '3 days'
+         -- Lo que mandó la IA sirve de ejemplo si salió bien (el dueño: «lo acertado es aprendizaje»); se deja afuera solo
+         -- si está marcado Mal, si fue la frase de escape, o si alguien del equipo escribió otra cosa en la hora siguiente
+         -- (la completó o la corrigió).
+         AND ($5::boolean IS NOT TRUE OR NOT EXISTS (SELECT 1 FROM ml_mensajes_ia i WHERE i.pack_id = r.pack_id
+               AND (i.escape_at BETWEEN r.fecha - INTERVAL '3 minutes' AND r.fecha + INTERVAL '3 minutes'
+                    OR (i.enviada_at BETWEEN r.fecha - INTERVAL '3 minutes' AND r.fecha + INTERVAL '3 minutes'
+                        AND (i.marca = 'mal' OR EXISTS (
+                          SELECT 1 FROM ml_mensajes h WHERE h.pack_id = r.pack_id AND h.propio
+                            AND h.fecha > r.fecha + INTERVAL '3 minutes' AND h.fecha < r.fecha + INTERVAL '60 minutes'
+                            AND h.texto !~* $3
+                            AND NOT EXISTS (SELECT 1 FROM ml_mensajes_ia j WHERE j.pack_id = h.pack_id
+                                              AND j.enviada_at BETWEEN h.fecha - INTERVAL '3 minutes' AND h.fecha + INTERVAL '3 minutes'))))))))
        ORDER BY r.fecha LIMIT 1) r ON TRUE
      WHERE NOT b.propio AND b.pack_id <> $2 AND (b.texto % $1 OR x.n >= LEAST(2, cardinality(qw.w)))
-       AND r.texto !~* $3
-     ORDER BY x.n DESC, parecido DESC LIMIT 30`, [consulta, pack, AUTOMATICOS])
+       AND r.texto !~* $3 AND ($4::timestamptz IS NULL OR b.fecha < $4)
+     ORDER BY CASE WHEN $6::boolean IS NULL THEN 0
+                   WHEN EXISTS (SELECT 1 FROM ml_mensajes g WHERE g.pack_id = b.pack_id AND g.fecha < b.fecha AND g.texto ~* $7) = $6 THEN 0 ELSE 1 END,
+              x.n DESC, parecido DESC LIMIT 30`, [consulta, pack, AUTOMATICOS, hasta, opciones.sinIA === true, paso, GUIA_ML])
   const vistas = new Set<string>()
   const sugerencias: Sugerencia[] = []
   for (const x of pares) {
