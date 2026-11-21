@@ -316,6 +316,12 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
      cómo va mejorando. También se abren con **Pruebas anteriores** en la tarjeta.
 4. Toca **Encender respuestas automáticas en Preguntas** (está siempre a la vista cuando está apagada; no hace falta
    probar antes) y acepta el aviso. Haz lo mismo en Mensajes.
+- **En «Después de la compra» (Mi IA) hay dos datos nuevos:** **¿Cobras embalaje?** (Sí/No, cuánto y qué incluye) y
+  **¿Quieres que la IA mande tus datos para pagar?** (Sí/No y los datos, escritos una sola vez, como los copiaría el
+  comprador). Con esto la IA contesta sola cuánto es el embalaje y, solo si el comprador los pide, dónde pagar; si eliges
+  No, esas preguntas te quedan para revisar. **Si el monto del embalaje cambia, actualízalo ahí** (la IA usa siempre el
+  que esté escrito). Mientras no los completes, Mi IA muestra el aviso «Hay un dato nuevo que tomar en cuenta» con
+  **Completarlo →**.
 - Para apagarla: **Apagar respuestas automáticas…** en la tarjeta de Mi IA. Se apaga al instante.
 - **Todo se enciende y se cambia en Mi IA**: encendido, modo y frenos.
 - **Mensajes automáticos: Próximamente.** Por ahora la IA responde sola solo en **Preguntas**; en Mi IA la tarjeta de

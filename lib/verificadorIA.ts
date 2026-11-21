@@ -151,3 +151,91 @@ function lista<T>(x: T[] | string | undefined | null): T[] {
   return []
 }
 function esLista(x: unknown) { return Array.isArray(x) || (typeof x === 'string' && Array.isArray((() => { try { return JSON.parse(x) } catch { return null } })())) }
+
+// ── Verificador de MENSAJES post-venta (21-11, el dueño: «¿por qué Mensajes rinde menos que Preguntas?») ─────────────
+// En medición: Mensajes no tenía verificador, así que toda respuesta con confianza media o baja quedaba para una persona
+// (304 de 1.373 frenadas solo por eso). Mismo enfoque que v3, con los datos y riesgos propios de después de la compra.
+const SISTEMA_MENSAJE = `Verificas un BORRADOR de respuesta a un mensaje POST-VENTA (el comprador YA compró) de un vendedor de MercadoLibre Venezuela, antes de que se envíe solo sin que lo revise una persona. Tu trabajo es encontrar cualquier cosa afirmada que NO esté escrita en los DATOS.
+
+1. Separa el borrador en afirmaciones concretas y ponle a cada una un "tipo":
+   · "producto": color, variante, talla, medida, qué incluye, cuántas unidades compró.
+   · "estado": que el pago se recibió o la compra está pagada, que tiene guía (y su número), que ya se envió o despachó, en qué paso está la compra.
+   · "envio": agencia, envío gratis o cobro a destino, día o plazo de despacho, tiempo de llegada, ciudad, retiro en persona.
+   · "pago": montos (Bs o $), datos para pagar (cuentas, pago móvil, teléfonos), adicionales como el embalaje, medios de pago.
+   · "compromiso": algo que el vendedor va a hacer distinto de lo normal (cambiar color, mandar junto con otra compra, reservar, reembolsar, enviar fotos, llamar).
+   · "otro": saludo, cortesía, gracias, "quedo a su orden", repetir lo que dijo el comprador, explicar cómo completar MercadoEnvíos con el link que ya está en la conversación, decir que el equipo lo revisa, pedirle un dato al comprador, recordar que algo es opcional.
+2. Para cada afirmación marca "respaldada" y anota "donde":
+   - producto: PRODUCTOS DE LA VENTA (la VARIANTE QUE COMPRÓ manda sobre fotos y ficha), ficha, descripción, fotos, notas del vendedor.
+   - estado: las líneas PAGO y ENVÍO, o el aviso automático de guía de MercadoLibre dentro de la CONVERSACIÓN. Que el comprador diga "ya pagué" o mande un adjunto NO respalda "recibimos su pago" ni "su pago está confirmado" (sí respalda "recibimos su mensaje/captura"). Un número de guía tiene que ser EXACTAMENTE el mismo.
+   - envio: la línea ENVÍO GRATIS DE ESTA COMPRA, las POLÍTICAS o las RESPUESTAS RÁPIDAS. Un día de despacho ("mañana miércoles", "hoy") tiene que cuadrar con HOY y con los días de despacho escritos en las POLÍTICAS.
+   - pago: los datos para pagar solo si están copiados EXACTOS de las POLÍTICAS o de lo que el VENDEDOR ya escribió en la conversación o sus respuestas rápidas; el monto del embalaje u otro adicional, igual; un total en Bs, del TOTAL DE LA VENTA.
+   - compromiso: solo si las POLÍTICAS lo permiten o el vendedor ya lo ofreció en esta conversación.
+   - Lo que el VENDEDOR ya dijo en esta misma conversación está respaldado. Las POLÍTICAS (incluida Mi IA) también, aunque se digan con otras palabras.
+   - Si no la encuentras escrita, respaldada = false. No la deduzcas ni la des por obvia.
+3. "principal_sin_contestar" = true SOLO si lo principal de lo ÚLTIMO que escribió el comprador quedó sin ninguna respuesta, o el borrador contesta otra cosa (pidió los datos para pagar y solo le dicen el día de envío). Una respuesta corta a un "ok", "listo" o "gracias" está contestada.
+
+AJUSTES (21-11, primera medición: frenaba frases que el equipo usa siempre; mandan sobre lo anterior):
+- Son "otro" (no se verifican): "le avisamos / le confirmamos / le respondemos por aquí (por este chat)", "lo verificamos / lo revisamos con el equipo", "verificamos su pago y el día en que procesamos el envío", "recibimos su mensaje / su comprobante / su captura / su aviso", "el embalaje es opcional y puede agregarlo cuando quiera" (si el vendedor ya lo ofreció), repetir lo que el comprador contó ("me alegra que ya lo haya recibido"), y cualquier frase de cortesía o despedida. Es el proceso normal del vendedor, no una promesa nueva.
+- Un saludo ("buenas tardes", "hola") contestado con un saludo cordial y/o el estado de su compra está CONTESTADO.
+- "El envío sale el próximo día hábil" está respaldado si las POLÍTICAS dicen días de despacho. Un día concreto ("mañana jueves", "el lunes", "hoy") está respaldado si sale de HOY y de esos días (HOY martes y despacho de lunes a viernes → "mañana miércoles" respaldado; HOY sábado → "el lunes"). Solo frena si no cuadra.
+- Tiempo de LLEGADA ("tarda 2 a 3 días", "le llega el jueves"): respaldado SOLO si está escrito en las POLÍTICAS. Que el vendedor lo haya dicho en otras conversaciones o en respuestas anteriores NO lo respalda. "El tiempo de la agencia no lo sabemos con exactitud" es "otro".
+- Estado del envío ("ya salió", "aún no se ha despachado"): solo con la línea ENVÍO o el aviso de guía que lo diga; tener guía NO quiere decir que ya salió ni que no salió.
+- Sigue frenando: decir que un pago aparte (embalaje, transferencia, diferencia) ya se RECIBIÓ o está CONFIRMADO; datos para pagar que no estén escritos exactos; un número de guía distinto; decir dónde va el paquete o que llegó sin un dato que lo diga; montos o costos de envío prometidos ("le confirmamos el costo exacto"); compromisos distintos de lo normal (cambiar color, mandar foto de la guía si el vendedor no lo ofrece, reservar, reembolsar); hablar del comprador en tercera persona ("el comprador mandó…").`
+
+// 21-11, 2ª medición (el dueño revisó: fallaban por no entender la situación, no por datos inventados).
+const SISTEMA_MENSAJE_ENCAJE = `
+
+¿ENCAJA CON LA CONVERSACIÓN? (campo "no_encaja"; null si encaja). Lee la CONVERSACIÓN completa y lo último del comprador, y anota en una frase si el borrador:
+- contradice lo que el comprador acaba de decir o lo que ya pasó en el chat (dice que ya pagó, ya llenó el formulario, ya recibió, o que el paquete está en tránsito, y el borrador le pide hacerlo o dice que no se despachó; ya eligió agencia y el borrador le ofrece otra);
+- contesta algo que nadie preguntó en lugar de lo último que escribió (a un "ok" o "gracias" le lista medios de pago, cobros o condiciones que no venían al caso; le habla de cobro a destino cuando ya tiene guía de envío gratis);
+- le dice que le manda o le da algo (un link, datos, una foto, un contacto) y no lo incluye;
+- le da datos para pagar (cuentas, pago móvil) que el comprador no pidió;
+- habla del comprador en tercera persona o comenta el mensaje ("parece un recordatorio", "el comprador mandó…");
+- no tiene sentido con lo último que escribió (le agradece "el número" si no mandó ninguno).
+Una respuesta corta y cordial que cuadra con lo que pasa ENCAJA aunque no agregue nada.`
+
+const SISTEMA_MENSAJE_FIN = `
+
+Siempre termina llamando a la herramienta verificar.`
+
+const HERRAMIENTA_MENSAJE = {
+  ...HERRAMIENTA_V3,
+  input_schema: {
+    ...HERRAMIENTA_V3.input_schema,
+    properties: {
+      ...HERRAMIENTA_V3.input_schema.properties,
+      afirmaciones: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            afirmacion: { type: 'string' }, donde: { type: 'string', description: 'Dónde está escrita, o "ninguna".' }, respaldada: { type: 'boolean' },
+            tipo: { type: 'string', enum: ['producto', 'estado', 'envio', 'pago', 'compromiso', 'otro'] },
+          },
+          required: ['afirmacion', 'donde', 'respaldada', 'tipo'],
+        },
+      },
+      no_encaja: { type: ['string', 'null'], description: 'Si el borrador no encaja con la conversación: por qué, en una frase. Si encaja, null.' },
+    },
+    required: ['afirmaciones', 'principal_sin_contestar', 'no_encaja'],
+  },
+}
+const RIESGO_MENSAJE = ['producto', 'estado', 'envio', 'pago', 'compromiso']
+
+/** `datos` = el mismo contexto que vio la IA del borrador (borradorMensaje → contexto). `comprador` = lo último que escribió. */
+export async function verificarMensaje(datos: string, comprador: string, borrador: string, modeloV = MODELO_SIMPLE): Promise<Verificacion> {
+  const { resultado: r, uso, modelo } = await llamarClaude<{
+    afirmaciones?: { afirmacion: string; donde: string; respaldada: boolean; tipo?: string }[]; principal_sin_contestar?: boolean; que_falta?: string
+    no_encaja?: string | null
+  }>({
+    para: 'Mensajes: verificador', sistema: SISTEMA_MENSAJE + SISTEMA_MENSAJE_ENCAJE + SISTEMA_MENSAJE_FIN, herramienta: HERRAMIENTA_MENSAJE, modelo: modeloV, maxTokens: 900,
+    contenido: `DATOS:\n${datos}\n\n────────\nLO ÚLTIMO QUE ESCRIBIÓ EL COMPRADOR: ${comprador || '(solo mandó un adjunto)'}\n\nBORRADOR A VERIFICAR:\n${borrador}`,
+  })
+  if (!esLista(r.afirmaciones)) return { ok: false, motivo: 'El verificador no respondió bien: lo revisa una persona', llamada: { modelo, uso } }
+  const sinRespaldo = lista(r.afirmaciones).filter(a => (!a.respaldada || /^ninguna/i.test(a.donde ?? '')) && RIESGO_MENSAJE.includes(a.tipo ?? 'producto'))
+  const noEncaja = typeof r.no_encaja === 'string' && r.no_encaja.trim() && !/^(null|ninguno|encaja)\b/i.test(r.no_encaja.trim()) ? r.no_encaja.trim() : null
+  const motivo = sinRespaldo.length ? `No está en los datos: ${sinRespaldo.map(a => a.afirmacion).join('; ')}`
+    : r.principal_sin_contestar ? `Falta contestar: ${r.que_falta || 'lo principal del mensaje'}`
+    : noEncaja ? `No encaja con la conversación: ${noEncaja}` : null
+  return { ok: !motivo, motivo: motivo?.slice(0, 300) ?? null, llamada: { modelo, uso }, sinRespaldo: sinRespaldo.map(a => ({ afirmacion: a.afirmacion, tipo: a.tipo })) }
+}

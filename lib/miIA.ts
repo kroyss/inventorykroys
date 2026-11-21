@@ -27,7 +27,12 @@ export interface MiIA {
   desconocido?: ('verificar' | 'preguntar' | 'recomendar' | 'persona')[]
   /** Temas que van siempre a una persona. */
   persona?: string[]
-  postventa?: { pasos?: string[]; datosPago?: string; noAplica?: boolean }   // noAplica: "no hace falta nada" (cuenta como completo)
+  postventa?: { pasos?: string[]; datosPago?: string; noAplica?: boolean   // noAplica: "no hace falta nada" (cuenta como completo)
+    /** 21-11 (el dueño): ¿la IA puede mandar los datos para pagar cuando el comprador los pide? Sin guardar = sí si hay datos. */
+    mandaDatos?: boolean
+    /** 21-11 (el dueño): embalaje u otro adicional opcional. Sin guardar = «dato nuevo» (se avisa en Mi IA, no frena). */
+    embalaje?: { cobra: boolean; monto?: string; incluye?: string }
+  }
   // 07-11 (Fase 2 de docs/analisis-mercasist.md): temas que en VE se preguntan mucho y no tenían dónde ir.
   cambios?: { acepta?: 'si' | 'falla' | 'no'; motivos?: MotivoCambio[]; dias?: number | null; envio?: 'comprador' | 'nosotros' | 'depende' }
   negocio?: { mayor?: 'escribir' | 'mismo'; mayorDesde?: number | null; regateo?: 'fijo' | 'consultar'; apartar?: 'no' | 'si'; apartarHoras?: number | null }
@@ -83,6 +88,9 @@ export function leerMiIA(json: string | null | undefined): MiIA | null {
     return v && typeof v === 'object' && v.version === 1 ? v as MiIA : null
   } catch { return null }
 }
+
+/** 21-11: la pregunta del embalaje se agregó después: quien ya tenía Mi IA la ve como «dato nuevo» hasta contestarla. */
+export const embalajeNuevo = (c: MiIA | null) => !!c && c.postventa?.embalaje === undefined
 
 /** Teléfono, correo o link (MercadoLibre borra o sanciona las respuestas que los tienen). */
 export const datoDeContacto = (s?: string | null) =>
@@ -198,11 +206,18 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
   if (gen.length) S.push(`INDICACIONES GENERALES DEL VENDEDOR (síguelas siempre)\n${gen.map(x => `- ${limpio(x.titulo)}: ${limpio(x.texto)}`).join('\n')}`)
   const ex = (c.extras ?? []).filter(x => !x.siempre && limpio(x.titulo) && limpio(x.texto) && (consulta === undefined || extraAplica(x, consulta)))
   if (ex.length) S.push(`INFORMACIÓN EXTRA DEL VENDEDOR (úsala solo si responde lo que preguntan)\n${ex.map(x => `- ${limpio(x.titulo)}: ${limpio(x.texto)}`).join('\n')}`)
+  const emb = c.postventa?.embalaje
+  const lineaEmbalaje = !emb ? null : !emb.cobra ? 'No cobramos embalaje ni otro adicional: no lo ofrezcas.'
+    : `Embalaje OPCIONAL${limpio(emb.monto) ? `: ${limpio(emb.monto)}` : ''}${limpio(emb.incluye) ? ` (incluye ${limpio(emb.incluye)})` : ''}. Es el monto vigente: si un mensaje o respuesta vieja dice otro, manda este (salvo que el vendedor ya le haya dicho otro monto a ESTE comprador en la conversación: respeta lo que le dijo).`
+  if (modulo === 'preguntas' && lineaEmbalaje) sec('EMBALAJE', [lineaEmbalaje + ' Menciónalo solo si preguntan por el embalaje o el empaque.'])
   if (modulo === 'mensajes') {
     const pv = c.postventa ?? {}
+    const manda = pv.mandaDatos !== false
     sec('DESPUÉS DE LA COMPRA', [
       pv.pasos?.length && `Lo que tiene que hacer el comprador: ${lista(pv.pasos)}.`,
-      limpio(pv.datosPago) && `Datos para pagar (cópialos EXACTOS, sin cambiar nada): ${limpio(pv.datosPago)}`,
+      lineaEmbalaje,
+      manda && limpio(pv.datosPago) && `Datos para pagar (cópialos EXACTOS, sin cambiar nada; dalos si el comprador los pide, p. ej. para pagar el embalaje): ${limpio(pv.datosPago)}`,
+      !manda && 'Los datos para pagar (cuentas, pago móvil) los manda una persona: si los pide, deja la respuesta VACÍA con confianza "baja" y falta_dato "Pide datos de pago: los da el equipo".',
     ])
   }
   return S.join('\n\n')

@@ -38,13 +38,17 @@ Antes de responder, piensa: ¿en qué paso está?, ¿qué quiere decir con lo ú
 Cómo responder:
 - Responde a lo ÚLTIMO que escribió el comprador, teniendo en cuenta toda la conversación, la nota de la venta y su estado.
 - Mensajes cortos ("Listo", "Ok", "Gracias", "Buenas noches") con todo en orden: responde corto como el vendedor ("Perfecto, quedo a su orden"). No repitas datos que ya están en el chat (la guía ya se la mandó ML) salvo que los pida o el saludo sea la primera vez que escribe después de la guía.
+- 21-11 (reglas de la medición v2): a un "ok", "gracias", "listo" o un emoji responde UNA frase corta de cortesía (puedes recordar el día de envío): NO agregues datos nuevos (embalaje, datos de pago, medidas, pasos, formulario) ni comentes lo que escribió ("su último mensaje fue…").
+- Datos para pagar: dalos SOLO si el comprador los pide o pregunta cómo o dónde pagar (p. ej. el embalaje). Nunca los agregues si no los pidió.
+- No digas que le mandas o compartes algo (contacto, foto, datos, link, guía) si no va en ESTE mismo mensaje.
 - El stock del sistema NO es asunto del comprador después de comprar: no lo menciones ni bajes la confianza por eso, salvo que pida más unidades, cambiar de color/variante o pregunte si hay.
 - Si pregunta cuánto es en bolívares, usa el TOTAL de la venta que te doy (ya calculado a tasa BCV) y di el monto exacto.
 - Español de Venezuela, cordial y breve: 1 o 2 frases, nunca más de 350 caracteres.
 - Copia el tono y las frases de las RESPUESTAS ANTERIORES DEL VENDEDOR: son su voz real.
 - Para dudas del producto (cómo se usa, qué incluye, compatibilidad) usa su FICHA, DESCRIPCIÓN, LO QUE SE VE EN LAS FOTOS y FICHA DE CONOCIMIENTO. Si dice que la publicación se contradice en lo que pregunta, no elijas: confianza "baja".
 - En Venezuela MercadoLibre no tiene carrito de compras: no lo menciones.
-- Las POLÍTICAS DEL VENDEDOR son lo vigente: si una respuesta anterior o la ficha de conocimiento dicen otra cosa (montos o mínimos para envío gratis, agencias, formas de pago, retiro), manda lo que dicen las POLÍTICAS.
+- Las POLÍTICAS DEL VENDEDOR son lo vigente: si una respuesta anterior o la ficha de conocimiento dicen otra cosa (montos o mínimos para envío gratis, agencias, formas de pago, retiro, tiempo de llegada), manda lo que dicen las POLÍTICAS.
+- Tiempo de LLEGADA (21-11, igual que en Preguntas): nunca des días ni fechas de llegada ("tarda 2 a 3 días", "le llega el jueves") salvo que estén en las POLÍTICAS, aunque una respuesta anterior lo diga. Di cuándo sale y que el tiempo de la agencia no lo sabemos con exactitud.
 - ZOOM / TEALCA / envío gratis: manda la línea de ENVÍO GRATIS del producto (calculada con su peso y precio), por encima de las POLÍTICAS generales. Si dice "SOLO por TEALCA" y preguntan por ZOOM: el envío gratis es solo por TEALCA y por ZOOM sería cobro a destino. Si dice "cobro a destino", no ofrezcas envío gratis. Si el producto no tiene esa línea o dice "Sin peso", no afirmes por qué agencia es gratis: confianza "baja".
 - Usa SOLO los datos que te doy. Nunca inventes fechas de entrega, números de guía, datos de pago, montos ni compromisos. Si el dato no está, dilo en "falta_dato" y deja una respuesta prudente (o vacía) con confianza "baja".
 - Si hay GUÍA de envío, puedes darla. Si no la hay, no digas que ya se envió.
@@ -52,7 +56,7 @@ Cómo responder:
 - Cuándo sale el envío: con HOY y los días de despacho de las POLÍTICAS di el día concreto ("el lunes", "mañana martes"). Si las POLÍTICAS no dicen días de despacho, no prometas un día.
 - No repitas datos que ya están en el chat (la guía que mandó ML, montos ya dados) salvo que los pida. Si ya tiene guía y solo saluda o dice "listo": dile que verifican su pago y el día en que procesan el envío.
 - Datos para pagar (cuentas, pago móvil, Zelle…): SOLO los de "Datos para pagar" de las POLÍTICAS, copiados exactos. Si no están ahí y el comprador los pide, deja la respuesta VACÍA con confianza "baja" y falta_dato "Pide datos de pago: los da el equipo".
-- Adicionales OPCIONALES que el vendedor ofrece en sus mensajes o respuestas rápidas (p. ej. embalaje): el monto sale de ahí, nunca uno fijo. Son opcionales: si dice que ya lo pagó, responde corto ("Perfecto, quedo a su orden") y el día de envío, sin decir que se verifica; si pregunta si es obligatorio o qué pasa si no lo paga, di que es opcional y que puede agregarlo cuando quiera; si ya tiene guía y no lo agregó, puedes sugerirlo una vez.
+- Adicionales OPCIONALES (p. ej. embalaje): el monto sale de la línea de embalaje de las POLÍTICAS o, si no está, de los mensajes o respuestas rápidas del vendedor; nunca uno inventado. Son opcionales: si dice que ya lo pagó, responde corto ("Perfecto, quedo a su orden") y el día de envío, sin decir que se verifica; si pregunta si es obligatorio o qué pasa si no lo paga, di que es opcional y que puede agregarlo cuando quiera; si ya tiene guía y no lo agregó, puedes sugerirlo una vez.
 - Otro pago aparte que NO es un adicional opcional (una diferencia, otro producto): ese lo verifica el equipo.
 - Monto: desglose "cantidad × precio = subtotal" con el TOTAL de la venta; si el vendedor ofrece un adicional opcional, súmalo aparte como opcional ("si desea agregar el embalaje de X, total Y").
 - Envío pagado por el comprador (cobro a destino): nunca des montos ni estimados (varían). Confirma la agencia entre las de cobro a destino de las POLÍTICAS; cuando la elija, pídele nombre completo, cédula, teléfono, dirección, ciudad y estado. Si las POLÍTICAS piden un mínimo de unidades para el envío gratis y el producto entra ahí, recomienda comprar ese mínimo: le sale más barato que el cobro a destino.
@@ -61,7 +65,7 @@ Cómo responder:
 - Si el comprador solo saluda o agradece, responde corto y amable.
 - Nada de correos, redes sociales ni links que no sean de MercadoLibre.
 - SOLO AGRADECE (08-11): si el comprador solo agradece o confirma ("gracias", "ok", "perfecto", "excelente") y no pregunta nada, responde corto y cordial (ej. "Con gusto, quedo a su orden"); puedes recordar cuándo sale el envío, pero NO vuelvas a ofrecer el embalaje ni otros cobros que ya se le dijeron.
-- PEDIDO ESPECIAL (08-11): si en lo que escribió AHORA el comprador pide algo DISTINTO a lo que compró —otro color, talla, modelo o variante; mezclar variantes ("compré 2 rojos, quiero 1 rojo y 1 azul"); más o menos unidades; cambiar o agregar otro producto— pon en "pedido_especial" un resumen corto con lo que compró y lo que quiere (ej. "Compró 2 rojos, quiere 1 rojo y 1 azul"). En ese caso el borrador NO confirma el cambio: di que lo verifican y le confirman por aquí. NO es pedido especial (deja null): preguntar de qué color o modelo le llega, confirmar que es el que compró (13-11: si lo que pide o nombra COINCIDE con la VARIANTE QUE COMPRÓ —ej. escribe "solo color blanco" y compró "Color: Luz solo Blanco"— es la misma compra repetida: confírmale que eso es lo que compró y así le llega; las fotos o la ficha pueden mostrar OTRA variante de la publicación y eso NO cambia lo que compró), preguntar si hay otros colores ANTES de decidir algo, reclamos por algo que llegó mal, ni dudas de uso.
+- PEDIDO ESPECIAL (08-11): si en lo que escribió AHORA el comprador pide algo DISTINTO a lo que compró —otro color, talla, modelo o variante; mezclar variantes ("compré 2 rojos, quiero 1 rojo y 1 azul"); más o menos unidades; cambiar o agregar otro producto; preguntar el precio o si hay de OTRO producto distinto al que compró (21-11)— pon en "pedido_especial" un resumen corto con lo que compró y lo que quiere (ej. "Compró 2 rojos, quiere 1 rojo y 1 azul"). En ese caso el borrador NO confirma el cambio: di que lo verifican y le confirman por aquí. NO es pedido especial (deja null): preguntar de qué color o modelo le llega, confirmar que es el que compró (13-11: si lo que pide o nombra COINCIDE con la VARIANTE QUE COMPRÓ —ej. escribe "solo color blanco" y compró "Color: Luz solo Blanco"— es la misma compra repetida: confírmale que eso es lo que compró y así le llega; las fotos o la ficha pueden mostrar OTRA variante de la publicación y eso NO cambia lo que compró), preguntar si hay otros colores ANTES de decidir algo, reclamos por algo que llegó mal, ni dudas de uso.
 - RECLAMO (08-11): si pide devolución, garantía, reemplazo o reembolso, o dice que le llegó dañado, defectuoso, que no funciona, incompleto o un producto/color/modelo distinto al que compró, pon en "reclamo" un resumen corto (ej. "Le llegó azul, compró rojo; pide cambio"). El borrador NO promete devolución, reemplazo ni reembolso: di que lo revisan con el equipo y le responden por aquí. Si no es eso, null.
 
 Siempre termina llamando a la herramienta proponer_respuesta.`
@@ -95,13 +99,20 @@ CORRECCIÓN: al final te paso TU BORRADOR ANTERIOR y por qué no se pudo enviar.
 - Solo lo que está en la conversación, la venta, las notas y las POLÍTICAS. Lo que no está, en una frase corta, sin explicar por qué.
 - No prometas verificar, confirmar ni avisar después si no lo dicen las POLÍTICAS.
 - Si con lo que hay ya respondes bien, confianza "alta". Si de verdad hace falta una persona, deja confianza "baja".`
+// 21-11 (medición, el dueño): `opciones` (apagadas por defecto, nada cambia en el automático):
+//   preguntasPrevias = suma lo que este comprador preguntó antes de comprar (como Preguntas, que ya lo tiene);
+//   historico = con `hasta`, la guía y el pago salen solo de la conversación hasta ese momento (no del envío de HOY).
+//   ejemplos = cómo se eligen las respuestas anteriores del vendedor (lib/mensajesML.ts sugerenciasMensaje: sin la IA, por paso).
+export interface OpcionesMensaje { preguntasPrevias?: boolean; historico?: boolean; ejemplos?: { sinIA?: boolean; porPaso?: boolean } }
 export async function borradorMensaje(db: Pool, conexionId: number, sellerId: number, pack: string, country: string,
-  conInventario = true, hasta?: string, correccion?: { anterior: string; problemas: string[] }): Promise<BorradorMensaje & { uso: UsoIA; modelo: string; ejemplos: number }> {
+  conInventario = true, hasta?: string, correccion?: { anterior: string; problemas: string[] }, opciones: OpcionesMensaje = {}): Promise<BorradorMensaje & { uso: UsoIA; modelo: string; ejemplos: number; contexto: string }> {
+  const historico = !!(opciones.historico && hasta)
   const [hiloEntero, venta, notas, ejemplos] = await Promise.all([
     leerHilo(db, conexionId, pack, sellerId, false),
     itemsDeVenta(db, conexionId, pack).catch(() => null),
     leerNotas(db, conexionId, pack).catch(() => ({ notas: [] })),
-    sugerenciasMensaje(db, pack, 6).catch(() => ({ consulta: null, sugerencias: [] })),
+    sugerenciasMensaje(db, pack, 6, { ...(opciones.historico && hasta ? { hasta } : {}), ...(opciones.ejemplos ?? {}) })
+      .catch(() => ({ consulta: null, sugerencias: [] as Awaited<ReturnType<typeof sugerenciasMensaje>>['sugerencias'] })),
   ])
   const corte = hasta ? Date.parse(hasta) + 1000 : null
   const hilo = corte ? { ...hiloEntero, mensajes: hiloEntero.mensajes.filter(m => Date.parse(m.fecha) <= corte) } : hiloEntero
@@ -173,7 +184,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     .map(m => /n[uú]mero de gu[ií]a para tu env[ií]o es:?\s*([A-Z0-9-]{5,})/i.exec(textoPlano(m.texto))?.[1]).find(Boolean) ?? null
   let g: { carrier?: string; guia?: string; jornada?: string } | undefined
   let ml: Awaited<ReturnType<typeof envioML>> = null
-  if (country === 'VE') {
+  if (country === 'VE' && !historico) {
     ({ rows: [g] } = await db.query(
       `SELECT e.carrier, COALESCE(e.guia_final, e.guia) AS guia, j.status AS jornada, j.closed_at
        FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id JOIN despacho_jornadas j ON j.id = l.jornada_id
@@ -184,8 +195,9 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   const guiaME = ml?.guia || avisoGuia
   const pagadoME = !!(g || guiaME)
   const lineaPago = pagadoME ? `PAGO: ya pagó en MercadoEnvíos (la compra está pagada${guiaME ? `, guía ${guiaME}` : ''}).` : null
-  if (conInventario) {
-    L.push(s ? `ESTADO EN EL SISTEMA: ${ESTADO_VENTA[s.status] ?? s.status}` : 'ESTADO EN EL SISTEMA: la venta todavía no está cargada en el sistema.')
+  if (historico) { /* el estado de HOY no es el de ese momento: no se muestra */ }
+  else if (conInventario) {
+    L.push(s ?`ESTADO EN EL SISTEMA: ${ESTADO_VENTA[s.status] ?? s.status}` : 'ESTADO EN EL SISTEMA: la venta todavía no está cargada en el sistema.')
   } else {
     const { rows: [o] } = await db.query(`SELECT estado FROM ml_ordenes WHERE id::text = $1 OR pack_id::text = $1 LIMIT 1`, [pack])
     if (o?.estado === 'cancelled') L.push('ESTADO DE LA VENTA: cancelada en MercadoLibre.')
@@ -218,6 +230,18 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   // Hoy (07-11): para decir el día de envío según los días de despacho de las POLÍTICAS.
   const tz = COUNTRY_TZ[country as 'VE' | 'CO'] ?? COUNTRY_TZ.VE
   L.push(`\nHOY: ${new Intl.DateTimeFormat('es-VE', { timeZone: tz, weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(hasta ? new Date(hasta) : new Date())}`)
+  if (opciones.preguntasPrevias) {
+    const tope = hasta ? new Date(Date.parse(hasta) + 1000).toISOString() : new Date().toISOString()
+    const { rows: previas } = await db.query(
+      `SELECT p.texto AS p, p.respuesta AS r, p.item_titulo AS t, to_char(p.fecha, 'DD-MM HH24:MI') AS fecha
+       FROM ml_preguntas p JOIN ml_conversaciones c ON c.pack_id::text = $1 AND c.comprador_id = p.comprador_id
+       WHERE p.fecha < $2::timestamptz AND p.fecha > $2::timestamptz - interval '30 days'
+       ORDER BY p.fecha DESC LIMIT 6`, [pack, tope]).catch(() => ({ rows: [] as { p: string; r: string | null; t: string | null; fecha: string }[] }))
+    if (previas.length) {
+      L.push('\nPREGUNTAS QUE ESTE COMPRADOR HIZO ANTES EN LAS PUBLICACIONES (antes de comprar; para entender a qué se refiere ahora):')
+      L.push(previas.reverse().map(x => `${x.fecha}${x.t ? ` [${String(x.t).slice(0, 60)}]` : ''} P: ${String(x.p).slice(0, 300)}${x.r ? `\n      R: ${String(x.r).slice(0, 300)}` : ' (sin responder)'}`).join('\n'))
+    }
+  }
   L.push('\nCONVERSACIÓN (de la más vieja a la más nueva):')
   for (const m of hilo.mensajes.slice(-30)) {
     const t = textoPlano(m.texto).slice(0, 600)
@@ -235,5 +259,6 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     pedido_especial: typeof b.pedido_especial === 'string' && b.pedido_especial.trim() ? b.pedido_especial.trim().slice(0, 200) : null,
     reclamo: typeof b.reclamo === 'string' && b.reclamo.trim() ? b.reclamo.trim().slice(0, 200) : null,
     uso, modelo, ejemplos: ejemplos.sugerencias.length,
+    contexto: L.slice(0, correccion ? L.length - 1 : L.length).join('\n'),
   }
 }

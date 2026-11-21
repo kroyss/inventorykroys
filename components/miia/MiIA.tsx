@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePrimera } from '@/lib/primera'
 import type { MiIA as Config, Agencia, MotivoCambio } from '@/lib/miIA'
-import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA } from '@/lib/miIA'
+import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA, embalajeNuevo } from '@/lib/miIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FrenosIA } from '@/components/preguntas/FrenosIA'
 import { ResponderTodo } from '@/components/ia/ResponderTodo'
@@ -59,7 +59,12 @@ function resumen(id: string, c: Config): string {
       c.negocio?.apartar === 'no' ? 'no aparta' : c.negocio?.apartar === 'si' ? `aparta${c.negocio.apartarHoras ? ` ${c.negocio.apartarHoras} h` : ''}` : ''].filter(Boolean).join(' · ')
     case 'atencion': return corto(c.atencion?.horario?.trim() ?? '')
     case 'extras': return c.extrasNoAplica && !c.extras?.length ? 'No hace falta' : corto(lista((c.extras ?? []).map(x => x.siempre ? `${x.titulo} (siempre)` : x.titulo)), 90)
-    case 'postventa': return c.postventa?.noAplica ? 'No hace falta nada' : [c.postventa?.pasos?.length ? corto(lista(c.postventa.pasos), 70) : '', c.postventa?.datosPago ? 'con datos de pago' : ''].filter(Boolean).join(' · ')
+    case 'postventa': {
+      const pv = c.postventa, emb = pv?.embalaje
+      const e = !emb ? '' : emb.cobra ? `embalaje ${pv?.embalaje?.monto?.trim() || 'opcional'}` : 'sin embalaje'
+      const d = pv?.datosPago?.trim() ? (pv.mandaDatos === false ? 'datos de pago: los manda una persona' : 'con datos de pago') : ''
+      return [pv?.noAplica ? 'No hace falta nada' : pv?.pasos?.length ? corto(lista(pv.pasos), 60) : '', e, d].filter(Boolean).join(' · ')
+    }
   }
   return ''
 }
@@ -368,18 +373,43 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
         {xs.length < 12 && <button type="button" onClick={() => setX([...xs, { titulo: '', texto: '' }])} className="btn-secondary !px-3 !py-1.5">+ Agregar sección</button>}
       </>
     }
-    case 'postventa': return <>
+    case 'postventa': {
+      const pv = c.postventa ?? {}, emb = pv.embalaje
+      const setPv = (x: Partial<NonNullable<Config['postventa']>>) => set(c => ({ ...c, postventa: { ...c.postventa, ...x } }))
+      const manda = pv.mandaDatos !== false && (pv.mandaDatos === true || !!pv.datosPago?.trim())
+      return <>
       <div className="flex gap-2">
-        <Chip activo={!!c.postventa?.noAplica} onClick={() => set(c => ({ ...c, postventa: c.postventa?.noAplica ? { ...c.postventa, noAplica: false } : { noAplica: true } }))}>No hace falta nada</Chip>
+        <Chip activo={!!pv.noAplica} onClick={() => setPv({ noAplica: !pv.noAplica })}>No hace falta nada</Chip>
       </div>
-      {!c.postventa?.noAplica && <Pregunta t="Después de comprar, ¿qué tiene que hacer el comprador?">
-        <Varios valor={c.postventa?.pasos} opciones={PASOS_PV} otroPlaceholder="Otro paso" onChange={v => set(c => ({ ...c, postventa: { ...c.postventa, pasos: v } }))} />
+      {!pv.noAplica && <Pregunta t="Después de comprar, ¿qué tiene que hacer el comprador?">
+        <Varios valor={pv.pasos} opciones={PASOS_PV} otroPlaceholder="Otro paso" onChange={v => setPv({ pasos: v })} />
       </Pregunta>}
-      {!c.postventa?.noAplica && <Pregunta t="Datos para pagar (si los das por el chat)" ayuda="La IA los copia exactos, sin cambiar nada. Déjalo vacío si el pago va por otro lado.">
-        <textarea rows={2} value={c.postventa?.datosPago ?? ''} onChange={e => set(c => ({ ...c, postventa: { ...c.postventa, datosPago: e.target.value } }))}
-          placeholder="Ej.: Pago móvil: banco, cédula, teléfono" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
-      </Pregunta>}
+      <Pregunta t="¿Cobras embalaje (u otro adicional opcional)?" ayuda="Así la IA dice el monto correcto cuando el comprador pregunta o avisa que lo pagó.">
+        <div className="flex flex-wrap gap-2">
+          <Chip activo={emb?.cobra === true} onClick={() => setPv({ embalaje: { ...emb, cobra: true } })}>Sí, cobro embalaje</Chip>
+          <Chip activo={emb?.cobra === false} onClick={() => setPv({ embalaje: { cobra: false } })}>No cobro</Chip>
+        </div>
+        {emb?.cobra && <div className="mt-2 space-y-2">
+          <input value={emb.monto ?? ''} maxLength={60} onChange={e => setPv({ embalaje: { ...emb, monto: e.target.value } })}
+            placeholder="¿Cuánto? Ej.: 500 Bs" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+          <input value={emb.incluye ?? ''} maxLength={150} onChange={e => setPv({ embalaje: { ...emb, incluye: e.target.value } })}
+            placeholder="¿Qué incluye? (opcional) Ej.: bolsa de seguridad y embalaje interno" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+          <p className="text-xs text-amber-800 rounded-lg bg-amber-50 px-3 py-2">Si el monto cambia más adelante, recuerda actualizarlo aquí: la IA usa siempre el que está guardado.</p>
+        </div>}
+      </Pregunta>
+      <Pregunta t="¿Quieres que la IA mande tus datos para pagar cuando el comprador los pide?" ayuda="Por ejemplo, para pagar el embalaje. Si eliges que no, esos mensajes quedan para que los responda una persona.">
+        <div className="flex flex-wrap gap-2">
+          <Chip activo={manda} onClick={() => setPv({ mandaDatos: true })}>Sí, que los mande</Chip>
+          <Chip activo={pv.mandaDatos === false} onClick={() => setPv({ mandaDatos: false })}>No, los mando yo</Chip>
+        </div>
+        {manda && <div className="mt-2 space-y-1">
+          <textarea rows={3} value={pv.datosPago ?? ''} onChange={e => setPv({ datosPago: e.target.value })}
+            placeholder={'Ej.: Pago móvil Mercantil (0105)\nCédula 12.345.678\nTeléfono 0414-0000000'} className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+          <p className="text-xs text-neutral-500">La IA los copia exactos, sin cambiar nada. Escribe una sola versión (banco, cédula o RIF, teléfono) para que no mezcle datos. Si cambian, actualízalos aquí.</p>
+        </div>}
+      </Pregunta>
     </>
+    }
   }
   return null
 }
@@ -450,8 +480,8 @@ type PruebaG = { id: string | null; creado_at: string; casos: Caso[]; marcas: Re
 const aCaso = (x: Caso & { pregunta?: string; mensaje?: string }): Caso => ({ ...x, texto: x.texto ?? x.pregunta ?? x.mensaje ?? '' })
 const fechaPrueba = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
-function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
-  quedan: number | null; faltan: string[] }) {
+function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan, datoNuevo = false }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
+  quedan: number | null; faltan: string[]; datoNuevo?: boolean }) {
   const [usadas, setUsadas] = useState(0)
   const quedan = quedanAl === null ? null : Math.max(0, quedanAl - usadas)
   const confirm = useConfirm()
@@ -484,6 +514,9 @@ function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedan
 
       {encendida === false && faltan.length > 0 && <p className="text-xs text-amber-900 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
         Para encenderla, primero completa Mi IA. Te {faltan.length === 1 ? 'falta 1 tema' : `faltan ${faltan.length} temas`}: <b>{faltan.join(', ')}</b>.</p>}
+      {datoNuevo && encendida !== null && faltan.length === 0 && <p className="text-xs text-sky-900 rounded-lg bg-sky-50 border border-sky-200 px-3 py-2">
+        Hay un dato nuevo que tomar en cuenta: <b>¿cobras embalaje?</b> y tus datos para pagar.{' '}
+        <button type="button" onClick={() => abrir('postventa')} className="underline">Completarlo</button></p>}
       {encendida === false && faltan.length === 0 && <button type="button" onClick={() => cambiar(true)} disabled={cambiando}
         className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">{cambiando ? 'Encendiendo…' : T.encender}</button>}
 
@@ -1054,6 +1087,12 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
         <span className={`text-xs px-2 py-1 rounded-full ${n === PASOS.length ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
           {Math.round((n / PASOS.length) * 100)}% completa</span>
       </div>
+      {embalajeNuevo(c) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+          <p className="text-sm text-sky-900"><b>Hay un dato nuevo que tomar en cuenta:</b> ¿cobras embalaje y cuánto? ¿Quieres que la IA mande tus datos para pagar? Está en «Después de la compra».</p>
+          <button type="button" onClick={() => abrirTema('postventa')} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm">Completarlo →</button>
+        </div>
+      )}
       {faltan.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
           <p className="text-sm text-amber-900">Te {faltan.length === 1 ? 'falta 1 tema' : `faltan ${faltan.length} temas`}: <b>{lista(faltan.map(i => PASOS[i].tema))}</b></p>
@@ -1095,7 +1134,7 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
         </div>
       ) : (
       <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} todo={!!datos.msgTodo} onCambio={cargar} abrir={abrirTema}
-        quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={faltan.map(i => PASOS[i].tema)} />
+        quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={faltan.map(i => PASOS[i].tema)} datoNuevo={embalajeNuevo(c)} />
       )}
       </div>
       {(datos.iaAuto !== null || datos.msgAuto != null) && <FrenosIA inicial={frenosInicial} preguntas={datos.iaAuto !== null} mensajes={datos.msgAuto != null} />}
