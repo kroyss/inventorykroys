@@ -507,7 +507,7 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 - **Buscar:** por comprador, nº de venta, producto o algo que se habló.
 
 **Pestañas:** Por atender · Atendidas · Recordatorios · Pedir calificación · **Configuración**. Dentro de
-**Configuración** (igual que en Preguntas): **Al recibir compra**, **Mi IA**, **Respuestas rápidas**, **Datos de
+**Configuración** (igual que en Preguntas): **Mi IA** (se abre primero), **Al recibir compra**, **Respuestas rápidas**, **Datos de
 productos** (y «IA en prueba», solo para la plataforma). Mi IA y Datos de productos son **los mismos que en Preguntas**:
 lo que guardas en un lado lo usan las dos IA. Las Respuestas rápidas de Mensajes son otras (llevan `{nombre}`, `{precio_bs}`…).
 

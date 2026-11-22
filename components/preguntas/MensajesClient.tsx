@@ -52,7 +52,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'recordatorios' | 'config'>(packPedido ? 'todas' : 'sin_leer')
   // 22-11 (el dueño, igual que Preguntas): Al recibir compra, Mi IA, Respuestas rápidas, Datos de productos e IA en prueba
   // van dentro de «Configuración».
-  const [subConfig, setSubConfig] = useState<'al_comprar' | 'mi_ia' | 'rapidas' | 'datos' | 'ia_prueba'>('al_comprar')
+  const [subConfig, setSubConfig] = useState<'al_comprar' | 'mi_ia' | 'rapidas' | 'datos' | 'ia_prueba'>(miIA ? 'mi_ia' : 'al_comprar')   // Mi IA primero, como en Preguntas
   const abrirConfig = (k: typeof subConfig) => { setSubConfig(k); setVista('config'); setAbierta(null) }
   const [pedir, setPedir] = useState<number | undefined>(undefined)     // "Pedir calificación": cuántas hay hoy
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
@@ -180,7 +180,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
           <div className="flex flex-wrap gap-1.5">
             {/* «IA en prueba» solo la organización de la plataforma (iaPrueba), al final. Mi IA y Datos de productos son
                 los mismos de Preguntas; las Respuestas rápidas de Mensajes son otras (llevan {nombre}, {precio_bs}…). */}
-            {([['al_comprar', 'Al recibir compra', true], ['mi_ia', 'Mi IA', miIA], ['rapidas', 'Respuestas rápidas', rapidas.esAdmin],
+            {([['mi_ia', 'Mi IA', miIA], ['al_comprar', 'Al recibir compra', true], ['rapidas', 'Respuestas rápidas', rapidas.esAdmin],
                ['datos', 'Datos de productos', rapidas.esAdmin], ['ia_prueba', 'IA en prueba', iaPrueba]] as const).filter(x => x[2]).map(([k, t]) => (
               <button key={k} type="button" onClick={() => setSubConfig(k)}
                 className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
