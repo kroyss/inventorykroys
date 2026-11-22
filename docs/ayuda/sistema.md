@@ -633,7 +633,7 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   el precio (si alguna no sale, el precio no se toca). Quedan en **Por restaurar** (arriba) con las promociones que
   tenían, hasta volver a esa campaña o tocar «Ya la revisé»; **Abrir en Promociones** las lleva a meterlas de nuevo
   (revisa el descuento: el precio cambió). **Volver a leer de ML** trae los precios de ML al momento. Tocar el **producto**
-  abre su ficha en Productos y tocar el **precio en ML** abre la publicación en el sistema (las dos en pestaña nueva).
+  abre su ficha en Productos (pestaña nueva) y tocar el **precio en ML** abre la publicación encima de la lista, sin salir.
 - **Vincular** y **Pesos y envío gratis** (antes en «Preparar»): se abren desde los botones de Mis publicaciones o
   desde sus etiquetas; estando ahí, «← Mis publicaciones» vuelve. Quien no tiene Mis publicaciones los ve como pestañas.
 - **Historial de tareas** (enlace a la derecha): lo que se mandó a MercadoLibre en segundo plano. Mientras algo se
@@ -1263,7 +1263,7 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar
   como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos
   datos» los deja para la próxima vez.
-- **Publicaciones** (menú propio, con pestañas Mis publicaciones · Promociones (Venezuela) · Stock vs inventario · Precio vs sistema (solo SolucionesMC), y a la derecha Historial de tareas; Vincular y Pesos se abren desde Mis publicaciones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
+- **Publicaciones** (menú propio, con pestañas Mis publicaciones · Promociones (Venezuela) · Stock vs inventario · Precio vs sistema (solo SolucionesMC), y a la derecha el reloj de Historial de tareas (con texto en pantallas anchas); Vincular y Pesos se abren desde Mis publicaciones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
 - **Vincular** (Publicaciones → Mis publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.
   **Publicaciones nuevas:** al abrir Vincular, el sistema busca solo las publicaciones que creaste en ML (como mucho
@@ -1597,7 +1597,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   exceso ML» calculado hoy, sin descuento. Bien = 1 % o menos; combo = N × precio. Por defecto solo activas (filtro de estado). **Poner precio del sistema** muestra
   antes → después y va por la cola (la lista se actualiza sola al avanzar). «Elegir las de este filtro» no toma promo, combos ni «No sincronizar». Las que están
   en promo pierden TODAS sus promociones (se sacan antes del precio) y quedan en «Por restaurar» para volver a meterlas
-  desde Promociones. El producto abre su ficha y el precio en ML abre la publicación (pestaña nueva).
+  desde Promociones. El producto abre su ficha (pestaña nueva) y el precio en ML la publicación encima, sin salir.
 - **Vincular:** une cada publicación (o color/modelo) con su producto, para que cada venta descuente el correcto y Stock
   vs inventario pueda comparar. Lo que falta sale en el botón Vincular de Mis publicaciones y en cada fila.
 - **Reportes:** el detalle con Excel: por fechas (Ventas, Compras) y cómo estás hoy (Inventario, En tránsito, Conteos).

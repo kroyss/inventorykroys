@@ -6,6 +6,7 @@ import { tiposPermitidos } from '@/lib/colaPermisos'
 import { NumeritoAviso } from '@/components/layout/Avisos'
 import { Nuevo } from '@/components/ui/Nuevo'
 import PendientesPreparar from '@/components/productos/PendientesPreparar'
+import PestanaVisible from '@/components/productos/PestanaVisible'
 
 // Publicaciones (26-10; menú propio en Inventario desde 08-11): todo lo de mis publicaciones de ML. Cada pantalla sigue
 // en su dirección de siempre (avisos de Telegram, ayuda, manual y permisos no cambian); arriba comparten estas pestañas.
@@ -60,8 +61,10 @@ export default function PublicacionesMLTabs({ user, actual }: { user: UsuarioML;
   return (
     <div className="mb-4">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-neutral-200">
-        <span className="hidden pb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 sm:inline">Publicaciones</span>
-        <nav className="-mb-px flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none]" aria-label="Publicaciones">
+        {/* 22-11 (el dueño: las pestañas quedaban tapadas por «Historial de tareas»): el rótulo solo en pantallas anchas y
+            el historial como reloj (con texto desde xl), sin quitarles lugar a las pestañas. */}
+        <span className="hidden pb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 2xl:inline">Publicaciones</span>
+        <nav className="relative -mb-px flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Publicaciones">
           {pestanas.map(x => (
             <Link key={x.k} href={x.href} aria-current={marcada(x.k) ? 'page' : undefined} className={CLASE(marcada(x.k))}>
               {x.t}{x.k === 'stock' && <NumeritoAviso clave="vende_de_mas" className="ml-1.5" />}
@@ -71,11 +74,16 @@ export default function PublicacionesMLTabs({ user, actual }: { user: UsuarioML;
             </Link>
           ))}
         </nav>
+        <PestanaVisible nav="Publicaciones" />
         {tareas && (
           <Link href={tareas.href} aria-current={actual === 'tareas' ? 'page' : undefined}
-            className={`pb-2 text-xs underline-offset-2 hover:underline ${actual === 'tareas' ? 'font-medium text-neutral-900' : 'text-neutral-500'}`}
-            title="Lo que se mandó a MercadoLibre en segundo plano (el avance de lo que está en curso sale abajo a la derecha)">
-            Historial de tareas</Link>
+            className={`inline-flex shrink-0 items-center gap-1 pb-2 text-xs underline-offset-2 hover:underline ${actual === 'tareas' ? 'font-medium text-neutral-900' : 'text-neutral-500'}`}
+            title="Historial de tareas: lo que se mandó a MercadoLibre en segundo plano (el avance de lo que está en curso sale abajo a la derecha)"
+            aria-label="Historial de tareas">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4" aria-hidden="true">
+              <circle cx="10" cy="10" r="7.25" /><path d="M10 6v4l2.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="hidden xl:inline">Historial de tareas</span></Link>
         )}
       </div>
       {enPreparar && (
