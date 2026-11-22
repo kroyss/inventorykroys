@@ -6,7 +6,7 @@ import { tieneModulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 import { crearLote } from '@/lib/lotesPublicaciones'
 import { actualizarCatalogo } from '@/lib/catalogoML'
-import { filasPrecioML, porRestaurar, promosActivas, type FilaPrecioML } from '@/lib/precioVsML'
+import { filasPrecioML, porRestaurar, promosActivas, type FilaPrecioML, type PromoActiva } from '@/lib/precioVsML'
 
 // Publicaciones → «Precio vs sistema» (22-11, lib/precioVsML.ts, módulo precio_vs_ml).
 //   GET → cada publicación vinculada: precio de lista en ML contra el precio con exceso del sistema, y las que quedaron
@@ -38,9 +38,10 @@ export async function GET() {
   if ('error' in s) return s.error
   try {
     const u = s.session.user
-    const [filas, activas, { rows: [cola] }] = await Promise.all([
-      filasPrecioML(s.db, tieneModulo(u, 'precios_categorias')),
-      promosActivas(s.db).catch(() => new Map()),
+    // 22-11 (rapidez): las promos activas se leen UNA vez y sirven para la lista y para «Por restaurar».
+    const activas = await promosActivas(s.db).catch(() => new Map<string, PromoActiva[]>())
+    const [filas, { rows: [cola] }] = await Promise.all([
+      filasPrecioML(s.db, tieneModulo(u, 'precios_categorias'), activas),
       s.db.query(`SELECT id::int, total::int FROM ml_pub_lotes WHERE tipo = 'precio' AND estado = 'en_curso'
                   AND parametros->>'origen' = 'precio_vs_ml' ORDER BY creado_at DESC LIMIT 1`),
     ])
