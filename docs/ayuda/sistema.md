@@ -320,8 +320,16 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   **¿Quieres que la IA mande tus datos para pagar?** (Sí/No y los datos, escritos una sola vez, como los copiaría el
   comprador). Con esto la IA contesta sola cuánto es el embalaje y, solo si el comprador los pide, dónde pagar; si eliges
   No, esas preguntas te quedan para revisar. **Si el monto del embalaje cambia, actualízalo ahí** (la IA usa siempre el
-  que esté escrito). Mientras no los completes, Mi IA muestra el aviso «Hay un dato nuevo que tomar en cuenta» con
-  **Completarlo →**.
+  que esté escrito).
+- **Retiro en persona (21-11-2026):** en «Ubicación y retiro», si marcas que se puede retirar, Mi IA pregunta **cómo te
+  contactan para coordinar el retiro** (teléfono o WhatsApp) y, opcional, **cómo se coordina** («escríbenos para acordar
+  día y hora»). **Solo en Mensajes** (ya compraron; MercadoLibre Venezuela permite el teléfono en los mensajes de la
+  compra): si el comprador pide retirar, la IA le confirma que se puede, le recuerda la opción de envío y le da ese
+  contacto, copiado exacto. **En Preguntas nunca da teléfonos** (son públicas): sigue diciendo que al comprar recibe
+  los datos.
+- **Para encender la IA en Mensajes hacen falta 3 datos más** (Preguntas no los pide): **Datos para pagar** (o «No, los
+  mando yo»), **Embalaje** (Sí o No) y, si hay retiro en persona, **el contacto para el retiro**. Si ya la tenías
+  encendida no se apaga: Mi IA muestra «Para la IA en Mensajes falta…» con **Completarlo →** hasta que los llenes.
 - Para apagarla: **Apagar respuestas automáticas…** en la tarjeta de Mi IA. Se apaga al instante.
 - **Todo se enciende y se cambia en Mi IA**: encendido, modo y frenos.
 - **Mensajes automáticos: Próximamente.** Por ahora la IA responde sola solo en **Preguntas**; en Mi IA la tarjeta de

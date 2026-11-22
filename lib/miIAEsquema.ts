@@ -15,11 +15,14 @@ export const EsquemaMiIA = z.object({
     minimo: z.object({ precioMenor: z.number().positive().max(1000), unidades: z.number().int().min(2).max(50) }).nullable().optional(),
   }).optional(),
   despacho: z.object({ dias: txt(80), corte: z.string().regex(/^\d{1,2}:\d{2}( ?[ap]m)?$/i).nullable().optional(), sabados: z.boolean().optional(), plazo: z.number().int().min(0).max(30).nullable().optional() }).optional(),
-  ubicacion: z.object({ zona: txt(80), decir: z.boolean().optional(), retiro: z.enum(['no', 'acuerdo', 'horario']).optional(), retiroHorario: txt(80) }).optional(),
+  ubicacion: z.object({ zona: txt(80), decir: z.boolean().optional(), retiro: z.enum(['no', 'acuerdo', 'horario']).optional(), retiroHorario: txt(80),
+    retiroContacto: txt(150), retiroComo: txt(200) }).optional(),   // 21-11: solo para Mensajes
   factura: z.object({ tipo: z.enum(['fiscal', 'nota', 'no']).optional(), garantiaDias: z.number().int().min(0).max(3650).nullable().optional(), garantiaNoCubre: txt(150) }).optional(),
   desconocido: z.array(z.enum(['verificar', 'preguntar', 'recomendar', 'persona'])).max(4).optional(),
   persona: z.array(z.string().trim().min(1).max(60)).max(12).optional(),
-  postventa: z.object({ pasos: z.array(z.string().trim().min(1).max(80)).max(6).optional(), datosPago: txt(400), noAplica: z.boolean().optional() }).optional(),
+  postventa: z.object({ pasos: z.array(z.string().trim().min(1).max(80)).max(6).optional(), datosPago: txt(400), noAplica: z.boolean().optional(),
+    // 21-11: sin estos dos el PUT los descartaba (zod saca lo que no conoce) y el embalaje nunca quedaba guardado.
+    mandaDatos: z.boolean().optional(), embalaje: z.object({ cobra: z.boolean(), monto: txt(80), incluye: txt(150) }).optional() }).optional(),
   cambios: z.object({ acepta: z.enum(['si', 'falla', 'no']).optional(), motivos: z.array(z.enum(['falla', 'error', 'cambio'])).max(3).optional(), dias: z.number().int().min(0).max(365).nullable().optional(),
     envio: z.enum(['comprador', 'nosotros', 'depende']).optional() }).optional(),
   negocio: z.object({ mayor: z.enum(['escribir', 'mismo']).optional(), mayorDesde: z.number().int().min(2).max(100000).nullable().optional(),

@@ -21,7 +21,9 @@ export interface MiIA {
   pago?: { tasa?: string; medios?: string[]; divisas?: { pct: number; medios?: string[] } | null }
   envio?: { agencias?: Agencia[]; minimo?: { precioMenor: number; unidades: number } | null }
   despacho?: { dias?: string; corte?: string | null; sabados?: boolean; plazo?: number | null }   // plazo (10-11): días hábiles hasta que sale
-  ubicacion?: { zona?: string; decir?: boolean; retiro?: 'no' | 'acuerdo' | 'horario'; retiroHorario?: string }
+  /** retiroContacto / retiroComo (21-11, el dueño): teléfono o WhatsApp y cómo se coordina el retiro. SOLO en Mensajes
+   *  (después de la compra, MLV lo permite); en Preguntas nunca (son públicas y ML borra los teléfonos). */
+  ubicacion?: { zona?: string; decir?: boolean; retiro?: 'no' | 'acuerdo' | 'horario'; retiroHorario?: string; retiroContacto?: string; retiroComo?: string }
   factura?: { tipo?: 'fiscal' | 'nota' | 'no'; garantiaDias?: number | null; garantiaNoCubre?: string }
   /** Qué hace si no sabe un dato técnico, en orden de preferencia. */
   desconocido?: ('verificar' | 'preguntar' | 'recomendar' | 'persona')[]
@@ -71,10 +73,23 @@ export function temasFaltan(c: MiIA | null): string[] {
   return TEMAS_MI_IA.filter(t => !c || !t.lleno(c)).map(t => t.tema)
 }
 
-/** Lo mismo leyendo Mi IA de la base (para frenar el encendido en el servidor). */
-export async function faltanMiIA(db: Pick<Pool, 'query'>): Promise<string[]> {
+/** 21-11 (el dueño): lo que hay que contestar ANTES de encender la IA en MENSAJES (Preguntas no lo pide). Quien ya la
+ *  tenía encendida no se apaga: lo ve como «dato nuevo» hasta llenarlo. `ir` = el tema de Mi IA donde se contesta. */
+export const TEMAS_MENSAJES: { id: string; tema: string; ir: string; lleno: (c: MiIA) => boolean }[] = [
+  { id: 'datosPago', tema: 'Datos para pagar', ir: 'postventa', lleno: c => c.postventa?.mandaDatos === false || !!limpio(c.postventa?.datosPago) },
+  { id: 'embalaje', tema: 'Embalaje', ir: 'postventa', lleno: c => c.postventa?.embalaje !== undefined },
+  { id: 'retiro', tema: 'Contacto para el retiro', ir: 'ubicacion',
+    lleno: c => !c.ubicacion?.retiro || c.ubicacion.retiro === 'no' || !!limpio(c.ubicacion.retiroContacto) },
+]
+export function temasFaltanMensajes(c: MiIA | null) {
+  return TEMAS_MENSAJES.filter(t => !c || !t.lleno(c))
+}
+
+/** Lo mismo leyendo Mi IA de la base (para frenar el encendido en el servidor). Con 'mensajes' suma los 3 de Mensajes. */
+export async function faltanMiIA(db: Pick<Pool, 'query'>, modulo: 'preguntas' | 'mensajes' = 'preguntas'): Promise<string[]> {
   const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
-  return temasFaltan(leerMiIA(r?.value))
+  const c = leerMiIA(r?.value)
+  return [...temasFaltan(c), ...(modulo === 'mensajes' ? temasFaltanMensajes(c).map(t => t.tema) : [])]
 }
 
 /** Texto del error al querer encender sin Mi IA completo. */
@@ -89,8 +104,6 @@ export function leerMiIA(json: string | null | undefined): MiIA | null {
   } catch { return null }
 }
 
-/** 21-11: la pregunta del embalaje se agregó después: quien ya tenía Mi IA la ve como «dato nuevo» hasta contestarla. */
-export const embalajeNuevo = (c: MiIA | null) => !!c && c.postventa?.embalaje === undefined
 
 /** Teléfono, correo o link (MercadoLibre borra o sanciona las respuestas que los tienen). */
 export const datoDeContacto = (s?: string | null) =>
@@ -164,8 +177,13 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
   sec('UBICACIÓN Y RETIRO', [
     limpio(u.zona) && (u.decir === false ? 'No digas dónde estamos (ni ciudad ni zona).' : `Estamos en ${limpio(u.zona)}. Nunca des la dirección exacta.`),
     u.retiro === 'no' ? 'No hay retiro personal: solo envíos.'
-      : u.retiro === 'acuerdo' ? 'Retiro personal disponible previo acuerdo; al comprar recibe nuestros datos.'
-      : u.retiro === 'horario' ? `Retiro personal${limpio(u.retiroHorario) ? ` en este horario: ${limpio(u.retiroHorario)}` : ''}; al comprar recibe nuestros datos.` : null,
+      : !u.retiro ? null
+      : `Retiro personal ${u.retiro === 'acuerdo' ? 'disponible previo acuerdo' : `disponible${limpio(u.retiroHorario) ? ` en este horario: ${limpio(u.retiroHorario)}` : ''}`}` +
+        (modulo === 'preguntas' ? '; al comprar recibe nuestros datos (nunca des teléfonos ni contactos aquí).' : '.'),
+    // 21-11 (el dueño): en Mensajes (ya compró) SÍ se da el contacto para coordinar; en Preguntas nunca.
+    modulo === 'mensajes' && u.retiro && u.retiro !== 'no' && (limpio(u.retiroContacto)
+      ? `Si el comprador quiere retirar en persona: confírmale que se puede, recuérdale también la opción de envío de la sección ENVÍO por si le conviene, y dale este contacto para coordinar el retiro (cópialo EXACTO, sin cambiar nada): ${limpio(u.retiroContacto)}.${limpio(u.retiroComo) ? ` Cómo se coordina: ${limpio(u.retiroComo)}.` : ''} Nunca des la dirección exacta.`
+      : 'Si el comprador quiere retirar en persona: confírmale que se puede; el contacto para coordinar lo da una persona: deja la respuesta VACÍA con confianza "baja" y falta_dato "Pide coordinar el retiro: el contacto lo da el equipo".'),
   ])
   const f = c.factura ?? {}
   sec('FACTURA Y GARANTÍA', [
