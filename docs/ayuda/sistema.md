@@ -1263,7 +1263,7 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar
   como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos
   datos» los deja para la próxima vez.
-- **Publicaciones** (menú propio, con pestañas Mis publicaciones · Promociones (Venezuela) · Stock vs inventario · Precio vs sistema (solo SolucionesMC), y a la derecha Historial de tareas; Vincular y Pesos se abren desde Mis publicaciones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
+- **Publicaciones** (menú propio, con pestañas Mis publicaciones · Promociones (Venezuela) · Stock vs inventario · Precio vs sistema (solo SolucionesMC), y a la derecha el reloj de Historial de tareas (con texto en pantallas anchas); Vincular y Pesos se abren desde Mis publicaciones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
 - **Vincular** (Publicaciones → Mis publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.
   **Publicaciones nuevas:** al abrir Vincular, el sistema busca solo las publicaciones que creaste en ML (como mucho
