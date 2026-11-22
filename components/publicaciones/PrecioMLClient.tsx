@@ -53,6 +53,7 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set())
   const [confirmar, setConfirmar] = useState(false)
   const [verRestaurar, setVerRestaurar] = useState(false)
+  const [elegRest, setElegRest] = useState<Set<string>>(new Set())
   const [releyendo, setReleyendo] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
 
@@ -157,19 +158,35 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
               className="shrink-0 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100">
               {verRestaurar ? 'Ocultar' : 'Ver cuáles'}</button>
           </div>
+          {/* 22-11 (el dueño): en vez de ir a Promociones una por una, se eligen y se abren TODAS juntas allá. */}
           {verRestaurar && <>
-          <p className="mt-1 text-xs text-amber-800">Salen de aquí solas al volver a la campaña, o con «Ya la revisé».</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-amber-200 pt-2">
+            <label className="flex items-center gap-1.5 text-xs text-amber-900">
+              <input type="checkbox" checked={elegRest.size === restaurar.length}
+                onChange={e => setElegRest(e.target.checked ? new Set(restaurar.map(x => x.item_id)) : new Set())} />
+              Elegir todas</label>
+            <span className="text-xs text-amber-800">{elegRest.size ? `${elegRest.size} elegida${elegRest.size === 1 ? '' : 's'}` : 'Elige las que vas a meter de nuevo'}</span>
+            <div className="ml-auto flex gap-2">
+              {datos?.conPromociones && (elegRest.size
+                ? <Link href={`/productos/promociones?buscar=${encodeURIComponent([...elegRest].join(','))}`} className="btn-primary text-xs">Abrir en Promociones ({elegRest.size})</Link>
+                : <span className="btn-primary pointer-events-none text-xs opacity-40">Abrir en Promociones</span>)}
+              <button disabled={!elegRest.size} className="btn-secondary text-xs disabled:opacity-40"
+                onClick={async () => { for (const x of restaurar.filter(r => elegRest.has(r.item_id))) await restaurada(x.lote_id, x.item_id); setElegRest(new Set()) }}>
+                Ya las revisé</button>
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-amber-800">Salen de aquí solas al volver a la campaña, o con «Ya las revisé».</p>
           <ul className="mt-1 max-h-80 divide-y divide-amber-200 overflow-y-auto">
             {restaurar.map(x => (
-              <li key={`${x.lote_id}:${x.item_id}`} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 text-sm">
-                  <p className="truncate font-medium text-neutral-900">{x.titulo ?? x.item_id}</p>
-                  <p className="text-xs text-neutral-600">{x.cuenta ?? ''} · {x.item_id} · {usd(x.precio_antes)} → {usd(x.precio_nuevo)} · tenía: {x.promos.map(p => p.nombre ?? p.id).join(', ')}</p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  {datos?.conPromociones && <Link href={`/productos/promociones?buscar=${encodeURIComponent(x.item_id)}`} className="btn-primary text-xs">Abrir en Promociones</Link>}
-                  <button onClick={() => restaurada(x.lote_id, x.item_id)} className="btn-secondary text-xs">Ya la revisé</button>
-                </div>
+              <li key={`${x.lote_id}:${x.item_id}`}>
+                <label className="flex cursor-pointer items-start gap-2 py-2">
+                  <input type="checkbox" className="mt-1 shrink-0" checked={elegRest.has(x.item_id)}
+                    onChange={e => setElegRest(s => { const n = new Set(s); if (e.target.checked) n.add(x.item_id); else n.delete(x.item_id); return n })} />
+                  <span className="min-w-0 text-sm">
+                    <span className="block truncate font-medium text-neutral-900">{x.titulo ?? x.item_id}</span>
+                    <span className="block text-xs text-neutral-600">{x.cuenta ?? ''} · {x.item_id} · {usd(x.precio_antes)} → {usd(x.precio_nuevo)} · tenía: {x.promos.map(p => p.nombre ?? p.id).join(', ')}</span>
+                  </span>
+                </label>
               </li>
             ))}
           </ul>
