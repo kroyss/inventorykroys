@@ -19,6 +19,7 @@ import { Tabs, EmptyState, Cargando, Pagination } from '@/components/ui'
 import { EncabezadoInfo } from '@/components/ui/Info'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { Ventana } from '@/components/ui/Ventana'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import type { MensajeRapido } from '@/lib/mensajesRapidos'
 import RecordatoriosPago from '@/components/preguntas/RecordatoriosPago'
@@ -60,6 +61,13 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   const [lista, setLista] = useState<Conversacion[] | null>(null)
   const [cont, setCont] = useState<{ conversaciones: number; mensajes: number; con_nota: number } | null>(null)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
+  // 22-11: «Abrir conversación» desde IA en prueba abre la conversación en una ventana, sin salir de la revisión.
+  const [enVentana, setEnVentana] = useState<Conversacion | null>(null)
+  const abrirEnVentana = (pack: string) => {
+    fetch(`/api/mensajes/de-venta?numero=${pack}`).then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.conversacion) setEnVentana(d.conversacion); else setError('No se pudo abrir la conversación') })
+      .catch(() => setError('No se pudo abrir la conversación'))
+  }
   const [error, setError] = useState<string | null>(null)
   // Atendidas: por páginas de 10 (Anterior / Siguiente, "11–20 de 340") y buscador (busca en todas
   // las conversaciones, no solo la página).
@@ -191,7 +199,12 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
           {subConfig === 'mi_ia' && miIA && <MiIA />}
           {subConfig === 'rapidas' && rapidas.esAdmin && <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />}
           {subConfig === 'datos' && rapidas.esAdmin && <><p className="text-xs text-neutral-500">Son los mismos datos que en Preguntas: lo que guardes aquí lo usan las dos IA.</p><DatosProductos /></>}
-          {subConfig === 'ia_prueba' && iaPrueba && <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} onMiIA={miIA ? () => abrirConfig('mi_ia') : undefined} />}
+          {enVentana && (
+            <Ventana ancha titulo={`Conversación con ${enVentana.comprador_nombre || enVentana.comprador_nick || 'el comprador'}`} onCerrar={() => setEnVentana(null)}>
+              <Hilo key={enVentana.pack_id} c={enVentana} rapidas={rapidas.lista} onCambio={() => { cargar(); cargarSeg() }} />
+            </Ventana>
+          )}
+          {subConfig === 'ia_prueba' && iaPrueba && <MensajesIAPrueba onAbrir={abrirEnVentana} onMiIA={miIA ? () => abrirConfig('mi_ia') : undefined} />}
         </div>
       ) : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : !lista ? <Cargando /> : (
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo
