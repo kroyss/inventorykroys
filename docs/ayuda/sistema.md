@@ -351,7 +351,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   **«Respondió la IA»** (o «Respondió la IA (Modo Total)»), en el mismo lugar donde sale el nombre de quien respondió
   de tu equipo.
 - **¿La IA respondió mal?** En Preguntas (Respondidas), al lado de «Respondió la IA» toca **✗ Corregir a la IA** (también
-  está en Configuración → Revisar respuestas IA en Preguntas, y en IA en prueba en Mensajes). Se abre una ventana: escribe **cómo la hubieras
+  está en Configuración → IA en prueba (en Preguntas y en Mensajes)). Se abre una ventana: escribe **cómo la hubieras
   respondido tú** (la respuesta correcta completa) y toca **Guardar**. La IA saca de ahí lo que es de ese producto (queda en
   sus datos guardados) y lo que vale para todas (queda en Mi IA → Información extra → «Correcciones de mi equipo»), y te
   muestra lo que aprendió. Si ya lo tenía anotado, no guarda nada repetido. No pongas precios ni teléfonos: no se guardan.
@@ -378,7 +378,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   mensaje, en breve te respondemos por aquí.») cuando el mensaje queda para una persona.
 - El plan Esencial no la trae: en Mi IA, las tarjetas dicen «vienen con los planes Automatizaciones y Completo».
 
-**Pantalla Revisar respuestas IA** (Preguntas → Configuración): solo la ve la organización de la plataforma
+**Pantalla IA en prueba** (Preguntas → Configuración): solo la ve la organización de la plataforma
 (evaluación interna). Los clientes encienden, eligen el modo y prueban en Mi IA.
 - **Apagada:** la IA solo responde cuando tocas «Proponer con IA».
 - (Si tienes Mi IA, el encendido y el modo se cambian allí; esta pantalla solo muestra el estado y el historial.)
