@@ -618,6 +618,19 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   el editor (ver abajo).
 - **Promociones** (ver abajo).
 - **Stock vs inventario:** el stock que muestra cada cuenta de ML contra tu inventario, con sus grupos y arreglos en lote.
+- **Precio vs sistema** (Venezuela; por ahora solo SolucionesMC, módulo «Precio vs sistema» en Plataforma): el precio de
+  lista de cada publicación vinculada en ML (en dólares, sin la promoción) contra el **precio del sistema** = el «Precio
+  con exceso ML» del producto calculado hoy (costo × recargo × exceso), **sin descuento** (el descuento lo ponen las
+  promociones). Grupos: **Más barato en ML**, **Más caro en ML**, **Bien** (diferencia de 1 % o menos) y **Sin comparar**
+  (falta costo o categoría, otra moneda, o sus variantes son productos con precios distintos: en ML la publicación
+  tiene un solo precio). Combo («trae N u.»): el precio del sistema es N × el del producto. Filtros por cuenta, con/sin
+  promo y búsqueda; orden por mayor diferencia (% o $) o nombre. Elige las publicaciones y **Poner precio del sistema**:
+  muestra antes → después y va por la cola (60 por minuto, el avance abajo a la derecha); el servidor recalcula el precio
+  al mandar. «Elegir las N de este filtro» no toma las que están en promo, los combos ni las «No sincronizar» (esas se
+  eligen a mano). **En promo:** avisa que pierden TODAS sus promociones: primero se sacan de cada una, después se cambia
+  el precio (si alguna no sale, el precio no se toca). Quedan en **Por restaurar** (arriba) con las promociones que
+  tenían, hasta volver a esa campaña o tocar «Ya la revisé»; **Abrir en Promociones** las lleva a meterlas de nuevo
+  (revisa el descuento: el precio cambió). **Volver a leer de ML** trae los precios de ML al momento.
 - **Vincular** y **Pesos y envío gratis** (antes en «Preparar»): se abren desde los botones de Mis publicaciones o
   desde sus etiquetas; estando ahí, «← Mis publicaciones» vuelve. Quien no tiene Mis publicaciones los ve como pestañas.
 - **Historial de tareas** (enlace a la derecha): lo que se mandó a MercadoLibre en segundo plano. Mientras algo se
@@ -1247,7 +1260,7 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar
   como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos
   datos» los deja para la próxima vez.
-- **Publicaciones** (menú propio, con pestañas Mis publicaciones · Promociones (Venezuela) · Stock vs inventario, y a la derecha Historial de tareas; Vincular y Pesos se abren desde Mis publicaciones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
+- **Publicaciones** (menú propio, con pestañas Mis publicaciones · Promociones (Venezuela) · Stock vs inventario · Precio vs sistema (solo SolucionesMC), y a la derecha Historial de tareas; Vincular y Pesos se abren desde Mis publicaciones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
 - **Vincular** (Publicaciones → Mis publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.
   **Publicaciones nuevas:** al abrir Vincular, el sistema busca solo las publicaciones que creaste en ML (como mucho
@@ -1577,6 +1590,11 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   **🔗 N vínculos** abre Vincular de ese producto en un panel, sin salir. Más de 10 a la vez van por la cola. Por publicación, también en Mis publicaciones. «⚠ Desde N u. pierde envío gratis»
   revisa cada cantidad hasta 20 (con la promo) y ofrece **Crear pack**. Ver cambios y Se acabó en el ⋯ del producto;
   Pausar en el ⋯ de cada publicación. En el celular cada producto sale resumido: **Ver ▾** lo abre.
+- **Precio vs sistema** (Publicaciones, solo SolucionesMC): precio de lista en ML (USD, sin la promo) contra el «Precio con
+  exceso ML» calculado hoy, sin descuento. Bien = 1 % o menos; combo = N × precio. **Poner precio del sistema** muestra
+  antes → después y va por la cola. «Elegir las de este filtro» no toma promo, combos ni «No sincronizar». Las que están
+  en promo pierden TODAS sus promociones (se sacan antes del precio) y quedan en «Por restaurar» para volver a meterlas
+  desde Promociones.
 - **Vincular:** une cada publicación (o color/modelo) con su producto, para que cada venta descuente el correcto y Stock
   vs inventario pueda comparar. Lo que falta sale en el botón Vincular de Mis publicaciones y en cada fila.
 - **Reportes:** el detalle con Excel: por fechas (Ventas, Compras) y cómo estás hoy (Inventario, En tránsito, Conteos).

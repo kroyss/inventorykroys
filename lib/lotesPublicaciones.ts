@@ -7,6 +7,7 @@ import { after } from 'next/server'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { componer, mismoTexto, separar, caracteresNoPermitidos, MAX_DESCRIPCION, NOMBRE_TIPO, type PlantillaTexto, type TipoTexto, quitarParecido, similitud } from '@/lib/descripcionTexto'
 import { cuentaDe, guardarPublicacion } from '@/lib/publicacionesML'
+import { quitarDeCampana } from '@/lib/promocionesML'
 
 export interface Plantilla extends PlantillaTexto { nombre: string; conexion_id: number | null; usos?: number }
 export interface Separacion { encabezadoId: number | null; pieId: number | null; condicionesId: number | null; cuerpo: string; separada: boolean }
@@ -190,6 +191,13 @@ async function procesarItem(db: Pool, l: { tipo: string; parametros: Record<stri
   if (l.tipo === 'precio') {
     const nuevo = Number(it.datos.precio_nuevo)
     if (!(nuevo > 0)) return ['error', 'Precio no válido']
+    // 22-11 Precio vs sistema (lib/precioVsML.ts): si estaba en promociones, primero se la SACA de cada una (decisión del
+    // dueño); si alguna no sale, el precio no se toca. Repetir es seguro: «ya no está» cuenta como hecho.
+    const promos = Array.isArray(it.datos.promos) ? it.datos.promos as { id: string; tipo: string; nombre: string | null }[] : []
+    for (const pr of promos) {
+      const q = await quitarDeCampana(db, cuenta.id, l.user_id as number, it.item_id, pr)
+      if (!q.ok && !/ya no está/.test(q.error)) return ['error', `No salió de la promoción «${pr.nombre ?? pr.id}»: ${q.error}. El precio no se cambió.`]
+    }
     const res = await guardarPublicacion(db, it.item_id, { precio: nuevo }, l.user_id)
     if (!res.ok) return ['error', res.errores.map(e => e.mensaje).join(' · ')]
     return res.guardado.length ? ['ok', null] : ['sin_cambio', 'Ya tenía ese precio']
