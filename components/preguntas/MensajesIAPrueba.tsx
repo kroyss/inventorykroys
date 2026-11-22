@@ -67,6 +67,8 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
         )}
       </div>
       {d.puedeConfigurar && !onMiIA && <FrenosIA mensajes />}
+      {/* 22-11 (el dueño): se mide desde la subida de Mensajes v2 (lib/mensajesIAPrueba.ts, PRUEBA_MENSAJES_DESDE). */}
+      <p className="text-xs text-neutral-500">Medición desde la versión actual de la IA (21-11, 19:19). Lo anterior ya no cuenta aquí.</p>
       <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
         {[
           ['Mensajes', `${r.total}`, ''],
