@@ -87,7 +87,7 @@ export async function resumenMetricas(db: Pool, dias: number, o: { inventario: b
                   COUNT(*) FILTER (WHERE cal_recibida = 'neutral' AND cal_recibida_at >= NOW() - make_interval(days => $1::int))::int AS neutrales,
                   COUNT(*) FILTER (WHERE cal_recibida = 'negative' AND cal_recibida_at >= NOW() - make_interval(days => $1::int))::int AS negativas,
                   COUNT(*) FILTER (WHERE cal_recibida = 'negative' AND cal_recibida_at < NOW() - make_interval(days => $1::int))::int AS antes_negativas,
-                  COUNT(*) FILTER (WHERE cal_contradictoria AND cal_recibida_at >= NOW() - make_interval(days => $1::int))::int AS contradictorias
+                  COUNT(*) FILTER (WHERE cal_contradictoria AND cal_recibida_concretada AND cal_recibida_at >= NOW() - make_interval(days => $1::int))::int AS contradictorias
            FROM ml_ordenes WHERE cal_recibida_at >= NOW() - make_interval(days => $1::int * 2)`, [dias]),
         db.query(`SELECT MIN(fecha) <= NOW() - make_interval(days => $1::int * 2) AS alcanza FROM ml_ordenes`, [dias]),
       ])

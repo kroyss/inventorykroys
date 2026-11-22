@@ -208,7 +208,12 @@ function FilaCalificacion({ c, pais, onVista, onPedido, onCorregir, ocupado }: {
   )
 }
 
-export default function ReputacionClient({ inicial = null }: { inicial?: unknown }) {
+type Tipo = 'neutrales' | 'negativas' | 'contradictorias'
+const ES_TIPO: Record<Tipo, (c: Calificacion) => boolean> = {
+  neutrales: c => c.rating === 'neutral', negativas: c => c.rating === 'negative', contradictorias: c => c.contradictoria,
+}
+
+export default function ReputacionClient({ inicial = null, tipo = null }: { inicial?: unknown; tipo?: Tipo | null }) {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
@@ -240,7 +245,8 @@ export default function ReputacionClient({ inicial = null }: { inicial?: unknown
       ? { ...x, cambio_estado: x.cambio_estado ?? 'pending', cambio_at: x.cambio_at ?? new Date().toISOString() } : x) })
   }
 
-  const lista = datos?.calificaciones ?? []
+  // 21-11 (el dueño): desde el Inicio llega filtrada por tipo (pendientes y atendidas de ese tipo); «Ver todas» lo quita.
+  const lista = (datos?.calificaciones ?? []).filter(c => !tipo || ES_TIPO[tipo](c))
   const cambiadas = lista.filter(c => (c.antes && c.rating !== c.antes) || c.resultado)
   // Atendidas: cambiadas (o con el pedido de cambio resuelto), con el cambio pedido o marcadas "Ya la vi".
   const pedidas = lista.filter(c => !cambiadas.includes(c) && c.cambio_estado)
@@ -257,9 +263,16 @@ export default function ReputacionClient({ inicial = null }: { inicial?: unknown
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       {!datos ? <Cargando /> : (
         <>
+          {tipo ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              <span>Mostrando solo las <b>{tipo}</b> de los últimos {datos.dias} días</span>
+              <Link href="/calificaciones?ver=recibidas" className="ml-auto text-sky-700 hover:underline">Ver todas</Link>
+            </div>
+          ) : (
           <div className={`grid gap-3 ${datos.cuentas.length > 1 ? 'md:grid-cols-2' : ''}`}>
             {datos.cuentas.map(c => <TarjetaCuenta key={c.id} c={c} />)}
           </div>
+          )}
 
           <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
             <div className="flex flex-wrap items-baseline gap-2 border-b border-neutral-100 bg-neutral-50 px-4 py-2">
@@ -277,7 +290,7 @@ export default function ReputacionClient({ inicial = null }: { inicial?: unknown
                 {pendientes.map(c => <FilaCalificacion key={c.id} c={c} pais={datos.pais} onVista={marcar} onPedido={pedir} onCorregir={setCorrigiendo} ocupado={ocupado === c.id} />)}
               </ul>
             ) : (
-              <EmptyState message={`Ninguna neutral ni negativa por atender en los últimos ${datos.dias} días.`} />
+              <EmptyState message={tipo ? `Ninguna ${tipo === 'neutrales' ? 'neutral' : tipo === 'negativas' ? 'negativa' : 'contradictoria'} por atender en los últimos ${datos.dias} días.` : `Ninguna neutral ni negativa por atender en los últimos ${datos.dias} días.`} />
             )}
           </div>
 
