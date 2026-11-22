@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Ventana } from '@/components/ui/Ventana'
 import Link from '@/components/ui/Link'
 import { useRouter } from 'next/navigation'
-import { EmptyState, FilterPills, Pagination } from '@/components/ui'
+import { EmptyState, Pagination, chipCls } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useTraidaME } from '@/components/pagosme/useTraidaME'
 import {
@@ -37,7 +37,17 @@ export interface AccionHecha {
   precio: number | null; precio_antes: number | null; resultado: 'ok' | 'error'; detalle: string | null; creado_at: string; usuario: string | null
 }
 
-type Filtro = 'todas' | 'doble' | 'adentro' | 'candidatas' | 'quita' | 'margen' | 'tealca' | 'destino' | 'sin_peso'
+type Filtro = 'todas' | 'doble' | 'adentro' | 'sin_promo' | 'candidatas' | 'quita' | 'margen' | 'tealca' | 'destino' | 'sin_peso' | 'revisar'
+// 22-11 (el dueño: «muchos chips que ni sé para qué»): fila corta Todas · En promoción · Sin promoción · ⚠ Para revisar;
+// los problemas van dentro de «Para revisar» (solo los que tienen algo, del más urgente al menos) con su explicación.
+const PROBLEMAS: { k: Filtro; t: string; title: string }[] = [
+  { k: 'quita', t: 'La promo quita el envío', title: 'Con el precio de la promo deja de tener envío gratis (o lo pierde comprando varias)' },
+  { k: 'destino', t: 'Cobro a destino', title: 'A su precio de hoy ya no tiene envío gratis' },
+  { k: 'tealca', t: 'La promo quita ZOOM', title: 'Con la promo sigue gratis solo por TEALCA' },
+  { k: 'margen', t: 'Rentabilidad baja', title: 'Al precio de la promo te queda menos que la rentabilidad mínima (arriba a la derecha)' },
+  { k: 'doble', t: 'Más del doble de lo habitual', title: 'Descuento mucho mayor que el que suele tener: revisa que no sea un error' },
+  { k: 'sin_peso', t: 'Sin peso', title: 'Falta el peso: no se puede saber si mantiene el envío gratis' },
+]
 type Modal =
   // pausa (11-11): al terminar bien, se olvida la pausa de esa campaña (Reanudar / Renovar).
   | { tipo: 'agregar'; claves: string[]; campana: string; pct: number; pausa?: { conexionId: number; id: string } }
@@ -109,10 +119,12 @@ const ENVIO: Record<EstadoEnvio, { t: string; c: string }> = {
 }
 const Chip = ({ e }: { e: EstadoEnvio }) => <span className={`inline-block px-2 py-0.5 rounded-full border text-[11px] ${ENVIO[e].c}`}>{ENVIO[e].t}</span>
 
-export default function PromocionesClient({ filas, campanas: campanasBase, cuentas, pesosAl, conPagosME, historial, pausas = {}, inicialTasa = null, buscarInicial = '' }: {
+export default function PromocionesClient({ filas, campanas: campanasBase, vencidas = [], cuentas, pesosAl, conPagosME, historial, pausas = {}, inicialTasa = null, buscarInicial = '' }: {
   buscarInicial?: string   // 18-11: desde «En promo» de Mis publicaciones llega ?buscar=MLV…
   inicialTasa?: import('@/lib/inicial').TasaYAjustes | null   // 12-11: tasa y Ajustes ya vinieron en el HTML
   filas: FilaPromo[]; campanas: CampanaVista[]
+  /** 22-11: campañas propias vencidas que ML ya no lista (para volver a crearlas). */
+  vencidas?: (CampanaVista & { publicaciones: number })[]
   /** 11-11: campañas propias pausadas → las publicaciones que tenían (clave conexión|campaña). */
   pausas?: Record<string, string[]>
   cuentas: { id: number; nombre: string; actualizado_at: string; error: string | null }[]
@@ -258,6 +270,8 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
     todas: () => true,
     doble: v => !!v.exceso,
     adentro: v => !!v.enPromo,
+    sin_promo: v => !v.enPromo,
+    revisar: v => PROBLEMAS.some(p => filtros[p.k](v)),
     candidatas: v => v.candidatas.length > 0,
     quita: v => v.quitaEnvio || !!v.hueco,
     margen: v => v.margen != null && v.margen < margenMin,
@@ -423,6 +437,15 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
     setModal({ tipo: 'agregar', campana: k, pct: pctDe(c), pausa: { conexionId: c.conexionId, id: c.id },
       claves: (pausas[k] ?? []).map(id => `${c.conexionId}|${id}`).filter(x => porClave.has(x)) })
   }
+  // 22-11: «Quitar de la lista» de una campaña propia vencida (no toca ML).
+  const quitarVencida = async (c: CampanaVista) => {
+    setBusy(`vencida-${c.id}`); setError(null)
+    try {
+      const r = await fetch('/api/promociones/vencidas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conexionId: c.conexionId, id: c.id }) })
+      if (!r.ok) setError('No se pudo quitar de la lista.')
+    } finally { setBusy(null); router.refresh() }
+  }
   const guardarMargen = (v: number) => { setMargenMin(v); try { localStorage.setItem('promo_rentab_min', String(v)) } catch { /* sin storage */ } }
 
   const sinFoto = cuentas.length === 0
@@ -431,7 +454,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
   return (
     <div className="space-y-4">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      <EncabezadoInfo info={<><li>Las campañas de MercadoLibre: qué publicaciones pueden entrar y hasta dónde bajar el precio.</li><li>Antes de entrar ves la rentabilidad al precio de la promo y si mantiene el envío gratis por transportista, también para quien lleva varias (cada cantidad hasta 20).</li><li><b className="font-medium text-neutral-800">+ Campaña propia</b>: tu propia promoción, con las publicaciones que elijas.</li></>} title="Promociones" subtitle="Campañas de MercadoLibre, envío gratis por transportista y rentabilidad al precio de la promo"
+      <EncabezadoInfo info={<><li>Las campañas de MercadoLibre: qué publicaciones pueden entrar y hasta dónde bajar el precio.</li><li>Antes de entrar ves la rentabilidad al precio de la promo y si mantiene el envío gratis por transportista, también para quien lleva varias (cada cantidad hasta 20).</li><li><b className="font-medium text-neutral-800">+ Campaña propia</b>: tu propia promoción, con las publicaciones que elijas.</li><li>Filtros: <b className="font-medium text-neutral-800">Todas · En promoción · Sin promoción · ⚠ Para revisar</b>. «Para revisar» abre debajo solo los problemas que tienen algo (envío, rentabilidad, peso); cada uno explica para qué es al pasar el cursor.</li><li><b className="font-medium text-neutral-800">Tus campañas vencidas</b>: las propias que vencieron y ML ya no muestra. «Volver a crear» arma una nueva con el mismo nombre y % y te propone sus publicaciones; las que borras a mano no salen ahí.</li></>} title="Promociones" subtitle="Campañas de MercadoLibre, envío gratis por transportista y rentabilidad al precio de la promo"
         actions={<>
           <Link href="/productos" className="btn-secondary text-sm whitespace-nowrap">← Productos</Link>
           <button onClick={() => setModal({ tipo: 'nueva' })} disabled={!!busy || sinFoto} className="btn-secondary text-sm whitespace-nowrap">+ Campaña propia</button>
@@ -526,18 +549,53 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
           </div>
         )}
 
+        {vencidas.length > 0 && (
+          <details className="rounded-xl border border-neutral-200 bg-white px-4 py-2">
+            <summary className="cursor-pointer text-sm font-medium text-neutral-700">Tus campañas vencidas ({vencidas.length})
+              <span className="ml-2 text-xs font-normal text-neutral-500">ML ya no las muestra: aquí las vuelves a crear con el mismo nombre y %</span></summary>
+            <ul className="mt-2 divide-y divide-neutral-100">
+              {vencidas.map(c => (
+                <li key={`${c.conexionId}|${c.id}`} className="flex flex-col gap-1.5 py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 text-sm">
+                    <p className="font-medium text-neutral-900">{c.nombre}</p>
+                    <p className="text-xs text-neutral-500">{c.pctDefecto ? <><b className="text-neutral-700">{c.pctDefecto}%</b> · </> : null}{fecha(c.inicio)} → {fecha(c.fin)} · {c.cuentas.join(', ')}
+                      {' · '}{c.publicaciones ? `tenía ${c.publicaciones} publicaci${c.publicaciones === 1 ? 'ón' : 'ones'}` : 'sin publicaciones guardadas'}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button onClick={() => setModal({ tipo: 'renovar', campana: c })} disabled={!!busy} className={`${BTN} border-sky-300 text-sky-800 hover:bg-sky-50`}
+                      title="Campaña nueva con el mismo nombre y %, desde hoy; después eliges cuáles de sus publicaciones entran">↻ Volver a crear</button>
+                    <button onClick={() => quitarVencida(c)} disabled={!!busy} className={`${BTN} text-neutral-500`}
+                      title="Ya no mostrarla aquí (no toca nada en MercadoLibre)">{busy === `vencida-${c.id}` ? 'Quitando…' : 'Quitar de la lista'}</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
-          <FilterPills<Filtro> value={filtro} onChange={v => { setFiltro(v); setPagina(1) }} options={[
-            { value: 'todas', label: 'Todas', count: base.length },
-            ...(cuenta_(filtros.doble) || filtro === 'doble' ? [{ value: 'doble' as Filtro, label: '⚠ Más del doble de lo habitual', count: cuenta_(filtros.doble) }] : []),
-            { value: 'adentro', label: 'En promoción', count: cuenta_(filtros.adentro) },
-            { value: 'candidatas', label: 'Pueden entrar', count: cuenta_(filtros.candidatas) },
-            { value: 'quita', label: 'La promo quita el envío', count: cuenta_(filtros.quita) },
-            { value: 'margen', label: `Rentabilidad < ${margenMin}%`, count: cuenta_(filtros.margen) },
-            { value: 'tealca', label: 'La promo quita ZOOM', count: cuenta_(filtros.tealca) },
-            { value: 'destino', label: 'Cobro a destino', count: cuenta_(filtros.destino) },
-            { value: 'sin_peso', label: 'Sin peso', count: cuenta_(filtros.sin_peso) },
-          ]} />
+          {(() => {
+            const cambiar = (v: Filtro) => { setFiltro(v); setPagina(1) }
+            const enRevisar = filtro === 'revisar' || PROBLEMAS.some(p => p.k === filtro)
+            const chip = (v: Filtro, t: string, n: number, title: string, on = filtro === v) => (
+              <button key={v} onClick={() => cambiar(v)} title={title} className={chipCls(on)}>
+                {t}<span className={`ml-1 num ${on ? 'text-white/60' : 'text-neutral-400'}`}>{n}</span>
+              </button>)
+            const problemas = PROBLEMAS.filter(p => cuenta_(filtros[p.k]) > 0 || filtro === p.k)
+            return <div className="w-full space-y-1.5">
+              <div className="flex flex-wrap gap-1.5">
+                {chip('todas', 'Todas', base.length, 'Todas las publicaciones de las cuentas')}
+                {chip('adentro', 'En promoción', cuenta_(filtros.adentro), 'Las que hoy están dentro de alguna promoción')}
+                {chip('sin_promo', 'Sin promoción', cuenta_(filtros.sin_promo), 'Las que no están en ninguna promoción')}
+                {chip('revisar', '⚠ Para revisar', cuenta_(filtros.revisar), 'Las que tienen algún problema con la promo (envío, rentabilidad, peso)', enRevisar)}
+              </div>
+              {enRevisar && problemas.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 border-l-2 border-amber-300 pl-2">
+                  {problemas.map(p => chip(p.k, p.k === 'margen' ? `Rentabilidad < ${margenMin}%` : p.t, cuenta_(filtros[p.k]), p.title))}
+                </div>
+              )}
+            </div>
+          })()}
           {cuentas.length > 1 && (
             <select value={cuenta} onChange={e => { setCuenta(e.target.value); setPagina(1) }} className="border border-neutral-300 rounded-lg px-2 py-1 text-sm">
               <option value="">Todas las cuentas</option>

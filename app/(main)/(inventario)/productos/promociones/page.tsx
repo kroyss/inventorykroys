@@ -99,6 +99,29 @@ export default async function PromocionesPage({ searchParams }: { searchParams: 
     }
   }
 
+  // 22-11 (el dueño): campañas PROPIAS que vencieron y ML ya no lista. No se pierden: salen en «Vencidas» para volver a
+  // crearlas (mismo nombre y %, con las publicaciones que tenía). Las borradas a mano no (si la borró, no la quiere) ni las
+  // que se quitaron de la lista (app_settings promo_vencidas_ocultas).
+  const [{ rows: vistas }, { rows: [ocultasRow] }] = await Promise.all([
+    db.query(
+      `SELECT v.conexion_id, x.nickname, v.campana_id, v.nombre, v.inicio, v.fin,
+              (SELECT COUNT(DISTINCT a.item_id) FROM ml_promociones_acciones a WHERE a.conexion_id = v.conexion_id
+                 AND a.campana_id = v.campana_id AND a.accion = 'agregar' AND a.resultado = 'ok')::int AS publicaciones
+       FROM ml_campanas_vistas v JOIN ml_conexiones x ON x.id = v.conexion_id AND x.estado = 'activa'
+       WHERE v.tipo = 'SELLER_CAMPAIGN' AND (v.fin IS NULL OR v.fin < NOW() + INTERVAL '1 day')
+         AND NOT EXISTS (SELECT 1 FROM ml_promociones_acciones b WHERE b.conexion_id = v.conexion_id
+                           AND b.campana_id = v.campana_id AND b.accion = 'borrar_campana' AND b.resultado = 'ok')
+       ORDER BY v.fin DESC NULLS LAST LIMIT 60`),
+    db.query(`SELECT value FROM app_settings WHERE key = 'promo_vencidas_ocultas'`),
+  ])
+  let ocultas: string[] = []
+  try { ocultas = ocultasRow ? JSON.parse(ocultasRow.value) : [] } catch { /* ignorado */ }
+  const vencidas: (CampanaVista & { publicaciones: number })[] = vistas
+    .filter(v => !campanas.has(`${v.conexion_id}|${v.campana_id}`) && !ocultas.includes(`${v.conexion_id}|${v.campana_id}`))
+    .map(v => ({ id: v.campana_id, tipo: 'SELLER_CAMPAIGN', estado: 'finished', nombre: v.nombre ?? v.campana_id, inicio: v.inicio, fin: v.fin,
+                 limite: null, conexionId: v.conexion_id, cuentas: [v.nickname], adentro: 0, candidatas: 0,
+                 pctDefecto: pctCampanas[v.campana_id] ?? null, publicaciones: v.publicaciones }))
+
   return (<>
     <PublicacionesMLTabs user={session.user} actual="promociones" />
     <PromocionesClient
@@ -106,6 +129,7 @@ export default async function PromocionesPage({ searchParams }: { searchParams: 
       pausas={pausas}
       filas={filas}
       campanas={[...campanas.values()]}
+      vencidas={vencidas}
       cuentas={fotos.map(f => ({ id: f.conexion_id as number, nombre: f.nickname as string, actualizado_at: f.actualizado_at as string, error: f.error as string | null }))}
       pesosAl={pesosAl}
       conPagosME={tieneModulo(session.user, 'pagos_me')}
