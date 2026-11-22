@@ -362,6 +362,16 @@ export function acuseSeguro(motivos: string[], comprador: string, tono?: { salud
   return { tipo, texto, nota }
 }
 
+/** Lo que escribió el comprador desde la última respuesta propia y todo lo del vendedor, hasta ese momento (prueba de Mi IA). */
+export async function textosHasta(db: Pool, pack: string, hasta: string) {
+  const { rows: msgs } = await db.query(
+    `SELECT propio, texto FROM ml_mensajes WHERE pack_id = $1 AND fecha <= $2::timestamptz + interval '1 second' ORDER BY fecha DESC LIMIT 10`, [pack, hasta])
+  const corte = msgs.findIndex(m => m.propio)
+  const comprador = (corte < 0 ? msgs : msgs.slice(0, corte)).reverse().map(m => String(m.texto)).join(NL).slice(0, 1000)
+  const vendedor = msgs.filter(m => m.propio).map(m => String(m.texto)).join(NL)
+  return { comprador, vendedor }
+}
+
 type FilaMensaje = { id: string; pack_id: string; conexion_id: number; mensaje_at: Date | string; seller: string | number }
 const NL = '\n'
 /** Un mensaje del automático con la v2 (solo la propietaria). Guarda, deja notas, envía y usa la frase de escape igual que antes. */

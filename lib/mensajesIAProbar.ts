@@ -5,10 +5,11 @@
 // No descuenta créditos (módulo 'simulacion'): es para decidir si se enciende.
 import type { Pool } from 'pg'
 import { borradorMensaje } from '@/lib/mensajesIA'
-import { CORREGIR_MENSAJES, mensajeCorregible, motivosMensaje } from '@/lib/mensajesIAPrueba'
+import { CORREGIR_MENSAJES, evaluarMensajeV2, mensajeCorregible, motivosMensaje } from '@/lib/mensajesIAPrueba'
 import { AUTOMATICOS, textoPlano } from '@/lib/mensajesML'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
 import { registrarUso, type LlamadaIA } from '@/lib/ia'
+import { textosHasta } from '@/lib/mensajesIAPrueba'
 
 export const PRUEBA_MENSAJES_N = 10
 const AUTOMATICO = new RegExp(AUTOMATICOS, 'i')
@@ -18,7 +19,7 @@ export interface CasoMensaje {
   tuya: string | null; ia: string; decision: 'sola' | 'revisar' | 'nada'; motivos: string[]; error?: string
 }
 
-export async function probarMensajesIA(db: Pool, country: string, conInventario: boolean, usuarioId: number | string | null): Promise<CasoMensaje[]> {
+export async function probarMensajesIA(db: Pool, country: string, conInventario: boolean, usuarioId: number | string | null, v2 = false): Promise<CasoMensaje[]> {
   // Mensaje del comprador seguido de una respuesta del vendedor (la del equipo). Los avisos automáticos y lo que
   // ya mandó la IA no cuentan como respuesta del equipo.
   const { rows } = await db.query(
@@ -40,12 +41,22 @@ export async function probarMensajesIA(db: Pool, country: string, conInventario:
     .sort((a, b) => +new Date(b.fecha) - +new Date(a.fecha))
     .slice(0, PRUEBA_MENSAJES_N)
   const { rows: [mi] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
-  const persona = leerMiIA(mi?.value)?.persona ?? []
+  const miIA = leerMiIA(mi?.value)
+  const persona = miIA?.persona ?? []
   const llamadas: LlamadaIA[] = []
   const caso = async (r: typeof elegidos[number]): Promise<CasoMensaje> => {
     const fecha = new Date(r.fecha).toISOString()
     const base = { id: `${r.pack}-${fecha}`, mensaje: textoPlano(String(r.texto)).slice(0, 600), titulo: r.productos ? String(r.productos) : null, tuya: textoPlano(String(r.sig_texto ?? '')).slice(0, 600) }
     try {
+      // 22-11 (el dueño: «sí, pásala»): la propietaria prueba con Mensajes v2, lo mismo que manda su automático.
+      if (v2) {
+        const t = await textosHasta(db, r.pack, fecha)
+        const e = await evaluarMensajeV2(db, { conexionId: r.conexion_id, seller: Number(r.ml_user_id), pack: r.pack, country, conInventario,
+          comprador: t.comprador, persona, vendedor: t.vendedor, hasta: fecha, historico: true, mensajeAt: fecha, tono: miIA?.tono })
+        llamadas.push(...e.llamadas)
+        const decision = !e.b.respuesta && e.b.confianza === 'alta' && !e.motivos.length ? 'nada' : e.motivos.length ? 'revisar' : 'sola'
+        return { ...base, ia: e.b.respuesta, decision, motivos: e.motivos }
+      }
       const b = await borradorMensaje(db, r.conexion_id, Number(r.ml_user_id), r.pack, country, conInventario, fecha)
       llamadas.push({ modelo: b.modelo, uso: b.uso })
       // Lo del vendedor ANTES de ese mensaje (los montos que ya dio no frenan).
