@@ -3,7 +3,7 @@
 // La IA lee la conversación completa y los datos de la venta (productos y stock real, nota de
 // ML, estado en el sistema, guía si ya se despachó) más lo que el vendedor respondió antes a
 // mensajes parecidos (su voz). Solo propone: la persona revisa y envía.
-import { politicasIA } from '@/lib/miIA'
+import { leerMiIA, MI_IA_KEY, politicasIA } from '@/lib/miIA'
 import { leerMensajesRapidos } from '@/lib/mensajesRapidos'
 import type { Pool } from 'pg'
 import { llamarClaude, MODELO_SIMPLE, type UsoIA } from '@/lib/ia'
@@ -68,6 +68,9 @@ Cómo responder:
 - PEDIDO ESPECIAL (08-11): si en lo que escribió AHORA el comprador pide algo DISTINTO a lo que compró —otro color, talla, modelo o variante; mezclar variantes ("compré 2 rojos, quiero 1 rojo y 1 azul"); más o menos unidades; cambiar o agregar otro producto; preguntar el precio o si hay de OTRO producto distinto al que compró (21-11)— pon en "pedido_especial" un resumen corto con lo que compró y lo que quiere (ej. "Compró 2 rojos, quiere 1 rojo y 1 azul"). En ese caso el borrador NO confirma el cambio: di que lo verifican y le confirman por aquí. NO es pedido especial (deja null): preguntar de qué color o modelo le llega, confirmar que es el que compró (13-11: si lo que pide o nombra COINCIDE con la VARIANTE QUE COMPRÓ —ej. escribe "solo color blanco" y compró "Color: Luz solo Blanco"— es la misma compra repetida: confírmale que eso es lo que compró y así le llega; las fotos o la ficha pueden mostrar OTRA variante de la publicación y eso NO cambia lo que compró), preguntar si hay otros colores ANTES de decidir algo, reclamos por algo que llegó mal, ni dudas de uso.
 - RECLAMO (08-11): si pide devolución, garantía, reemplazo o reembolso, o dice que le llegó dañado, defectuoso, que no funciona, incompleto o un producto/color/modelo distinto al que compró, pon en "reclamo" un resumen corto (ej. "Le llegó azul, compró rojo; pide cambio"). El borrador NO promete devolución, reemplazo ni reembolso: di que lo revisan con el equipo y le responden por aquí. Si no es eso, null.
 
+- PENDIENTE (22-11, el dueño: «todo lo que deje pendiente debe ir a notas»): si tu respuesta deja algo para que el equipo lo haga o lo verifique ("lo revisamos con el equipo", "le confirmamos por aquí", "le avisamos"), pon en "pendiente" lo que pidió el comprador con los datos EXACTOS que dio (nombre, razón social, RIF, cédula, dirección, cantidad…) y en "pendiente_tema" el tema: FACTURA (pide factura o datos fiscales), CAMBIO (cambiar algo de la compra o del envío que no es pedido especial ni reclamo), PAGO (dice que pagó, pagó otro monto u otra cantidad, comprobantes), DATOS (manda datos de envío o personales), ENVIO (pide algo del despacho: agencia, oficina, fecha) u OTRO. Ej.: FACTURA · "a nombre de Cami Farma 4:19, C.A RIF J506862611". Si no deja nada pendiente, los dos en null. El pedido especial y el reclamo van en sus campos, no aquí.
+- FORMULARIO DE MERCADOENVÍOS (22-11): lo llena el comprador desde SU cuenta; nosotros no tenemos acceso y no podemos llenarlo por él (ni con los datos que nos pase por aquí). Si pide que se lo llenemos, explícaselo con amabilidad, guíalo con el video o el paso a paso de la conversación y ofrécele aclarar por aquí cualquier campo que no entienda. Eso SÍ contesta lo que pidió.
+
 Siempre termina llamando a la herramienta proponer_respuesta.`
 
 const HERRAMIENTA = {
@@ -81,12 +84,17 @@ const HERRAMIENTA = {
       falta_dato: { type: ['string', 'null'], description: 'Qué dato faltó para responder bien, o null.' },
       pedido_especial: { type: ['string', 'null'], description: 'Si pide algo distinto a lo que compró (otro color/talla/variante, mezclar variantes, otra cantidad u otro producto): resumen corto "Compró X, quiere Y". Si no, null.' },
       reclamo: { type: ['string', 'null'], description: 'Si es devolución, garantía, reemplazo, reembolso, producto dañado/defectuoso, incompleto o envío equivocado: resumen corto. Si no, null.' },
+      pendiente: { type: ['string', 'null'], description: 'Si la respuesta deja algo pendiente para el equipo: lo que pidió el comprador con sus datos exactos (máx. 160 caracteres). Si no, null.' },
+      pendiente_tema: { type: ['string', 'null'], enum: ['FACTURA', 'CAMBIO', 'PAGO', 'DATOS', 'ENVIO', 'OTRO', null], description: 'Tema del pendiente, o null.' },
     },
-    required: ['respuesta', 'confianza', 'falta_dato', 'pedido_especial', 'reclamo'],
+    required: ['respuesta', 'confianza', 'falta_dato', 'pedido_especial', 'reclamo', 'pendiente', 'pendiente_tema'],
   },
 }
 
-export interface BorradorMensaje { respuesta: string; confianza: 'alta' | 'media' | 'baja'; falta_dato: string | null; pedido_especial?: string | null; reclamo?: string | null }
+export type TemaPendiente = 'FACTURA' | 'CAMBIO' | 'PAGO' | 'DATOS' | 'ENVIO' | 'OTRO'
+export interface BorradorMensaje { respuesta: string; confianza: 'alta' | 'media' | 'baja'; falta_dato: string | null; pedido_especial?: string | null; reclamo?: string | null
+  /** 22-11: lo que la respuesta deja pendiente para el equipo (va a la nota de la venta). */
+  pendiente?: string | null; pendiente_tema?: TemaPendiente | null }
 
 // conInventario = false: la empresa trabaja "todo desde MercadoLibre" (sin ventas cargadas): el
 // estado sale de la venta en ML y NO se le dice a la IA que "no está cargada" (sería falso).
@@ -128,6 +136,8 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
        FROM product_ml_codes m JOIN products p ON p.id = m.product_id LEFT JOIN inventory i ON i.product_id = p.id
        WHERE split_part(m.ml_code, ':', 1) = ANY($1::text[]) AND p.is_active AND m.is_active AND ${sinEnteraVieja('m')}
        GROUP BY 1`, [codigos])   // el de la publicación como siempre; si solo hay productos por variante, la suma
+    const { rows: [mi] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
+    const minimoEnvio = leerMiIA(mi?.value)?.envio?.minimo ?? null
     L.push('PRODUCTOS DE LA VENTA:')
     for (const it of venta.items) {
       const s = stock.find(x => x.ml_code === it.id.replace(/^[A-Z]{3}/, ''))
@@ -136,6 +146,10 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
       L.push(`- ${it.cantidad} × ${it.titulo}${it.variante ? ` — VARIANTE QUE COMPRÓ: ${it.variante} (la eligió en ML; manda sobre fotos, ficha y descripción)` : ''}${precio}${s ? ` (stock en el sistema: ${s.stock}; solo importa si pide más o cambiar)` : ''}`)
       // 08-11 (el dueño): el envío gratis de ESTA compra (lo que la pantalla muestra como "Gratis SOLO TEALCA").
       if (it.envio) L.push(`  ENVÍO GRATIS DE ESTA COMPRA (según peso y precio pagado): ${it.envio.estado === 'sin_peso' ? 'Sin peso: no se sabe' : it.envio.texto}${it.envio.conflicto ? ' (dudoso: vinculada a productos de distinto peso)' : ''}`)
+      // 22-11 (el dueño): por debajo del mínimo de Mi IA (ej. menos de 2 unidades de un producto de menos de $3) MercadoEnvíos
+      // no activa el envío gratis con esa compra: tiene que volver a ofertar con el mínimo.
+      if (minimoEnvio && it.usd != null && it.usd < minimoEnvio.precioMenor && it.cantidad < minimoEnvio.unidades)
+        L.push(`  MÍNIMO PARA ENVÍO GRATIS: compró ${it.cantidad} y este producto pide mínimo ${minimoEnvio.unidades} unidades (cuesta menos de $${minimoEnvio.precioMenor}). Con esta compra MercadoEnvíos NO activa el envío gratis: si pregunta por el envío o el formulario no le funciona, dile que debe volver a ofertar (comprar de nuevo) mínimo ${minimoEnvio.unidades} unidades de este producto para que se active. Si dice que pagó otra cantidad, no lo des por bueno: va en "pendiente" (PAGO).`)
     }
     // Total de la venta en USD y Bs a tasa BCV (07-11): "¿cuánto sería en Bs?".
     if (country === 'VE' && venta.items.every(i => i.precio != null)) {
@@ -211,7 +225,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   const textoNotas = [...notas.notas.map(n => n.texto), s?.notes].filter((x): x is string => !!x?.trim())
   // 13-11: las notas «PEDIDO ESPECIAL / RECLAMO - verificar» las escribió la IA misma (lib/mensajesIAPrueba.ts): se marcan
   // como suposición para que no se repita un error suyo (dijo que compró otra variante y lo volvió a leer como dato).
-  const deLaIA = (t: string) => /^(PEDIDO ESPECIAL|RECLAMO) - verificar:/i.test(t.trim())
+  const deLaIA = (t: string) => /^(PEDIDO ESPECIAL|RECLAMO|PAGO|DATOS|ARCHIVO|FACTURA|CAMBIO|ENV[IÍ]O|PENDIENTE|VARIAS SOLICITUDES)\b[^:]{0,80} - (verificar|pendiente):/i.test(t.trim())
   const unicas = [...new Set(textoNotas)]
   const delEquipo = unicas.filter(t => !deLaIA(t)), propias = unicas.filter(deLaIA)
   if (delEquipo.length) L.push(`NOTA DE LA VENTA: ${delEquipo.join(' · ')}`)
@@ -258,6 +272,8 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     falta_dato: b.falta_dato || null,
     pedido_especial: typeof b.pedido_especial === 'string' && b.pedido_especial.trim() ? b.pedido_especial.trim().slice(0, 200) : null,
     reclamo: typeof b.reclamo === 'string' && b.reclamo.trim() ? b.reclamo.trim().slice(0, 200) : null,
+    pendiente: typeof b.pendiente === 'string' && b.pendiente.trim() ? b.pendiente.trim().slice(0, 200) : null,
+    pendiente_tema: (['FACTURA', 'CAMBIO', 'PAGO', 'DATOS', 'ENVIO', 'OTRO'] as const).find(t => t === b.pendiente_tema) ?? null,
     uso, modelo, ejemplos: ejemplos.sugerencias.length,
     contexto: L.slice(0, correccion ? L.length - 1 : L.length).join('\n'),
   }

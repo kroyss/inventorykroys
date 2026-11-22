@@ -7,7 +7,7 @@
 // CLIENTES (09-11, mig. 158): solo con el automático ENCENDIDO (Mi IA) y cada respuesta usa 1 crédito ('mensajes');
 // sin créditos no procesa. Los que no salen solos quedan escritos en la conversación para el equipo.
 import type { Pool } from 'pg'
-import { borradorMensaje, type OpcionesMensaje } from '@/lib/mensajesIA'
+import { borradorMensaje, type OpcionesMensaje, type TemaPendiente } from '@/lib/mensajesIA'
 import { verificarMensaje } from '@/lib/verificadorIA'
 import type { LlamadaIA } from '@/lib/ia'
 import { textoPlano } from '@/lib/mensajesML'
@@ -16,7 +16,7 @@ import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
 import { responderHilo } from '@/lib/mensajesML'
 import { leerFrenos, motivosFrenos } from '@/lib/iaFrenos'
-import { copiarNotas, crearNota, editarNota, leerNotas, unirNotas, LARGO_NOTA } from '@/lib/notasML'
+import { borrarNota, copiarNotas, crearNota, editarNota, leerNotas, unirNotas, LARGO_NOTA } from '@/lib/notasML'
 
 // AUTOMÁTICO (07-11, mig 149, pedido del dueño: las de confianza alta venían bien): con 'mensajes_ia_auto' = {"modo":"real"}
 // las de decisión 'sola' se MANDAN. Antes de mandar se confirma que la conversación sigue esperando al vendedor (nadie del
@@ -68,22 +68,60 @@ export const PEDIDO_ESPECIAL = 'Pedido especial'
 // Reclamos (devolución, garantía, reemplazo, dañado, envío equivocado) ya iban siempre a una persona (RECLAMO); ahora
 // también dejan su nota "RECLAMO - verificar: …" para que el reemplazo o la devolución no se pierdan en el chat.
 // 21-11: los acuses (v2) dejan su nota igual: PAGO / DATOS / ARCHIVO - verificar.
-const PREFIJOS = { pedido: 'PEDIDO ESPECIAL', reclamo: 'RECLAMO', pago: 'PAGO', datos: 'DATOS', archivo: 'ARCHIVO' } as const
+const PREFIJOS = { pedido: 'PEDIDO ESPECIAL', reclamo: 'RECLAMO', pago: 'PAGO', datos: 'DATOS', archivo: 'ARCHIVO',
+  factura: 'FACTURA', cambio: 'CAMBIO', envio: 'ENVÍO', otro: 'PENDIENTE' } as const
+type TipoNota = keyof typeof PREFIJOS
+const DE_TEMA: Record<TemaPendiente, TipoNota> = { FACTURA: 'factura', CAMBIO: 'cambio', PAGO: 'pago', DATOS: 'datos', ENVIO: 'envio', OTRO: 'otro' }
 
-async function notaVerificar(db: Pool, conexionId: number, pack: string, tipo: keyof typeof PREFIJOS, resumen: string) {
-  const texto = `${PREFIJOS[tipo]} - verificar: ${resumen}`.slice(0, LARGO_NOTA)
+// 22-11 (el dueño: «cuando vuelvan a salir nuevos pendientes la nota debe modificarse e ir guardando los nuevos; las notas
+// de ML tienen límite»): UNA sola nota de la IA por venta que va sumando. Un tema: «FACTURA - verificar: …». Varios:
+// «VARIAS SOLICITUDES (FACTURA, RECLAMO) - verificar: FACTURA: … | RECLAMO: …», recortando cada uno para entrar en los
+// 300 caracteres de ML. El mismo tema otra vez reemplaza al anterior (lo más nuevo manda). Las notas viejas de la IA
+// (una por tema) se juntan en esa la primera vez que se toca.
+const NOTA_IA = /^(PEDIDO ESPECIAL|RECLAMO|PAGO|DATOS|ARCHIVO|FACTURA|CAMBIO|ENV[IÍ]O|PENDIENTE) - (?:verificar|pendiente): ([\s\S]*)$/i
+const NOTA_VARIAS = /^VARIAS SOLICITUDES \([^)]*\) - verificar: ([\s\S]*)$/i
+export function entradasNotaIA(texto: string): [string, string][] {
+  const t = texto.trim()
+  const v = NOTA_VARIAS.exec(t)
+  if (v) return v[1].split(' | ').map(x => /^([A-ZÁÉÍÓÚÑ ]+): ([\s\S]*)$/.exec(x.trim())).filter((x): x is RegExpExecArray => !!x)
+    .map(x => [x[1].toUpperCase(), x[2]] as [string, string])
+  const u = NOTA_IA.exec(t)
+  return u ? [[u[1].toUpperCase().replace('ENVIO', 'ENVÍO'), u[2]]] : []
+}
+export function textoNotaIA(entradas: [string, string][]): string {
+  if (entradas.length === 1) return `${entradas[0][0]} - verificar: ${entradas[0][1]}`.slice(0, LARGO_NOTA)
+  const cab = `VARIAS SOLICITUDES (${entradas.map(e => e[0]).join(', ')}) - verificar: `
+  const sep = ' | '
+  let largo = Math.max(20, Math.floor((LARGO_NOTA - cab.length - sep.length * (entradas.length - 1)) / entradas.length))
+  const armar = () => cab + entradas.map(([t, r]) => { const x = `${t}: ${r}`; return x.length > largo ? x.slice(0, largo - 1) + '…' : x }).join(sep)
+  let out = armar()
+  while (out.length > LARGO_NOTA && largo > 12) { largo--; out = armar() }
+  return out.slice(0, LARGO_NOTA)
+}
+
+async function notaVerificar(db: Pool, conexionId: number, pack: string, nuevas: [TipoNota, string][]) {
+  if (!nuevas.length) return
   const { notas, error } = await leerNotas(db, conexionId, pack)
   if (error) throw new Error(error)
-  const previa = notas.find(n => n.texto.trim().toUpperCase().startsWith(`${PREFIJOS[tipo]} - VERIFICAR`))
-  if (previa?.texto.trim() === texto) return
-  if (previa) await editarNota(db, conexionId, pack, previa, texto)
+  const propias = notas.filter(n => entradasNotaIA(n.texto).length)
+  const mapa = new Map<string, string>()
+  for (const n of propias) for (const [t, r] of entradasNotaIA(n.texto)) mapa.set(t, r)
+  for (const [tipo, resumen] of nuevas) { const t = PREFIJOS[tipo]; mapa.delete(t); mapa.set(t, resumen.replace(/\s+/g, ' ').trim()) }
+  const texto = textoNotaIA([...mapa.entries()])
+  const [primera, ...sobran] = propias
+  if (primera?.texto.trim() === texto && !sobran.length) return
+  if (primera) await editarNota(db, conexionId, pack, primera, texto)
   else await crearNota(db, conexionId, pack, texto)
+  for (const n of sobran) await borrarNota(db, conexionId, pack, n).catch(() => {})
   const r = await leerNotas(db, conexionId, pack)
   const todas = r.notas.some(n => n.texto.trim() === texto) ? r.notas
-    : [...r.notas.filter(n => n.id !== previa?.id), { id: 'pendiente', texto, fecha: new Date().toISOString(), fuente: 'orden' as const }]
+    : [...r.notas.filter(n => !propias.some(x => x.id === n.id)), { id: 'pendiente', texto, fecha: new Date().toISOString(), fuente: 'orden' as const }]
   await copiarNotas(db, pack, todas)
   await db.query(`UPDATE sales SET notes = $2, updated_at = NOW() WHERE ml_order_number = $1`, [pack, unirNotas(todas)])
 }
+
+// 22-11: la respuesta deja algo pendiente y la IA no lo anotó: igual queda la nota con lo que escribió el comprador.
+const DEJA_PENDIENTE = /\b(lo|la|los|las) (verificamos|revisamos|coordinamos|consultamos|chequeamos)\b|\b(le|te) (confirmamos|avisamos|respondemos|informamos)\b|con el equipo/i
 
 /** Por qué NO saldría sola (vacío = saldría sola). */
 export function motivosMensaje(b: { respuesta: string; confianza: string; falta_dato: string | null; pedido_especial?: string | null; reclamo?: string | null }, comprador: string, persona: string[] = [], vendedor = ''): string[] {
@@ -186,12 +224,16 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
            decision = $6, motivos = $7, modelo = $8, costo = $9, sin_seguro = $10 WHERE id = $1`,
         [r.id, comprador, b.respuesta || null, b.confianza, b.falta_dato, decision, motivos, b.modelo, costoDe(b.modelo, b.uso), sinSeguro])
       listos++
-      for (const [tipo, resumen] of [['pedido', b.pedido_especial], ['reclamo', b.reclamo]] as const) {
-        if (!resumen) continue
-        try { await notaVerificar(db, r.conexion_id, r.pack_id, tipo, resumen) } catch (e) {
+      // 22-11: pedido especial, reclamo y lo que deja pendiente, en la nota única de la IA.
+      const nv: [TipoNota, string][] = []
+      if (b.pedido_especial) nv.push(['pedido', b.pedido_especial])
+      if (b.reclamo) nv.push(['reclamo', b.reclamo])
+      if (b.pendiente && b.pendiente_tema) nv.push([DE_TEMA[b.pendiente_tema], b.pendiente])
+      if (nv.length) {
+        try { await notaVerificar(db, r.conexion_id, r.pack_id, nv) } catch (e) {
           const msg = (e instanceof Error ? e.message : String(e)).slice(0, 200)
-          console.error('[mensajes ia nota]', tipo, r.pack_id, msg)
-          await db.query(`UPDATE ml_mensajes_ia SET envio_error = $2 WHERE id = $1`, [r.id, `Nota de ${tipo === 'pedido' ? 'pedido especial' : 'reclamo'}: ${msg}`]).catch(() => {})
+          console.error('[mensajes ia nota]', nv.map(n => n[0]).join(','), r.pack_id, msg)
+          await db.query(`UPDATE ml_mensajes_ia SET envio_error = $2 WHERE id = $1`, [r.id, `Nota de la venta: ${msg}`]).catch(() => {})
         }
       }
       if (real && decision === 'sola' && b.respuesta) {
@@ -409,16 +451,20 @@ async function procesarV2(db: Pool, r: FilaMensaje, country: string, conInventar
        decision = $6, motivos = $7, modelo = $8, costo = $9, sin_seguro = $10 WHERE id = $1`,
     [r.id, comprador, b.respuesta || null, b.confianza, b.falta_dato, decision, motivos, b.modelo, costo, sinSeguro])
   // Notas en la venta: pedido especial y reclamo (como antes), el precio de otro producto (= pedido) y el acuse.
-  const notas: [keyof typeof PREFIJOS, string][] = []
+  // 22-11: + lo que la respuesta deja PENDIENTE (factura, cambio…), todo junto en una sola nota que va sumando.
+  const notas: [TipoNota, string][] = []
   if (b.pedido_especial) notas.push(['pedido', b.pedido_especial])
   else if (motivos.includes(PRECIO_OTRO)) notas.push(['pedido', `pregunta el precio de otro producto: ${textoPlano(comprador).replace(/\s+/g, ' ').slice(0, 120)}`])
   if (b.reclamo) notas.push(['reclamo', b.reclamo])
   if (e.acuse && e.nota) notas.push([e.acuse, e.nota.replace(/^[A-Z ]+ - verificar: /, '')])
-  for (const [tipo, resumen] of notas) {
-    try { await notaVerificar(db, r.conexion_id, r.pack_id, tipo, resumen) } catch (err) {
+  if (b.pendiente && b.pendiente_tema) notas.push([DE_TEMA[b.pendiente_tema], b.pendiente])
+  else if (!notas.length && b.respuesta && DEJA_PENDIENTE.test(b.respuesta) && textoPlano(comprador).trim())
+    notas.push(['otro', textoPlano(comprador).replace(/\s+/g, ' ').slice(0, 160)])
+  if (notas.length) {
+    try { await notaVerificar(db, r.conexion_id, r.pack_id, notas) } catch (err) {
       const msg = (err instanceof Error ? err.message : String(err)).slice(0, 200)
-      console.error('[mensajes ia nota]', tipo, r.pack_id, msg)
-      await db.query(`UPDATE ml_mensajes_ia SET envio_error = $2 WHERE id = $1`, [r.id, `Nota de ${PREFIJOS[tipo].toLowerCase()}: ${msg}`]).catch(() => {})
+      console.error('[mensajes ia nota]', notas.map(n => n[0]).join(','), r.pack_id, msg)
+      await db.query(`UPDATE ml_mensajes_ia SET envio_error = $2 WHERE id = $1`, [r.id, `Nota de la venta: ${msg}`]).catch(() => {})
     }
   }
   let enviada = 0, escape = 0

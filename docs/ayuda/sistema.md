@@ -504,6 +504,17 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 - **Nota de la venta:** una nota interna que se guarda en MercadoLibre; **el comprador no la ve** (ej. «cambia a
   talla L», «garantía, espera fotos»). Va en una sola línea (sale corrida en la guía): **Enter la guarda**. En Pagos ME,
   «📝 Nota» abre directo para escribir y se cierra sola al guardar.
+- **La nota de la IA:** cuando la respuesta de la IA deja algo pendiente («lo revisamos con el equipo», «le
+  confirmamos»), un pedido especial o un reclamo, lo anota en la nota de la venta con los datos que dio el comprador
+  (ej. «FACTURA - verificar: a nombre de … RIF …»). Es **una sola nota por venta que va sumando**: si después aparece
+  otro pendiente, la misma nota pasa a «VARIAS SOLICITUDES (FACTURA, RECLAMO…) - verificar: …» con cada tema
+  resumido (ML admite hasta 300 caracteres). Un tema repetido reemplaza al anterior. Temas: PEDIDO ESPECIAL, RECLAMO,
+  FACTURA, CAMBIO, PAGO, DATOS, ARCHIVO, ENVÍO y PENDIENTE (lo demás). Tus notas propias no las toca.
+- **Formulario de MercadoEnvíos:** lo llena el comprador desde su cuenta; la IA no ofrece llenarlo por él (no hay
+  acceso): le explica y lo guía.
+- **Mínimo de unidades (Mi IA):** si compró menos del mínimo que pusiste para productos baratos (ej. menos de 2 de un
+  producto de menos de $3), la IA le dice que con esa compra MercadoEnvíos no activa el envío gratis y que debe volver
+  a ofertar con el mínimo. Si dice que pagó otra cantidad, queda como pendiente de PAGO en la nota.
 - **Buscar:** por comprador, nº de venta, producto o algo que se habló.
 
 **Pestañas:** Por atender · Atendidas · Recordatorios · Pedir calificación · **Configuración**. Dentro de
