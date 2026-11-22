@@ -628,7 +628,7 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   cuenta, con/sin promo y búsqueda; orden por mayor diferencia (% o $) o nombre. Elige las publicaciones y **Poner precio del sistema**:
   muestra antes → después y va por la cola (60 por minuto, el avance abajo a la derecha; la lista se actualiza sola mientras
   dura y las que quedan bien salen de la lista); el servidor recalcula el precio
-  al mandar. «Elegir las N de este filtro» no toma las que están en promo, los combos ni las «No sincronizar» (esas se
+  al mandar. La casilla general (arriba de la tabla; en el celular «Elegir todas») y «Elegir las N de este filtro» no toman las que están en promo, los combos ni las «No sincronizar» (esas se
   eligen a mano). **En promo:** avisa que pierden TODAS sus promociones: primero se sacan de cada una, después se cambia
   el precio (si alguna no sale, el precio no se toca). Quedan en **Por restaurar**: arriba sale un aviso corto con la cantidad y «Ver cuáles» abre la lista con las promociones que
   tenían, hasta volver a esa campaña o tocar «Ya la revisé»; se eligen (o «Elegir todas») y **Abrir en Promociones (N)** las abre TODAS juntas allá para meterlas de nuevo
