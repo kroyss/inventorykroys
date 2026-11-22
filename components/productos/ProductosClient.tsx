@@ -285,7 +285,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   // Open create modal when arriving via command palette (/productos?new=1)
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('new') === '1') openCreate()
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('new') === '1') openCreate()
+    // 22-11 (Precio vs sistema): /productos?ver=ID abre la ficha de ese producto.
+    const ver = Number(q.get('ver'))
+    if (ver > 0) openView(ver)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
