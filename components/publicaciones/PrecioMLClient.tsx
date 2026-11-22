@@ -30,6 +30,9 @@ const MOTIVO: Record<MotivoSinDato, string> = {
   sin_precio_ml: 'Sin precio en ML (vuelve a leer de ML)',
 }
 type Orden = 'pct' | 'monto' | 'nombre'
+type EstadoPub = 'activas' | 'pausadas' | 'todas'
+/** Activas = active en ML; pausadas = todo lo demás (paused, closed, under_review…). */
+const deEstado = (f: FilaPrecioML, e: EstadoPub) => e === 'todas' || (e === 'activas') === (f.estado_ml === 'active')
 const POR_PAGINA = 50
 /** Se elige sola con «Elegir las de este filtro»: lo que no tiene riesgo (sin promo, sin combo, sin «No sincronizar»). */
 const segura = (f: FilaPrecioML) => (f.estado === 'barato' || f.estado === 'caro') && !f.promos.length && !f.combo && !f.aparte
@@ -39,7 +42,9 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
   const [datos, setDatos] = useState<PrecioVsMLRespuesta | null>(inicial)
   const [cargando, setCargando] = useState(!inicial)
   const [error, setError] = useState<string | null>(null)
-  const [filtro, setFiltro] = useState<EstadoPrecio>(() => primerFiltro(inicial?.filas ?? []))
+  // 22-11 (el dueño): por defecto solo las publicaciones activas; pausadas o todas, si las elige.
+  const [estadoPub, setEstadoPub] = useState<EstadoPub>('activas')
+  const [filtro, setFiltro] = useState<EstadoPrecio>(() => primerFiltro((inicial?.filas ?? []).filter(f => deEstado(f, 'activas'))))
   const [buscar, setBuscar] = useState(buscarInicial)
   const [cuenta, setCuenta] = useState('')
   const [promo, setPromo] = useState<'todas' | 'sin' | 'con'>('todas')
@@ -63,27 +68,27 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
     } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo cargar'); return null }
     finally { setCargando(false) }
   }, [])
-  useEffect(() => { if (!inicial) cargar().then(d => d && setFiltro(primerFiltro(d.filas))) }, [inicial, cargar])
+  useEffect(() => { if (!inicial) cargar().then(d => d && setFiltro(primerFiltro(d.filas.filter(f => deEstado(f, 'activas'))))) }, [inicial, cargar])
 
   const filas = useMemo(() => datos?.filas ?? [], [datos])
   const cuentas = useMemo(() => [...new Set(filas.map(f => f.cuenta))].sort(), [filas])
   const conteo = useMemo(() => {
     const c: Record<EstadoPrecio, number> = { bien: 0, barato: 0, caro: 0, sin_dato: 0 }
-    for (const f of filas) if ((!cuenta || f.cuenta === cuenta)) c[f.estado]++
+    for (const f of filas) if ((!cuenta || f.cuenta === cuenta) && deEstado(f, estadoPub)) c[f.estado]++
     return c
-  }, [filas, cuenta])
+  }, [filas, cuenta, estadoPub])
 
   const vista = useMemo(() => {
     const q = buscar.trim().toLowerCase()
-    const l = filas.filter(f => f.estado === filtro && (!cuenta || f.cuenta === cuenta)
+    const l = filas.filter(f => f.estado === filtro && (!cuenta || f.cuenta === cuenta) && deEstado(f, estadoPub)
       && (promo === 'todas' || (promo === 'con') === f.promos.length > 0)
       && (!q || f.item_id.toLowerCase().includes(q) || (f.titulo ?? '').toLowerCase().includes(q)
           || f.productos.some(p => p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q))))
     return l.sort((a, b) => orden === 'nombre' ? (a.titulo ?? '').localeCompare(b.titulo ?? '')
       : orden === 'monto' ? Math.abs(b.diferencia ?? 0) - Math.abs(a.diferencia ?? 0)
       : Math.abs(b.pct ?? 0) - Math.abs(a.pct ?? 0))
-  }, [filas, filtro, cuenta, promo, buscar, orden])
-  useEffect(() => { setPagina(0) }, [filtro, cuenta, promo, buscar, orden])
+  }, [filas, filtro, cuenta, estadoPub, promo, buscar, orden])
+  useEffect(() => { setPagina(0) }, [filtro, cuenta, estadoPub, promo, buscar, orden])
 
   const pag = vista.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA)
   const paginas = Math.ceil(vista.length / POR_PAGINA)
@@ -119,6 +124,7 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
           <li><b className="font-medium text-neutral-800">Bien</b>: la diferencia es de 1 % o menos (por decimales). <b className="font-medium text-neutral-800">Combo</b> («trae N u.»): el precio del sistema es N × el del producto.</li>
           <li>Elige las que quieras corregir y toca <b className="font-medium text-neutral-800">Poner precio del sistema</b>: antes de mandar ves el antes → después. Va por la cola (el avance sale abajo a la derecha).</li>
           <li><b className="font-medium text-neutral-800">En promo</b>: para cambiarle el precio primero se saca de TODAS sus promociones. Después quedan en <b className="font-medium text-neutral-800">Por restaurar</b> y las vuelves a meter desde Promociones (los descuentos y precios cambian).</li>
+          <li>Arriba se ven solo las publicaciones <b className="font-medium text-neutral-800">activas</b>; para ver las pausadas (o las dos), cámbialo en el filtro de estado.</li>
           <li>Con «Elegir las de este filtro» no se eligen las que están en promo, los combos ni las de «No sincronizar»: esas se eligen a mano.</li>
         </>} />
 
@@ -166,6 +172,11 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
         <select value={cuenta} onChange={e => setCuenta(e.target.value)} className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm" aria-label="Cuenta">
           <option value="">Todas las cuentas</option>
           {cuentas.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={estadoPub} onChange={e => setEstadoPub(e.target.value as EstadoPub)} className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm" aria-label="Estado de la publicación">
+          <option value="activas">Activas</option>
+          <option value="pausadas">Pausadas</option>
+          <option value="todas">Activas y pausadas</option>
         </select>
         <select value={promo} onChange={e => setPromo(e.target.value as typeof promo)} className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm" aria-label="Promociones">
           <option value="todas">Con y sin promo</option>
