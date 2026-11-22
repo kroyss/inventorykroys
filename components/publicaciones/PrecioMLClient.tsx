@@ -252,7 +252,7 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-left text-xs text-neutral-500">
                 <tr>
-                  <th className="w-8 px-3 py-2" />
+                  <th className="w-8 px-3 py-2"><TodasCasilla segurasFiltro={segurasFiltro} marcadas={marcadas} setMarcadas={setMarcadas} /></th>
                   <th className="px-3 py-2">Publicación</th>
                   <th className="px-3 py-2">Producto</th>
                   <th className="px-3 py-2 text-right">Precio en ML</th>
@@ -281,6 +281,11 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
             </table>
           </div>
           {/* Celular: tarjetas */}
+          {segurasFiltro.length > 0 && (
+            <label className="flex items-center gap-2 px-1 text-sm text-neutral-700 md:hidden">
+              <TodasCasilla segurasFiltro={segurasFiltro} marcadas={marcadas} setMarcadas={setMarcadas} />
+              Elegir todas ({segurasFiltro.length})</label>
+          )}
           <ul className="space-y-2 md:hidden">
             {pag.map(f => (
               <li key={f.item_id} className={`rounded-xl border bg-white p-3 ${marcadas.has(f.item_id) ? 'border-lime-400' : 'border-neutral-200'}`}>
@@ -310,6 +315,26 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
       {confirmar && <Confirmar elegidas={elegidas} onCerrar={() => setConfirmar(false)}
         onHecho={(msg) => { setConfirmar(false); setMarcadas(new Set()); setAviso(msg); cargar() }} />}
     </div>
+  )
+}
+
+/** 22-11 (el dueño): casilla general. Elige/quita TODAS las de este filtro (todas las páginas) que se eligen sin riesgo,
+ *  igual que «Elegir las de este filtro»: promo, combos y «No sincronizar» siguen siendo a mano. */
+function TodasCasilla({ segurasFiltro, marcadas, setMarcadas }: {
+  segurasFiltro: FilaPrecioML[]; marcadas: Set<string>; setMarcadas: (f: (s: Set<string>) => Set<string>) => void
+}) {
+  const n = segurasFiltro.filter(f => marcadas.has(f.item_id)).length
+  const todas = n > 0 && n === segurasFiltro.length
+  return (
+    <input type="checkbox" disabled={!segurasFiltro.length} checked={todas}
+      ref={el => { if (el) el.indeterminate = n > 0 && !todas }}
+      onChange={() => setMarcadas(s => {
+        const x = new Set(s)
+        for (const f of segurasFiltro) { if (todas) x.delete(f.item_id); else x.add(f.item_id) }
+        return x
+      })}
+      title={`Elegir todas las de este filtro (${segurasFiltro.length}); las que están en promo, los combos y «No sincronizar» se eligen a mano`}
+      aria-label="Elegir todas las de este filtro" />
   )
 }
 
