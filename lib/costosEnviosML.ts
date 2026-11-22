@@ -88,21 +88,27 @@ export async function costosEnviosML(db: Pool, mes: string, conFactura: boolean)
       WHERE e.guia IS NOT NULL AND e.guia <> '' AND e.created_at >= $1::date - 20 AND e.created_at < $2::date + 20
       ORDER BY e.guia, e.created_at),
     g2 AS (SELECT g.*, coalesce(g.sale_id, (SELECT s.id FROM sales s WHERE s.ml_order_number = g.venta LIMIT 1)) AS sid FROM g),
-    p AS (
-      SELECT si.sale_id, sum(si.quantity * pr.weight_kg) AS peso, bool_or(pr.weight_kg IS NULL OR pr.weight_kg <= 0) AS sin_peso,
-             string_agg(si.quantity || '× ' || pr.name, ' · ') AS productos
-      FROM sale_items si JOIN products pr ON pr.id = si.product_id
-      WHERE si.sale_id IN (SELECT sid FROM g2 WHERE sid IS NOT NULL)
-      GROUP BY si.sale_id)
-    SELECT g.guia, g.venta, g.carrier, to_char(g.created_at, 'YYYY-MM-DD') AS fecha, o.conexion_id,
-           p.peso::float AS peso, coalesce(p.sin_peso, true) AS sin_peso, p.productos
+    -- 22-11 (rapidez, 6,3 s → 0,1 s): los cobros a destino se leen UNA vez (antes se recorrían los ~2.400 pagos por guía).
+    cd AS MATERIALIZED (SELECT guia, venta FROM me_pagos WHERE envio_metodo = 'Cobro a destino')
+    SELECT g.guia, g.venta, g.carrier, to_char(g.created_at, 'YYYY-MM-DD') AS fecha, o.conexion_id, g.sid
     FROM g2 g
     LEFT JOIN LATERAL (SELECT conexion_id, fecha FROM ml_ordenes o WHERE o.id = g.venta_num OR o.pack_id = g.venta_num ORDER BY fecha LIMIT 1) o ON true
-    LEFT JOIN p ON p.sale_id = g.sid
     WHERE COALESCE(o.fecha, g.created_at) >= $1::date AND COALESCE(o.fecha, g.created_at) < $2::date
       -- «Cobro a destino» (lo paga el comprador al retirar): ML no se lo cobra al vendedor (Pagos ME lo sabe).
-      AND NOT EXISTS (SELECT 1 FROM me_pagos mp WHERE (mp.guia = g.guia OR mp.venta = g.venta) AND mp.envio_metodo = 'Cobro a destino')
+      AND NOT EXISTS (SELECT 1 FROM cd WHERE cd.guia = g.guia) AND NOT EXISTS (SELECT 1 FROM cd WHERE cd.venta = g.venta)
     ORDER BY g.created_at`, [desde, hasta])
+  // El peso del paquete (Σ cantidad × peso) en una consulta aparte: unida arriba, Postgres la recalculaba por cada guía.
+  const sids = [...new Set(rows.map(r => r.sid).filter((x): x is number => x != null))]
+  const { rows: pesos } = sids.length ? await db.query(
+    `SELECT si.sale_id, sum(si.quantity * pr.weight_kg)::float AS peso, bool_or(pr.weight_kg IS NULL OR pr.weight_kg <= 0) AS sin_peso,
+            string_agg(si.quantity || '× ' || pr.name, ' · ') AS productos
+     FROM sale_items si JOIN products pr ON pr.id = si.product_id
+     WHERE si.sale_id = ANY($1::int[]) GROUP BY si.sale_id`, [sids]) : { rows: [] }
+  const pesoDe = new Map(pesos.map(p => [p.sale_id as number, p]))
+  for (const r of rows) {
+    const p = r.sid != null ? pesoDe.get(r.sid) : undefined
+    r.peso = p?.peso ?? null; r.sin_peso = p?.sin_peso ?? true; r.productos = p?.productos ?? null
+  }
 
   const { rows: conexiones } = await db.query(
     `SELECT id, nickname FROM ml_conexiones WHERE site_id = 'MLV' AND estado = 'activa' ORDER BY id`)
