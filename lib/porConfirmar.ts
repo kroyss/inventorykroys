@@ -60,6 +60,8 @@ export interface PorConfirmar {
   sinStock: boolean
   // Su guía ya está en Despachos (23-10): para no trabajarla dos veces.
   despacho: 'en_lote' | 'impresa' | 'reportada' | null   // reportada = la guía ya se le escribió al comprador (26-10)
+  /** 22-11: comprada antes de prender el inventario, pero todavía en curso (pago por verificar o guía en el lote). */
+  antesInventario?: boolean
 }
 
 
@@ -87,6 +89,7 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
             (SELECT CASE WHEN bool_or(e.reportado_at IS NOT NULL) THEN 'reportada' WHEN bool_or(e.impresa) THEN 'impresa' ELSE 'en_lote' END FROM despacho_etiquetas e
              WHERE e.venta IN (o.id::text, o.pack_id::text)) AS despacho,
             (p.verificacion IS NULL OR p.verificacion = 'invalido') AND o.fecha < NOW() - make_interval(days => $1) AS vencida,
+            ($4::timestamptz IS NOT NULL AND o.fecha < $4) AS antes_inventario,
             o.cal_vendedor IS NOT NULL AS calificada, COALESCE(o.cal_concretada, FALSE) AS cal_concretada
      FROM ml_ordenes o
      JOIN ml_conexiones x ON x.id = o.conexion_id
@@ -102,7 +105,11 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
        AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL AND o.fuera_at IS NULL
        AND o.sin_inv_at IS NULL       -- mig 183: quitada de pendientes con «Sin inventario»
        AND o.venta_local_id IS NULL   -- mig 165: enlazada a la venta LOCAL que se registró a mano
-       AND ($4::timestamptz IS NULL OR o.fecha >= $4)
+       -- 22-11 (bug SHOPIT_VE): el corte de la mig 148 no esconde una venta todavía en curso: pago traído sin verificar
+       -- o guía esperando en un lote pendiente. Antes quedaba con la guía en Despachos y sin fila donde confirmar el pago.
+       AND ($4::timestamptz IS NULL OR o.fecha >= $4 OR p.verificacion = 'pendiente'
+            OR EXISTS (SELECT 1 FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
+                       WHERE e.venta IN (o.id::text, o.pack_id::text) AND l.status = 'PENDIENTE' AND e.incluida AND NOT e.impresa))
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)
      ORDER BY o.fecha DESC`, [dias, DIAS_MAX, DIAS_CON_PAGO, desde])
@@ -182,6 +189,7 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
       mensaje: r.msg_texto ? { texto: r.msg_texto, at: r.msg_at } : null,
       escribio: escribioDe.get(r.numero) ?? [], nota: !!r.tiene_nota,
       vencida: r.vencida, sinStock, despacho: r.despacho ?? null,
+      ...(r.antes_inventario ? { antesInventario: true } : {}),
       ...(r.vencida && r.calificada && r.cal_concretada ? { concretadaSinVenta: true } : {}),
       calificada: !!r.calificada,
       calNoConcretada: !!r.calificada && !r.cal_concretada,

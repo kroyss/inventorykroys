@@ -565,6 +565,11 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago, onPagoChip }: {
           {verPago && f.pago && f.pago.verificacion === 'pendiente' && f.pago.monto != null && (
             <Monto p={{ monto_pagado: f.pago.monto, total_orden: f.pago.totalOrden }} banco={!!f.pago.bancoRes} />
           )}
+          {f.antesInventario && (
+            <Etiqueta tono="gris" title="La compraron en MercadoLibre antes de que activaras el inventario, pero sigue en curso: confirma el pago. Si la registras, se descuenta del stock">
+              Comprada antes de activar el inventario
+            </Etiqueta>
+          )}
           {f.pago?.retiro && <Etiqueta tono="ambar" title="El comprador pasa a buscarlo: no lleva guía ni pasa por Despachos">🏪 Retiro en tienda</Etiqueta>}
           {/* Solo vence la que no tiene pago (26-10: salía "Vence hoy" en una venta pagada y ya despachada). */}
           {!f.vencida && quedan <= 2 && (!f.pago || f.pago.verificacion === 'invalido') && <Etiqueta tono="rojo">{quedan <= 0 ? 'Vence hoy' : `Quedan ${quedan} día${quedan === 1 ? '' : 's'}`}</Etiqueta>}
@@ -760,6 +765,14 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   }, [datos])
   // Buscador (20-10): nombre, apodo de ML, número de venta, producto o cuenta.
   const [buscar, setBuscar] = useState('')
+  // 22-11: «Confirmar pago →» de Despachos llega con ?buscar=<venta>: la lista abre filtrada en esa venta.
+  useEffect(() => {
+    try {
+      const b = new URLSearchParams(window.location.search).get('buscar')
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- se lee de la URL después de montar
+      if (b) setBuscar(b)
+    } catch { /* nada */ }
+  }, [])
   // "Traer ME" (2026-10-12; Pagos ME salió del menú de los usuarios): le pide a la PC del vigilante que traiga
   // los pagos y guías del portal. Tarda 1-3 min: se recarga la lista cada 10 s hasta que llega la búsqueda nueva.
   const [pidiendoME, setPidiendoME] = useState<number | null>(null)

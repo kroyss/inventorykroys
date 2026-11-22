@@ -10,7 +10,7 @@ import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import NegocioSettings from '@/components/tasas/NegocioSettings'
 import { redirect } from 'next/navigation'
-import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
+import { llevaInventario, tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 import { dbDeSesion } from '@/lib/session'
 
@@ -47,7 +47,7 @@ export default async function DespachosPage() {
     `SELECT key, value FROM app_settings WHERE key IN ('ml_cuentas', 'despacho_remitente')`)).rows.map(r => [r.key, r.value])) as Record<string, string> : null
   return (
     <div className="space-y-6">
-      <DespachosClient inicial={inicial} isAdmin={isAdmin} reportador={tieneModulo(session!.user, 'reportador')} desdeML={desdeML} />
+      <DespachosClient inicial={inicial} isAdmin={isAdmin} reportador={tieneModulo(session!.user, 'reportador')} desdeML={desdeML} conInventario={llevaInventario(session!.user)} />
       {/* El remitente del manifiesto se cambia aquí, para todas las empresas (ya no está en Ajustes). */}
       {isAdmin && <NegocioSettings conDespachos soloRemitente inicial={negocio} />}
     </div>

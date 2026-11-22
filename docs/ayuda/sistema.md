@@ -722,7 +722,9 @@ corriendo, la sigue en vez de pedir otra.
 
 **Uso diario:** toca **Traer pagos y guías** y espera el aviso verde. Chrome se abre solo, trabaja y se cierra: no
 lo toques. Luego verifica cada pago (Pago correcto / inválido). **Despachos no imprime guías con el pago sin
-verificar.**
+verificar:** las marca **«Falta confirmar el pago»** con el enlace **Confirmar pago →**, que abre la lista ya filtrada
+en esa venta (o **Despachar igual**, que deja anotado quién lo hizo). Con inventario y las ventas de ML, si la guía se
+imprime sin haber registrado la venta, Despachos avisa **«Venta no registrada: no se descontó del stock»**.
 
 **En cada venta de la lista** ves la foto del producto y dos botones: **💬 Conversación** se marca en celeste si el
 comprador escribió algo después de comprar (al pasar el mouse ves sus últimos mensajes); en blanco, no escribió nada
@@ -1352,7 +1354,9 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   venta** crea una venta LOCAL en Borrador con esos productos (los ítems libres van en la nota) y sigue como cualquier
   venta. Uno pasado a venta ya no se edita ni se borra.- **Prender o apagar el Inventario:** no se pierde nada (pagos, guías, despachos y calificaciones siguen igual). Al
   prenderlo, Por confirmar solo pide registrar las ventas **desde ese momento**; las anteriores quedan como estaban en
-  Pagos ME. Si se apagó y se volvió a prender, en Inventario sale un aviso: lo vendido mientras estuvo apagado no se
+  Pagos ME. Excepción: las compradas antes pero **todavía en curso** (pago traído sin verificar o guía esperando en
+  Despachos) siguen en la lista con la etiqueta **«Comprada antes de activar el inventario»**, para confirmar su pago
+  (y registrarla si quieres que se descuente del stock). Si se apagó y se volvió a prender, en Inventario sale un aviso: lo vendido mientras estuvo apagado no se
   descontó, conviene hacer un conteo (hoja de conteo) y cargar las diferencias como ajuste.
 - **Inventario:** stock actual de cada producto y sus movimientos. Ajuste de stock: si contaste y está mal, se guarda
   como ajuste.
