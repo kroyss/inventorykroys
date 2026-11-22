@@ -69,6 +69,15 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
     finally { setCargando(false) }
   }, [])
   useEffect(() => { if (!inicial) cargar().then(d => d && setFiltro(primerFiltro(d.filas.filter(f => deEstado(f, 'activas'))))) }, [inicial, cargar])
+  // 22-11 (el dueño: «al terminar no me los quitó de la lista»): mientras haya un cambio de precios en la cola, la lista
+  // se vuelve a pedir cada 6 s (sin «Cargando…»); al terminar la cola, la última recarga ya trae los precios nuevos y las
+  // corregidas pasan a «Bien» solas.
+  const enCola = datos?.cola?.id ?? null
+  useEffect(() => {
+    if (enCola == null) return
+    const t = setInterval(() => { if (!document.hidden) cargar() }, 6000)
+    return () => clearInterval(t)
+  }, [enCola, cargar])
 
   const filas = useMemo(() => datos?.filas ?? [], [datos])
   const cuentas = useMemo(() => [...new Set(filas.map(f => f.cuenta))].sort(), [filas])
@@ -122,7 +131,7 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
           <li><b className="font-medium text-neutral-800">Precio en ML</b>: el precio de lista de la publicación, en dólares, sin la promoción.</li>
           <li><b className="font-medium text-neutral-800">Precio sistema</b>: el «Precio con exceso ML» del producto calculado hoy (costo × recargo × exceso), sin descuento. El descuento lo pones con las promociones.</li>
           <li><b className="font-medium text-neutral-800">Bien</b>: la diferencia es de 1 % o menos (por decimales). <b className="font-medium text-neutral-800">Combo</b> («trae N u.»): el precio del sistema es N × el del producto.</li>
-          <li>Elige las que quieras corregir y toca <b className="font-medium text-neutral-800">Poner precio del sistema</b>: antes de mandar ves el antes → después. Va por la cola (el avance sale abajo a la derecha).</li>
+          <li>Elige las que quieras corregir y toca <b className="font-medium text-neutral-800">Poner precio del sistema</b>: antes de mandar ves el antes → después. Va por la cola (el avance sale abajo a la derecha) y la lista se actualiza sola: las que quedan bien salen de aquí.</li>
           <li><b className="font-medium text-neutral-800">En promo</b>: para cambiarle el precio primero se saca de TODAS sus promociones. Después quedan en <b className="font-medium text-neutral-800">Por restaurar</b> y las vuelves a meter desde Promociones (los descuentos y precios cambian).</li>
           <li>Arriba se ven solo las publicaciones <b className="font-medium text-neutral-800">activas</b>; para ver las pausadas (o las dos), cámbialo en el filtro de estado.</li>
           <li>Con «Elegir las de este filtro» no se eligen las que están en promo, los combos ni las de «No sincronizar»: esas se eligen a mano.</li>
@@ -202,7 +211,7 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
             Poner precio del sistema{elegidas.length ? ` (${elegidas.length})` : ''}</button>
         </div>
       )}
-      {datos?.cola && <p className="text-xs text-neutral-500">Hay un cambio de precios en curso ({datos.cola.total}): el avance sale abajo a la derecha. Cuando termine, vuelve a cargar.</p>}
+      {datos?.cola && <p className="text-xs text-neutral-500">Hay un cambio de precios en curso ({datos.cola.total}): el avance sale abajo a la derecha. La lista se actualiza sola: las que vayan quedando bien salen de aquí.</p>}
 
       {cargando && !datos ? <p className="py-10 text-center text-sm text-neutral-500">Cargando…</p>
         : !vista.length ? <p className="rounded-xl border border-dashed border-neutral-300 py-10 text-center text-sm text-neutral-500">

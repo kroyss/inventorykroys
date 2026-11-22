@@ -626,7 +626,8 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   tiene un solo precio). Combo («trae N u.»): el precio del sistema es N × el del producto. Filtros por estado de la
   publicación (por defecto **Activas**; también Pausadas o Activas y pausadas: los números de arriba siguen ese filtro),
   cuenta, con/sin promo y búsqueda; orden por mayor diferencia (% o $) o nombre. Elige las publicaciones y **Poner precio del sistema**:
-  muestra antes → después y va por la cola (60 por minuto, el avance abajo a la derecha); el servidor recalcula el precio
+  muestra antes → después y va por la cola (60 por minuto, el avance abajo a la derecha; la lista se actualiza sola mientras
+  dura y las que quedan bien salen de la lista); el servidor recalcula el precio
   al mandar. «Elegir las N de este filtro» no toma las que están en promo, los combos ni las «No sincronizar» (esas se
   eligen a mano). **En promo:** avisa que pierden TODAS sus promociones: primero se sacan de cada una, después se cambia
   el precio (si alguna no sale, el precio no se toca). Quedan en **Por restaurar** (arriba) con las promociones que
@@ -1593,7 +1594,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   Pausar en el ⋯ de cada publicación. En el celular cada producto sale resumido: **Ver ▾** lo abre.
 - **Precio vs sistema** (Publicaciones, solo SolucionesMC): precio de lista en ML (USD, sin la promo) contra el «Precio con
   exceso ML» calculado hoy, sin descuento. Bien = 1 % o menos; combo = N × precio. Por defecto solo activas (filtro de estado). **Poner precio del sistema** muestra
-  antes → después y va por la cola. «Elegir las de este filtro» no toma promo, combos ni «No sincronizar». Las que están
+  antes → después y va por la cola (la lista se actualiza sola al avanzar). «Elegir las de este filtro» no toma promo, combos ni «No sincronizar». Las que están
   en promo pierden TODAS sus promociones (se sacan antes del precio) y quedan en «Por restaurar» para volver a meterlas
   desde Promociones.
 - **Vincular:** une cada publicación (o color/modelo) con su producto, para que cada venta descuente el correcto y Stock
