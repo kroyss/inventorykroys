@@ -20,6 +20,8 @@ const fecha = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0)
 
 // 10-11: encender, el modo y los frenos se cambian solo en Mi IA (onMiIA); sin Mi IA quedan aquí.
+const CONTRA_A_LA_VISTA = 5
+
 export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack: string) => void; onMiIA?: () => void }) {
   const [d, setD] = useState<{ casos: Caso[]; contradicciones?: Contra[]; resumen: Resumen; auto?: boolean; todo?: boolean; puedeConfigurar?: boolean } | null>(null)
   const [cambiando, setCambiando] = useState(false)
@@ -33,6 +35,8 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
   }
   const [error, setError] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<'todas' | 'sola' | 'revisar' | 'sin_marcar'>('todas')
+  // 22-11 (el dueño: «son demasiadas, muestra 5 y si doy clic sale la lista ahí mismo»): 5 a la vista; el resto se abre en el mismo recuadro, con su propia barra.
+  const [todasContra, setTodasContra] = useState(false)
   const cargar = () => fetch('/api/mensajes/ia-prueba').then(async r => {
     const j = await r.json().catch(() => ({}))
     if (!r.ok) setError(j.error ?? 'No se pudo cargar'); else setD(j)
@@ -87,9 +91,14 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
           <p className="font-medium">Publicaciones que se contradicen ({d.contradicciones.length})</p>
           <p className="text-xs">Al leer las fotos, la ficha y la descripción, la IA encontró datos que no coinciden; mientras tanto no responde sola sobre eso. Primero las que más preguntas reciben. En cada una puedes decirle el dato correcto, marcar que no es problema o, si ya la corregiste en MercadoLibre, que la vuelva a leer.</p>
-          <ul className="space-y-2">
-            {d.contradicciones.map(x => <FilaContra key={x.item_id} x={x} onListo={() => setD(v => v && { ...v, contradicciones: v.contradicciones?.filter(c => c.item_id !== x.item_id) })} />)}
+          <ul className={`space-y-2 ${todasContra ? 'max-h-[60vh] overflow-y-auto overscroll-contain pr-1' : ''}`}>
+            {(todasContra ? d.contradicciones : d.contradicciones.slice(0, CONTRA_A_LA_VISTA)).map(x => <FilaContra key={x.item_id} x={x} onListo={() => setD(v => v && { ...v, contradicciones: v.contradicciones?.filter(c => c.item_id !== x.item_id) })} />)}
           </ul>
+          {d.contradicciones.length > CONTRA_A_LA_VISTA && (
+            <button type="button" onClick={() => setTodasContra(v => !v)} aria-expanded={todasContra}
+              className="text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950">
+              {todasContra ? 'Ver solo las primeras 5 ▴' : `Ver las ${d.contradicciones.length} ▾`}</button>
+          )}
         </div>
       )}
       <div className="flex flex-wrap gap-2">
