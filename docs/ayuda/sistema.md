@@ -506,11 +506,20 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   «📝 Nota» abre directo para escribir y se cierra sola al guardar.
 - **Buscar:** por comprador, nº de venta, producto o algo que se habló.
 
-**Pestañas extra:**
-- **Mensaje al comprador nuevo:** manda un mensaje de bienvenida a cada venta nueva (a los pocos segundos, unos 10, después de los dos de ML),
-  una sola vez por venta, solo a ventas que entren desde que lo prendes. No se manda si la venta se canceló o si el
-  comprador escribió primero (su mensaje queda en «Por atender»; en «Últimos 7 días» sale «No se mandó» con el motivo). `{nombre}` = primer nombre del comprador. MercadoLibre corta los mensajes de más de
-  **350 caracteres** sin avisar. Lo configura un administrador.
+**Pestañas:** Por atender · Atendidas · Recordatorios · Pedir calificación · **Configuración**. Dentro de
+**Configuración** (igual que en Preguntas): **Al recibir compra**, **Mi IA**, **Respuestas rápidas**, **Datos de
+productos** (y «IA en prueba», solo para la plataforma). Mi IA y Datos de productos son **los mismos que en Preguntas**:
+lo que guardas en un lado lo usan las dos IA. Las Respuestas rápidas de Mensajes son otras (llevan `{nombre}`, `{precio_bs}`…).
+
+- **Al recibir compra (Configuración):** manda **hasta 2 mensajes** a cada venta nueva (a los pocos segundos, unos 10,
+  después de los dos de ML; el segundo, unos segundos después del primero), una sola vez por venta, solo a ventas que
+  entren desde que lo prendes. No se manda si la venta se canceló o si el comprador escribió primero (su mensaje queda en
+  «Por atender»; en el historial sale «No se mandó» con el motivo). `{nombre}` = primer nombre del comprador.
+  MercadoLibre corta cada mensaje de más de **350 caracteres** sin avisar: si no te alcanza, toca **+ Agregar un
+  segundo mensaje**. Se edita uno a la vez (al abrir uno se cierra el otro) y el campo crece con el texto.
+  **Ver cómo llega** muestra la conversación como la ve el comprador. ML limita los mensajes seguidos sin respuesta:
+  usa el segundo solo si hace falta; si ML lo rechaza, el primero igual llega y el motivo queda en el historial
+  (**Últimos 7 días**, de a 20 por página). Lo configura un administrador.
 - **Recordatorios de pago:** le recuerda el pago a quien compró y no ha concretado (1 vez al día a las 10:00, o 2
   veces: 10:00 y 17:00). Puedes poner otro texto para el último aviso. Si ya pagó, toca **Ya pagó, no recordar**.
   Los recordatorios salen cuando tocas **Traer pagos y guías** (Pagos ME), desde 4 horas antes de cada turno: así no se
@@ -1564,8 +1573,8 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   respuesta rápida o **Proponer con IA** (no sale sin que lo revises; con confianza baja te dice qué revisar).
   Historial = lo respondido; Configuración (administrador): Mi IA, datos de productos, respuestas rápidas.
 - **Mensajes:** leer aquí no lo marca leído en ML (se marca al responder o tocar el sobre). **Por atender**: Responder,
-  Pedir pago y Escribirle (más de 12 h sin mensajes). **Atendidas** con buscador. Al comprar, Recordatorios y Pedir
-  calificación.
+  Pedir pago y Escribirle (más de 12 h sin mensajes). **Atendidas** con buscador. Recordatorios y Pedir calificación.
+  **Configuración**: Al recibir compra (hasta 2 mensajes), Mi IA, Respuestas rápidas y Datos de productos (los mismos de Preguntas).
 - **Stock** (Automatizaciones): lo vendido en los últimos 30 días que se agotó o está por agotarse; el aviso cuenta 7
   días; se revisa sola cada hora y con ↻ Actualizar (arriba) como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
   «⚠ desde N u. sin envío gratis · pack»: comprando varias pierde el envío gratis (el pack se arma en Stock vs inventario).

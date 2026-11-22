@@ -29,17 +29,21 @@ const SYNC_MIN = 5
 const MAX_POR_PASADA = 30
 export { MAX_TEXTO }
 
-export interface ConfigAlComprar { activo: boolean; texto: string; desde: string | null }
+/** 22-11 (el dueño): hasta 2 mensajes seguidos (ML corta cada uno en MAX_TEXTO). Se guarda también `texto` = el primero,
+ *  para que la versión anterior (subida sin corte) siga leyendo lo mismo. */
+export const MAX_MENSAJES = 2
+/** Segundos entre el primer y el segundo mensaje (que lleguen en orden y no parezcan un envío masivo). */
+const PAUSA_SEG = 3
+export interface ConfigAlComprar { activo: boolean; textos: string[]; desde: string | null }
 
-export const CONFIG_DEFECTO: ConfigAlComprar = {
-  activo: false, desde: null,
-  texto: '¡Hola {nombre}! Gracias por tu compra de {producto}. Por aquí te indicamos cómo pagar y coordinar el envío. Cualquier duda, escríbenos por este chat.',
-}
+const TEXTO_DEFECTO = '¡Hola {nombre}! Gracias por tu compra de {producto}. Por aquí te indicamos cómo pagar y coordinar el envío. Cualquier duda, escríbenos por este chat.'
+export const CONFIG_DEFECTO: ConfigAlComprar = { activo: false, desde: null, textos: [TEXTO_DEFECTO] }
 
 export function leerConfig(valor: string | null | undefined): ConfigAlComprar {
   try {
-    const v = JSON.parse(valor ?? '') as Partial<ConfigAlComprar>
-    return { activo: !!v.activo, texto: v.texto?.trim() || CONFIG_DEFECTO.texto, desde: v.desde ?? null }
+    const v = JSON.parse(valor ?? '') as Partial<ConfigAlComprar> & { texto?: string }
+    const textos = (Array.isArray(v.textos) ? v.textos : [v.texto ?? '']).map(t => String(t ?? '').trim()).filter(Boolean).slice(0, MAX_MENSAJES)
+    return { activo: !!v.activo, textos: textos.length ? textos : [TEXTO_DEFECTO], desde: v.desde ?? null }
   } catch { return CONFIG_DEFECTO }
 }
 
@@ -138,18 +142,30 @@ async function mandarUno(db: Pool, c: Candidato, cfg: ConfigAlComprar): Promise<
     if (hilo.mensajes.some(m => !m.propio && new Date(m.fecha) > new Date(c.fecha))) {
       await anotar(db, c.pack, 'saltado', ESCRIBIO, null); return 'saltado'
     }
-    const texto = armarTexto(cfg.texto, orden.buyer.first_name || c.comprador_nombre, c.producto)
-    await mlFetch(db, c.conexion_id, `/messages/packs/${c.pack}/sellers/${seller}?tag=post_sale`, {
-      method: 'POST', body: { from: { user_id: seller }, to: { user_id: orden.buyer.id }, text: texto },
+    const textos = cfg.textos.map(t => armarTexto(t, orden.buyer!.first_name || c.comprador_nombre, c.producto))
+    const mandar = (text: string) => mlFetch(db, c.conexion_id, `/messages/packs/${c.pack}/sellers/${seller}?tag=post_sale`, {
+      method: 'POST', body: { from: { user_id: seller }, to: { user_id: orden.buyer!.id }, text },
     })
+    await mandar(textos[0])
+    // El segundo (opcional), unos segundos después. Si ML lo rechaza (p. ej. por mensajes seguidos sin respuesta) no se
+    // reintenta: el primero ya llegó y queda el motivo a la vista.
+    let motivo2: string | null = null, enviados = [textos[0]]
+    if (textos[1]) {
+      await new Promise(r => setTimeout(r, PAUSA_SEG * 1000))
+      try { await mandar(textos[1]); enviados = textos } catch (e) {
+        motivo2 = `El mensaje 2 no se mandó: ${e instanceof ErrorML ? 'ML: ' : ''}${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`
+        console.error('[mensaje al comprar] mensaje 2', c.pack, motivo2)
+      }
+    }
+    const texto = enviados.join('\n\n— — —\n\n')
     await db.query(
       `INSERT INTO ml_conversaciones (pack_id, conexion_id, productos, comprador_nick, comprador_nombre, ultimo_texto, ultimo_de_comprador, ultimo_at)
        VALUES ($1::bigint, $2, $3, $4, $5, $6, FALSE, NOW())
        ON CONFLICT (empresa_id, pack_id) DO UPDATE SET ultimo_texto = EXCLUDED.ultimo_texto, ultimo_de_comprador = FALSE,
          ultimo_at = NOW(), actualizada_at = NOW()`,
-      [c.pack, c.conexion_id, c.productos, c.comprador, c.comprador_nombre, texto])
-    await anotar(db, c.pack, 'enviado', null, texto)
-    await registrarOrigen(db, { modulo: 'mensajes', ref: String(c.pack), fuente: 'automatica', base: texto, texto })
+      [c.pack, c.conexion_id, c.productos, c.comprador, c.comprador_nombre, enviados[enviados.length - 1]])
+    await anotar(db, c.pack, 'enviado', motivo2, texto)
+    for (const t of enviados) await registrarOrigen(db, { modulo: 'mensajes', ref: String(c.pack), fuente: 'automatica', base: t, texto: t })
     return 'enviado'
   } catch (e) {
     const msg = (e instanceof Error ? e.message : String(e)).slice(0, 300)
@@ -160,14 +176,16 @@ async function mandarUno(db: Pool, c: Candidato, cfg: ConfigAlComprar): Promise<
   }
 }
 
-/** Los últimos mensajes (para la pantalla). */
-export async function ultimos(db: Pool) {
+/** Los últimos mensajes (para la pantalla), de a POR_PAGINA (22-11: antes una lista larga sin páginas). */
+export const POR_PAGINA = 20
+export async function ultimos(db: Pool, pagina = 1) {
   const { rows } = await db.query(
     `SELECT b.pack_id::text AS pack, b.estado, b.motivo, b.texto, b.creado_at, b.enviado_at, o.comprador,
             COALESCE(o.detalle->0->>'titulo', o.productos) AS producto, x.nickname AS cuenta
      FROM ml_bienvenidas b
      LEFT JOIN LATERAL (SELECT comprador, detalle, productos, conexion_id FROM ml_ordenes WHERE COALESCE(pack_id, id) = b.pack_id LIMIT 1) o ON TRUE
      LEFT JOIN ml_conexiones x ON x.id = o.conexion_id
-     WHERE b.creado_at > NOW() - INTERVAL '7 days' ORDER BY b.creado_at DESC LIMIT 50`)
-  return rows
+     WHERE b.creado_at > NOW() - INTERVAL '7 days' ORDER BY b.creado_at DESC LIMIT ${POR_PAGINA + 1} OFFSET $1`,
+    [(Math.max(1, pagina) - 1) * POR_PAGINA])
+  return { filas: rows.slice(0, POR_PAGINA), hayMas: rows.length > POR_PAGINA }
 }
