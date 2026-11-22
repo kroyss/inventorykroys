@@ -172,7 +172,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
         ...(miIA ? [{ value: 'mi_ia' as const, label: <>Mi IA<Nuevo clave="mi_ia" /></> }] : []),
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
         // 12-11 (el dueño): los mismos datos de cada producto de Preguntas (la IA de Mensajes también los usa).
-        ...(rapidas.esAdmin ? [{ value: 'datos' as const, label: 'Datos de cada producto' }] : []),
+        ...(rapidas.esAdmin ? [{ value: 'datos' as const, label: 'Datos de productos' }] : []),
         ...(iaPrueba ? [{ value: 'ia_prueba' as const, label: 'IA en prueba' }] : []),
       ]} />
       {vista === 'ia_prueba' ? <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} onMiIA={miIA ? () => setVista('mi_ia') : undefined} /> : vista === 'mi_ia' ? <MiIA /> : vista === 'datos' ? <DatosProductos /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (

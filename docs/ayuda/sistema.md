@@ -351,7 +351,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   **«Respondió la IA»** (o «Respondió la IA (Modo Total)»), en el mismo lugar donde sale el nombre de quien respondió
   de tu equipo.
 - **¿La IA respondió mal?** En Preguntas (Respondidas), al lado de «Respondió la IA» toca **✗ Corregir a la IA** (también
-  está en Configuración → IA automática de Preguntas y de Mensajes). Se abre una ventana: escribe **cómo la hubieras
+  está en Configuración → Revisar respuestas IA en Preguntas, y en IA en prueba en Mensajes). Se abre una ventana: escribe **cómo la hubieras
   respondido tú** (la respuesta correcta completa) y toca **Guardar**. La IA saca de ahí lo que es de ese producto (queda en
   sus datos guardados) y lo que vale para todas (queda en Mi IA → Información extra → «Correcciones de mi equipo»), y te
   muestra lo que aprendió. Si ya lo tenía anotado, no guarda nada repetido. No pongas precios ni teléfonos: no se guardan.
@@ -360,8 +360,8 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   frase de escape (al pasar el mouse se ve por qué se frenó). También tienen **✗ Corregir a la IA** para enseñarle.
 - **N datos guardados** (al lado, o en cada pregunta sin responder) abre una ventana con lo que la IA sabe de esa
   publicación: ahí se editan o borran.
-- **Agregar datos antes de que pregunten:** Preguntas → Configuración → Datos de cada producto (también en Mensajes →
-  Datos de cada producto) → **+ Agregar datos a un producto**. Buscas la publicación (activas y pausadas, todas tus
+- **Agregar datos antes de que pregunten:** Preguntas → Configuración → Datos de productos (también en Mensajes →
+  Datos de productos) → **+ Agregar datos a un producto**. Buscas la publicación (activas y pausadas, todas tus
   cuentas), la eliges y escribes uno o varios datos fijos (material, medidas, compatibilidad). La IA los usa en Preguntas y Mensajes.
 - **Esta publicación solo la responde mi equipo:** casilla en «Datos para la IA» de cada publicación. La IA no responde
   sola en esa publicación (ni en Modo Total ni con la frase de escape): las preguntas quedan en Sin responder con el motivo
@@ -378,7 +378,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   mensaje, en breve te respondemos por aquí.») cuando el mensaje queda para una persona.
 - El plan Esencial no la trae: en Mi IA, las tarjetas dicen «vienen con los planes Automatizaciones y Completo».
 
-**Pantalla Respuesta automática con IA** (Preguntas → Configuración): solo la ve la organización de la plataforma
+**Pantalla Revisar respuestas IA** (Preguntas → Configuración): solo la ve la organización de la plataforma
 (evaluación interna). Los clientes encienden, eligen el modo y prueban en Mi IA.
 - **Apagada:** la IA solo responde cuando tocas «Proponer con IA».
 - (Si tienes Mi IA, el encendido y el modo se cambian allí; esta pantalla solo muestra el estado y el historial.)
@@ -431,7 +431,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 - **Lo aprendido de cada producto:** el sistema aprende con tus respuestas qué publicaciones tienen envío gratis y
   cuáles no, para no sugerir la respuesta rápida de envío gratis donde no aplica (gratis). Si tu empresa tiene los
   pesos de MercadoEnvíos cargados (Promociones), esto lo calcula solo con el peso y el precio de hoy (también si es
-  solo TEALCA) y la pestaña se llama **Datos de cada producto** (ahí quedan los datos anotados).
+  solo TEALCA) y la pestaña se llama **Datos de productos** (ahí quedan los datos anotados).
 
 **Respuesta sugerida:** cuando una pregunta se parece mucho a otra que ya respondiste, la respuesta aparece ya
 escrita; la revisas y la envías (también varias juntas con «Enviar las sugeridas»). La respuesta sugerida **no se

@@ -5,7 +5,7 @@ import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { releerFotos } from '@/lib/fotosIA'
 
 // Publicaciones que se contradicen (Mensajes → IA en prueba, 09-11): resolverlas sin salir de la lista.
-//  · dato     → «El dato correcto es…»: queda en Datos de cada producto (ml_item_notas; lo leen Preguntas y Mensajes)
+//  · dato     → «El dato correcto es…»: queda en Datos de productos (ml_item_notas; lo leen Preguntas y Mensajes)
 //               y la publicación sale de la lista (la IA ya responde con ese dato).
 //  · ignorar  → «No es problema»: sale de la lista y la IA responde normal. Si la publicación cambia, se vuelve a revisar.
 //  · releer   → «Ya lo corregí en ML»: se vuelve a leer ahora mismo.
