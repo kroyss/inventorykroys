@@ -132,6 +132,7 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
           <li><b className="font-medium text-neutral-800">Precio sistema</b>: el «Precio con exceso ML» del producto calculado hoy (costo × recargo × exceso), sin descuento. El descuento lo pones con las promociones.</li>
           <li><b className="font-medium text-neutral-800">Bien</b>: la diferencia es de 1 % o menos (por decimales). <b className="font-medium text-neutral-800">Combo</b> («trae N u.»): el precio del sistema es N × el del producto.</li>
           <li>Elige las que quieras corregir y toca <b className="font-medium text-neutral-800">Poner precio del sistema</b>: antes de mandar ves el antes → después. Va por la cola (el avance sale abajo a la derecha) y la lista se actualiza sola: las que quedan bien salen de aquí.</li>
+          <li>Toca el <b className="font-medium text-neutral-800">producto</b> para ver su ficha y el <b className="font-medium text-neutral-800">precio en ML</b> para ver la publicación (se abren en otra pestaña).</li>
           <li><b className="font-medium text-neutral-800">En promo</b>: para cambiarle el precio primero se saca de TODAS sus promociones. Después quedan en <b className="font-medium text-neutral-800">Por restaurar</b> y las vuelves a meter desde Promociones (los descuentos y precios cambian).</li>
           <li>Arriba se ven solo las publicaciones <b className="font-medium text-neutral-800">activas</b>; para ver las pausadas (o las dos), cámbialo en el filtro de estado.</li>
           <li>Con «Elegir las de este filtro» no se eligen las que están en promo, los combos ni las de «No sincronizar»: esas se eligen a mano.</li>
@@ -240,7 +241,8 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
                     <td className="max-w-md px-3 py-2 align-top"><Publicacion f={f} /></td>
                     <td className="px-3 py-2 align-top"><Productos f={f} /></td>
                     <td className="whitespace-nowrap px-3 py-2 text-right align-top">
-                      <span className="font-medium">{usd(f.precio_ml)}</span>
+                      <a href={`/publicaciones/${f.item_id}`} target="_blank" rel="noopener" title="Ver la publicación en el sistema (pestaña nueva)"
+                        className="font-medium text-sky-700 hover:underline">{usd(f.precio_ml)}</a>
                       {precioPromo(f) != null && <span className="block text-[11px] text-violet-700">en promo {usd(precioPromo(f))}</span>}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right align-top font-medium">{usd(f.precio_sistema)}</td>
@@ -261,7 +263,7 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
                 </div>
                 <div className="mt-2"><Productos f={f} /></div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="rounded-lg bg-neutral-50 p-1.5"><span className="block text-neutral-500">En ML</span><span className="font-semibold">{usd(f.precio_ml)}</span></div>
+                  <div className="rounded-lg bg-neutral-50 p-1.5"><span className="block text-neutral-500">En ML</span><a href={`/publicaciones/${f.item_id}`} target="_blank" rel="noopener" className="font-semibold text-sky-700 underline-offset-2 hover:underline">{usd(f.precio_ml)}</a></div>
                   <div className="rounded-lg bg-neutral-50 p-1.5"><span className="block text-neutral-500">Sistema</span><span className="font-semibold">{usd(f.precio_sistema)}</span></div>
                   <div className="rounded-lg bg-neutral-50 p-1.5"><span className="block text-neutral-500">Diferencia</span><Diferencia f={f} /></div>
                 </div>
@@ -318,7 +320,8 @@ function Productos({ f }: { f: FilaPrecioML }) {
     <ul className="space-y-0.5 text-xs">
       {f.productos.slice(0, 4).map(p => (
         <li key={`${p.product_id}:${p.variante ?? ''}`} className="text-neutral-700">
-          <span className="font-mono text-[11px] text-neutral-500">{p.code}</span> {p.name}
+          <a href={`/productos?ver=${p.product_id}`} target="_blank" rel="noopener" title="Ver el producto en el sistema (pestaña nueva)"
+            className="hover:underline"><span className="font-mono text-[11px] text-neutral-500">{p.code}</span> {p.name}</a>
           {p.variante && <span className="text-neutral-400"> · {p.variante}</span>}
           {p.unidades > 1 && <span className="text-sky-700"> · trae {p.unidades} u.</span>}
           {f.productos.length > 1 && <span className="text-neutral-500"> · {usd(p.precio)}</span>}
