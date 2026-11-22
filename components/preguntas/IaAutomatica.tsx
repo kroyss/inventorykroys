@@ -6,7 +6,7 @@ import { FrenosIA } from './FrenosIA'
 import { ResponderTodo, nombreModo } from '@/components/ia/ResponderTodo'
 import { CorregirIA } from '@/components/ia/CorregirIA'
 
-// Preguntas → Configuración → Respuesta automática con IA (01-11-2026, lib/iaAutomatica.ts).
+// Preguntas → Configuración → IA en prueba (01-11-2026, lib/iaAutomatica.ts).
 // Modo prueba: la IA decide qué habría salido solo, sin publicar; el vendedor marca cada una bien o mal y ve el % de
 // acierto antes de activarla de verdad.
 
@@ -104,7 +104,7 @@ export function IaAutomatica({ interno = false, onMiIA }: { interno?: boolean; o
     <div className="space-y-4">
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
         <div>
-          <h2 className="font-semibold text-neutral-900">Respuesta automática con IA</h2>
+          <h2 className="font-semibold text-neutral-900">IA en prueba</h2>
           <p className="text-xs text-neutral-500">
             Solo salen solas las respuestas en que la IA está segura y que pasan todas las revisiones. Las demás te quedan escritas para revisar y enviar.
           </p>

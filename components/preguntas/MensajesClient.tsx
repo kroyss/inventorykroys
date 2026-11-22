@@ -1,7 +1,7 @@
 'use client'
 import MiIA from '@/components/miia/MiIA'
 import { DatosProductos } from './DatosProducto'
-import { Nuevo } from '@/components/ui/Nuevo'
+import { Nuevo, vistoNuevo } from '@/components/ui/Nuevo'
 import { conDatosDeEjemplo, rellenarVariables } from '@/lib/variablesTexto'
 import { AyudaVariables } from './AyudaVariables'
 import MensajesIAPrueba from '@/components/preguntas/MensajesIAPrueba'
@@ -49,7 +49,11 @@ function hace(fecha: string | null) {
 export default function MensajesClient({ pack: packPedido = null, miIA = false, iaPrueba = false, inicial = null }: { pack?: string | null; miIA?: boolean; iaPrueba?: boolean
   /** 12-11 (rapidez): Por atender y los contadores del seguimiento, ya en el HTML. */
   inicial?: { lista: unknown; seg: unknown } | null }) {
-  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios' | 'al_comprar' | 'mi_ia' | 'ia_prueba' | 'datos'>(packPedido ? 'todas' : 'sin_leer')
+  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'recordatorios' | 'config'>(packPedido ? 'todas' : 'sin_leer')
+  // 22-11 (el dueño, igual que Preguntas): Al recibir compra, Mi IA, Respuestas rápidas, Datos de productos e IA en prueba
+  // van dentro de «Configuración».
+  const [subConfig, setSubConfig] = useState<'al_comprar' | 'mi_ia' | 'rapidas' | 'datos' | 'ia_prueba'>('al_comprar')
+  const abrirConfig = (k: typeof subConfig) => { setSubConfig(k); setVista('config'); setAbierta(null) }
   const [pedir, setPedir] = useState<number | undefined>(undefined)     // "Pedir calificación": cuántas hay hoy
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
   const [conRecordatorios, setConRecordatorios] = useState(false)
@@ -77,7 +81,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   const primera = usePrimera(inicial?.lista as Record<string, any> | null | undefined)
   const cargar = useCallback(async () => {
     const id = ++ultimoPedido.current
-    const v = vista === 'rapidas' || vista === 'recordatorios' || vista === 'pedir' || vista === 'mi_ia' || vista === 'ia_prueba' ? 'sin_leer' : vista
+    const v = vista === 'recordatorios' || vista === 'pedir' || vista === 'config' ? 'sin_leer' : vista
     const pre = primera()
     let d: Record<string, any>
     if (pre && v === 'sin_leer' && pagina === 1) d = pre
@@ -152,7 +156,8 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
           <li>Leer un mensaje aquí <b className="font-medium text-neutral-800">no lo marca como leído</b> en MercadoLibre: se marca cuando respondes o tocas el sobre.</li>
           <li><b className="font-medium text-neutral-800">Por atender</b>: Responder (mensajes sin contestar), Pedir pago (ventas sin señal de pago dentro de tu plazo) y Escribirle (más de 12 h sin mensajes).</li>
           <li><b className="font-medium text-neutral-800">Atendidas</b>: las conversaciones ya respondidas, con buscador.</li>
-          <li><b className="font-medium text-neutral-800">Al comprar</b>, Recordatorios y Pedir calificación: los mensajes de cada momento de la venta.</li>
+          <li><b className="font-medium text-neutral-800">Recordatorios</b> y <b className="font-medium text-neutral-800">Pedir calificación</b>: los mensajes de cada momento de la venta.</li>
+          <li><b className="font-medium text-neutral-800">Configuración</b>: Al recibir compra (hasta 2 mensajes a cada comprador nuevo), Mi IA, Respuestas rápidas y Datos de productos (Mi IA y Datos de productos son los mismos que en Preguntas).</li>
         </>}
         actions={<UsoIA />} />
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{error}</div>}
@@ -161,23 +166,34 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
         // Pestaña de lista nueva: "cargando" en vez de la lista de la anterior mientras llega.
         const lista_ = (x: string) => x === 'todas' ? 'todas' : 'sin_leer'
         if (lista_(v) !== lista_(vista)) setLista(null)
+        if (v === 'config') vistoNuevo('config_mensajes')
         setVista(v); setAbierta(null); setPagina(1); setSeg('todas')
       }} items={[
         { value: 'sin_leer', label: 'Por atender', count: cont?.conversaciones },
         { value: 'todas', label: 'Atendidas' },
-        // 10-11 (el dueño): este orden. «IA en prueba» solo la organización de la plataforma (iaPrueba), al final.
-        { value: 'al_comprar' as const, label: 'Al comprar' },
         ...(conRecordatorios ? [{ value: 'recordatorios' as const, label: 'Recordatorios' }] : []),
         { value: 'pedir', label: 'Pedir calificación', count: pedir },
-        ...(miIA ? [{ value: 'mi_ia' as const, label: <>Mi IA<Nuevo clave="mi_ia" /></> }] : []),
-        ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
-        // 12-11 (el dueño): los mismos datos de cada producto de Preguntas (la IA de Mensajes también los usa).
-        ...(rapidas.esAdmin ? [{ value: 'datos' as const, label: 'Datos de cada producto' }] : []),
-        ...(iaPrueba ? [{ value: 'ia_prueba' as const, label: 'IA en prueba' }] : []),
+        { value: 'config' as const, label: <>Configuración<Nuevo clave="config_mensajes" /></> },
       ]} />
-      {vista === 'ia_prueba' ? <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} onMiIA={miIA ? () => setVista('mi_ia') : undefined} /> : vista === 'mi_ia' ? <MiIA /> : vista === 'datos' ? <DatosProductos /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
-        <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
-      ) : !lista ? <Cargando /> : (
+      {vista === 'config' ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-1.5">
+            {/* «IA en prueba» solo la organización de la plataforma (iaPrueba), al final. Mi IA y Datos de productos son
+                los mismos de Preguntas; las Respuestas rápidas de Mensajes son otras (llevan {nombre}, {precio_bs}…). */}
+            {([['al_comprar', 'Al recibir compra', true], ['mi_ia', 'Mi IA', miIA], ['rapidas', 'Respuestas rápidas', rapidas.esAdmin],
+               ['datos', 'Datos de productos', rapidas.esAdmin], ['ia_prueba', 'IA en prueba', iaPrueba]] as const).filter(x => x[2]).map(([k, t]) => (
+              <button key={k} type="button" onClick={() => setSubConfig(k)}
+                className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
+                {t}{k === 'mi_ia' && <Nuevo clave="mi_ia" />}</button>
+            ))}
+          </div>
+          {subConfig === 'al_comprar' && <MensajeAlComprar />}
+          {subConfig === 'mi_ia' && miIA && <MiIA />}
+          {subConfig === 'rapidas' && rapidas.esAdmin && <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />}
+          {subConfig === 'datos' && rapidas.esAdmin && <><p className="text-xs text-neutral-500">Son los mismos datos que en Preguntas: lo que guardes aquí lo usan las dos IA.</p><DatosProductos /></>}
+          {subConfig === 'ia_prueba' && iaPrueba && <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} onMiIA={miIA ? () => abrirConfig('mi_ia') : undefined} />}
+        </div>
+      ) : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : !lista ? <Cargando /> : (
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo
         // de la conversación estiraba la página y todo se corría de lado), y lista O conversación, no las dos.
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">

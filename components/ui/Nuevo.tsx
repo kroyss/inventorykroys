@@ -17,6 +17,8 @@ export const NUEVOS = {
   actualizar: '2026-12-18',
   // 18-11: Manual de Automatizaciones (tarjeta en Aprendizaje).
   manual_automatizaciones: '2026-12-18',
+  // 22-11: Configuración en Mensajes (Al recibir compra con hasta 2 mensajes, Mi IA, Respuestas rápidas, Datos, IA en prueba).
+  config_mensajes: '2026-12-22',
 } as const
 export type ClaveNuevo = keyof typeof NUEVOS
 

@@ -8,7 +8,7 @@ import { tieneModulo } from '@/lib/modulos'
 import { frenosDeFabrica } from '@/lib/iaFrenos'
 import { errorFaltanMiIA, faltanMiIA } from '@/lib/miIA'
 
-// GET /api/preguntas/ia-auto → Preguntas → Configuración → Respuesta automática con IA: el modo, los créditos y las
+// GET /api/preguntas/ia-auto → Preguntas → Configuración → IA en prueba: el modo, los créditos y las
 // últimas preguntas que procesó (qué decidió, la respuesta, la que se publicó y la marca bien/mal del vendedor).
 export async function GET(req: NextRequest) {
   const s = await sesionPreguntas('automatizaciones_config')

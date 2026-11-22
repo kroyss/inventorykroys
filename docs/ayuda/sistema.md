@@ -351,7 +351,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   **«Respondió la IA»** (o «Respondió la IA (Modo Total)»), en el mismo lugar donde sale el nombre de quien respondió
   de tu equipo.
 - **¿La IA respondió mal?** En Preguntas (Respondidas), al lado de «Respondió la IA» toca **✗ Corregir a la IA** (también
-  está en Configuración → IA automática de Preguntas y de Mensajes). Se abre una ventana: escribe **cómo la hubieras
+  está en Configuración → IA en prueba (en Preguntas y en Mensajes)). Se abre una ventana: escribe **cómo la hubieras
   respondido tú** (la respuesta correcta completa) y toca **Guardar**. La IA saca de ahí lo que es de ese producto (queda en
   sus datos guardados) y lo que vale para todas (queda en Mi IA → Información extra → «Correcciones de mi equipo»), y te
   muestra lo que aprendió. Si ya lo tenía anotado, no guarda nada repetido. No pongas precios ni teléfonos: no se guardan.
@@ -360,8 +360,8 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   frase de escape (al pasar el mouse se ve por qué se frenó). También tienen **✗ Corregir a la IA** para enseñarle.
 - **N datos guardados** (al lado, o en cada pregunta sin responder) abre una ventana con lo que la IA sabe de esa
   publicación: ahí se editan o borran.
-- **Agregar datos antes de que pregunten:** Preguntas → Configuración → Datos de cada producto (también en Mensajes →
-  Datos de cada producto) → **+ Agregar datos a un producto**. Buscas la publicación (activas y pausadas, todas tus
+- **Agregar datos antes de que pregunten:** Preguntas → Configuración → Datos de productos (también en Mensajes →
+  Datos de productos) → **+ Agregar datos a un producto**. Buscas la publicación (activas y pausadas, todas tus
   cuentas), la eliges y escribes uno o varios datos fijos (material, medidas, compatibilidad). La IA los usa en Preguntas y Mensajes.
 - **Esta publicación solo la responde mi equipo:** casilla en «Datos para la IA» de cada publicación. La IA no responde
   sola en esa publicación (ni en Modo Total ni con la frase de escape): las preguntas quedan en Sin responder con el motivo
@@ -378,7 +378,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   mensaje, en breve te respondemos por aquí.») cuando el mensaje queda para una persona.
 - El plan Esencial no la trae: en Mi IA, las tarjetas dicen «vienen con los planes Automatizaciones y Completo».
 
-**Pantalla Respuesta automática con IA** (Preguntas → Configuración): solo la ve la organización de la plataforma
+**Pantalla IA en prueba** (Preguntas → Configuración): solo la ve la organización de la plataforma
 (evaluación interna). Los clientes encienden, eligen el modo y prueban en Mi IA.
 - **Apagada:** la IA solo responde cuando tocas «Proponer con IA».
 - (Si tienes Mi IA, el encendido y el modo se cambian allí; esta pantalla solo muestra el estado y el historial.)
@@ -431,7 +431,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 - **Lo aprendido de cada producto:** el sistema aprende con tus respuestas qué publicaciones tienen envío gratis y
   cuáles no, para no sugerir la respuesta rápida de envío gratis donde no aplica (gratis). Si tu empresa tiene los
   pesos de MercadoEnvíos cargados (Promociones), esto lo calcula solo con el peso y el precio de hoy (también si es
-  solo TEALCA) y la pestaña se llama **Datos de cada producto** (ahí quedan los datos anotados).
+  solo TEALCA) y la pestaña se llama **Datos de productos** (ahí quedan los datos anotados).
 
 **Respuesta sugerida:** cuando una pregunta se parece mucho a otra que ya respondiste, la respuesta aparece ya
 escrita; la revisas y la envías (también varias juntas con «Enviar las sugeridas»). La respuesta sugerida **no se
@@ -506,11 +506,20 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   «📝 Nota» abre directo para escribir y se cierra sola al guardar.
 - **Buscar:** por comprador, nº de venta, producto o algo que se habló.
 
-**Pestañas extra:**
-- **Mensaje al comprador nuevo:** manda un mensaje de bienvenida a cada venta nueva (a los pocos segundos, unos 10, después de los dos de ML),
-  una sola vez por venta, solo a ventas que entren desde que lo prendes. No se manda si la venta se canceló o si el
-  comprador escribió primero (su mensaje queda en «Por atender»; en «Últimos 7 días» sale «No se mandó» con el motivo). `{nombre}` = primer nombre del comprador. MercadoLibre corta los mensajes de más de
-  **350 caracteres** sin avisar. Lo configura un administrador.
+**Pestañas:** Por atender · Atendidas · Recordatorios · Pedir calificación · **Configuración**. Dentro de
+**Configuración** (igual que en Preguntas): **Al recibir compra**, **Mi IA**, **Respuestas rápidas**, **Datos de
+productos** (y «IA en prueba», solo para la plataforma). Mi IA y Datos de productos son **los mismos que en Preguntas**:
+lo que guardas en un lado lo usan las dos IA. Las Respuestas rápidas de Mensajes son otras (llevan `{nombre}`, `{precio_bs}`…).
+
+- **Al recibir compra (Configuración):** manda **hasta 2 mensajes** a cada venta nueva (a los pocos segundos, unos 10,
+  después de los dos de ML; el segundo, unos segundos después del primero), una sola vez por venta, solo a ventas que
+  entren desde que lo prendes. No se manda si la venta se canceló o si el comprador escribió primero (su mensaje queda en
+  «Por atender»; en el historial sale «No se mandó» con el motivo). `{nombre}` = primer nombre del comprador.
+  MercadoLibre corta cada mensaje de más de **350 caracteres** sin avisar: si no te alcanza, toca **+ Agregar un
+  segundo mensaje**. Se edita uno a la vez (al abrir uno se cierra el otro) y el campo crece con el texto.
+  **Ver cómo llega** muestra la conversación como la ve el comprador. ML limita los mensajes seguidos sin respuesta:
+  usa el segundo solo si hace falta; si ML lo rechaza, el primero igual llega y el motivo queda en el historial
+  (**Últimos 7 días**, de a 20 por página). Lo configura un administrador.
 - **Recordatorios de pago:** le recuerda el pago a quien compró y no ha concretado (1 vez al día a las 10:00, o 2
   veces: 10:00 y 17:00). Puedes poner otro texto para el último aviso. Si ya pagó, toca **Ya pagó, no recordar**.
   Los recordatorios salen cuando tocas **Traer pagos y guías** (Pagos ME), desde 4 horas antes de cada turno: así no se
@@ -1564,8 +1573,8 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   respuesta rápida o **Proponer con IA** (no sale sin que lo revises; con confianza baja te dice qué revisar).
   Historial = lo respondido; Configuración (administrador): Mi IA, datos de productos, respuestas rápidas.
 - **Mensajes:** leer aquí no lo marca leído en ML (se marca al responder o tocar el sobre). **Por atender**: Responder,
-  Pedir pago y Escribirle (más de 12 h sin mensajes). **Atendidas** con buscador. Al comprar, Recordatorios y Pedir
-  calificación.
+  Pedir pago y Escribirle (más de 12 h sin mensajes). **Atendidas** con buscador. Recordatorios y Pedir calificación.
+  **Configuración**: Al recibir compra (hasta 2 mensajes), Mi IA, Respuestas rápidas y Datos de productos (los mismos de Preguntas).
 - **Stock** (Automatizaciones): lo vendido en los últimos 30 días que se agotó o está por agotarse; el aviso cuenta 7
   días; se revisa sola cada hora y con ↻ Actualizar (arriba) como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
   «⚠ desde N u. sin envío gratis · pack»: comprando varias pierde el envío gratis (el pack se arma en Stock vs inventario).

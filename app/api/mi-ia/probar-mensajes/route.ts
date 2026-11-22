@@ -6,6 +6,7 @@ import { iaConfigurada } from '@/lib/ia'
 import { tieneModulo } from '@/lib/modulos'
 import { contarPrueba, ERROR_TOPE, puedeProbar } from '@/lib/miIAPruebasTope'
 import { guardarPrueba } from '@/lib/miIAPruebas'
+import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 
 // POST /api/mi-ia/probar-mensajes → Mi IA (09-11): la IA responde 10 mensajes reales de compradores que el equipo ya
 // contestó. No manda nada ni usa créditos.
@@ -16,7 +17,8 @@ export async function POST() {
   if (!iaConfigurada()) return NextResponse.json({ error: 'La IA no está configurada' }, { status: 503 })
   try {
     if (!(await puedeProbar(s.db, s.session.user, 'mensajes'))) return NextResponse.json({ error: ERROR_TOPE }, { status: 429 })
-    const casos = await probarMensajesIA(s.db, s.session.user.country, tieneModulo(s.session.user, 'inventario'), s.session.user.id)
+    const casos = await probarMensajesIA(s.db, s.session.user.country, tieneModulo(s.session.user, 'inventario'), s.session.user.id,
+      s.session.user.organizacionId === ORGANIZACION_PLATAFORMA)   // 22-11: tu organización prueba con Mensajes v2 (lo que manda su automático)
     await contarPrueba(s.db, s.session.user, 'mensajes')
     const id = await guardarPrueba(s.db, 'mensajes', casos, s.session.user.id)   // 10-11: historial (mig 164)
     return NextResponse.json({ casos, id })
