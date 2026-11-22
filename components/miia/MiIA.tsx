@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePrimera } from '@/lib/primera'
 import type { MiIA as Config, Agencia, MotivoCambio } from '@/lib/miIA'
-import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA, embalajeNuevo } from '@/lib/miIA'
+import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA, temasFaltanMensajes } from '@/lib/miIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FrenosIA } from '@/components/preguntas/FrenosIA'
 import { ResponderTodo } from '@/components/ia/ResponderTodo'
@@ -242,6 +242,15 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
         {c.ubicacion?.retiro === 'horario' && <input value={c.ubicacion.retiroHorario ?? ''} onChange={e => set(c => ({ ...c, ubicacion: { ...c.ubicacion, retiroHorario: e.target.value } }))}
           placeholder="Ej.: lunes a viernes de 9 a 4" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />}
       </Pregunta>
+      {(c.ubicacion?.retiro === 'acuerdo' || c.ubicacion?.retiro === 'horario') && (
+        <Pregunta t="¿Cómo te contactan para coordinar el retiro?" ayuda="Solo lo da en Mensajes, cuando ya compraron (MercadoLibre lo permite ahí). En Preguntas nunca: son públicas.">
+          <input value={c.ubicacion.retiroContacto ?? ''} maxLength={150} onChange={e => set(c => ({ ...c, ubicacion: { ...c.ubicacion, retiroContacto: e.target.value } }))}
+            placeholder="Ej.: WhatsApp 0414-0000000 (Marcos)" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+          <input value={c.ubicacion.retiroComo ?? ''} maxLength={200} onChange={e => set(c => ({ ...c, ubicacion: { ...c.ubicacion, retiroComo: e.target.value } }))}
+            placeholder="Cómo se coordina (opcional). Ej.: escríbenos para acordar día y hora en el centro" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+          <p className="text-xs text-neutral-500">La IA lo copia exacto. Sin dirección exacta: se acuerda por ese contacto. Hace falta para encender la IA en Mensajes.</p>
+        </Pregunta>
+      )}
     </>
     case 'factura': return <>
       <Pregunta t="¿Das factura?"><div className="flex flex-wrap gap-2">
@@ -480,8 +489,8 @@ type PruebaG = { id: string | null; creado_at: string; casos: Caso[]; marcas: Re
 const aCaso = (x: Caso & { pregunta?: string; mensaje?: string }): Caso => ({ ...x, texto: x.texto ?? x.pregunta ?? x.mensaje ?? '' })
 const fechaPrueba = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
-function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan, datoNuevo = false }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
-  quedan: number | null; faltan: string[]; datoNuevo?: boolean }) {
+function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan, nuevos = [] }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
+  quedan: number | null; faltan: string[]; nuevos?: { tema: string; ir: string }[] }) {
   const [usadas, setUsadas] = useState(0)
   const quedan = quedanAl === null ? null : Math.max(0, quedanAl - usadas)
   const confirm = useConfirm()
@@ -513,10 +522,11 @@ function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedan
         Las respuestas automáticas vienen con los planes <b>Automatizaciones</b> y <b>Completo</b>. <a href="/mi-plan" className="text-sky-700">Ver Mi plan →</a></div>}
 
       {encendida === false && faltan.length > 0 && <p className="text-xs text-amber-900 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-        Para encenderla, primero completa Mi IA. Te {faltan.length === 1 ? 'falta 1 tema' : `faltan ${faltan.length} temas`}: <b>{faltan.join(', ')}</b>.</p>}
-      {datoNuevo && encendida !== null && faltan.length === 0 && <p className="text-xs text-sky-900 rounded-lg bg-sky-50 border border-sky-200 px-3 py-2">
-        Hay un dato nuevo que tomar en cuenta: <b>¿cobras embalaje?</b> y tus datos para pagar.{' '}
-        <button type="button" onClick={() => abrir('postventa')} className="underline">Completarlo</button></p>}
+        Para encenderla, primero completa Mi IA. Te {faltan.length === 1 ? 'falta 1 tema' : `faltan ${faltan.length} temas`}: <b>{faltan.join(', ')}</b>.
+        {nuevos.length > 0 && <>{' '}<button type="button" onClick={() => abrir(nuevos[0].ir)} className="underline">Completarlo</button></>}</p>}
+      {encendida === true && nuevos.length > 0 && <p className="text-xs text-sky-900 rounded-lg bg-sky-50 border border-sky-200 px-3 py-2">
+        Hay {nuevos.length === 1 ? 'un dato nuevo' : 'datos nuevos'} que tomar en cuenta: <b>{nuevos.map(t => t.tema).join(', ')}</b>.{' '}
+        <button type="button" onClick={() => abrir(nuevos[0].ir)} className="underline">Completarlo</button></p>}
       {encendida === false && faltan.length === 0 && <button type="button" onClick={() => cambiar(true)} disabled={cambiando}
         className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">{cambiando ? 'Encendiendo…' : T.encender}</button>}
 
@@ -1080,6 +1090,7 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
   // Página Mi IA (el título lo pone la página o la pestaña: aquí no se repite)
   const n = lleno(c)
   const faltan = PASOS.map((p, i) => p.lleno(c) ? -1 : i).filter(i => i >= 0)
+  const nuevosMsg = temasFaltanMensajes(c)
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1087,10 +1098,11 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
         <span className={`text-xs px-2 py-1 rounded-full ${n === PASOS.length ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
           {Math.round((n / PASOS.length) * 100)}% completa</span>
       </div>
-      {embalajeNuevo(c) && (
+      {/* 21-11: lo que pide Mensajes (datos para pagar, embalaje, contacto de retiro). Sin Mi IA guardado no se muestra: ya sale en «te faltan». */}
+      {c.actualizado && nuevosMsg.length > 0 && !datos.msgPronto && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-          <p className="text-sm text-sky-900"><b>Hay un dato nuevo que tomar en cuenta:</b> ¿cobras embalaje y cuánto? ¿Quieres que la IA mande tus datos para pagar? Está en «Después de la compra».</p>
-          <button type="button" onClick={() => abrirTema('postventa')} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm">Completarlo →</button>
+          <p className="text-sm text-sky-900"><b>Para la IA en Mensajes falta{nuevosMsg.length === 1 ? '' : 'n'}:</b> {lista(nuevosMsg.map(t => t.tema))}. Se contesta{nuevosMsg.length === 1 ? '' : 'n'} en «{nuevosMsg[0].ir === 'ubicacion' ? 'Ubicación y retiro' : 'Después de la compra'}».</p>
+          <button type="button" onClick={() => abrirTema(nuevosMsg[0].ir)} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm">Completarlo →</button>
         </div>
       )}
       {faltan.length > 0 && (
@@ -1134,7 +1146,7 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
         </div>
       ) : (
       <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} todo={!!datos.msgTodo} onCambio={cargar} abrir={abrirTema}
-        quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={faltan.map(i => PASOS[i].tema)} datoNuevo={embalajeNuevo(c)} />
+        quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={[...faltan.map(i => PASOS[i].tema), ...nuevosMsg.map(t => t.tema)]} nuevos={nuevosMsg} />
       )}
       </div>
       {(datos.iaAuto !== null || datos.msgAuto != null) && <FrenosIA inicial={frenosInicial} preguntas={datos.iaAuto !== null} mensajes={datos.msgAuto != null} />}

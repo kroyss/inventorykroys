@@ -48,9 +48,9 @@ export async function PUT(req: NextRequest) {
         [CLAVE_AUTO, JSON.stringify({ ...actual, todo: p.data.todo, todoPor: s.session.user.id, todoAt: new Date().toISOString() })])
       return NextResponse.json({ ok: true, todo: p.data.todo })
     }
-    // 09-11: solo se enciende con Mi IA completo.
+    // 09-11: solo se enciende con Mi IA completo. 21-11: y con los 3 de Mensajes (datos para pagar, embalaje, contacto de retiro).
     if (p.data.auto && tieneModulo(s.session.user, 'mi_ia')) {
-      const faltan = await faltanMiIA(s.db)
+      const faltan = await faltanMiIA(s.db, 'mensajes')
       if (faltan.length) return NextResponse.json({ error: errorFaltanMiIA(faltan), faltanMiIA: faltan }, { status: 400 })
     }
     await s.db.query(
