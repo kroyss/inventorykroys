@@ -1069,7 +1069,7 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
     mouse o tocarla abre el detalle: oficial, paralelo, diferencial (cuánto más cara está la paralela), exceso y Descuento
     ML (con permiso de costos), la fecha, ↻ actualizar (solo el dueño de la plataforma) y **Ver historial →** (quien
     entra a Ajustes). Después el bono
-  (si lo tienes) y el panel **Cómo va tu negocio**, con los botones **Hoy / Mes / Trim. / Año / Fechas…** (Fechas… abre
+  (si lo tienes: «Bono del mes · Vendido $X · Bono $Y», lo que le corresponde al equipo este mes, y la barra por fases) y el panel **Cómo va tu negocio**, con los botones **Hoy / Mes / Trim. / Año / Fechas…** (Fechas… abre
   desde/hasta y **Aplicar**; elegidas, el botón muestra el rango, p. ej. «1–20 nov»), que **mandan
   sobre todo lo de abajo** (no sobre los pendientes), siempre contra el período anterior (Hoy = ayer a esta hora; Mes =
   el mes pasado hasta el mismo día; Año = el año pasado hasta el mismo día; fechas = los mismos días justo antes): la

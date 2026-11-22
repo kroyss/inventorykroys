@@ -45,7 +45,6 @@ export default function BonusPipeline({ detalle = false }: { detalle?: boolean }
 
   const startDotColor = salesAmount > 0 ? fillColor : '#d1d5db'
   const ganado   = phases.filter(p => salesAmount >= p.end).reduce((a, p) => a + p.bonus, 0)
-  const proximo  = phases.find(p => salesAmount < p.end)
   const usd = (n: number) => Math.round(n).toLocaleString('de-DE')
 
   // pb-2.5: el aire que necesita la etiqueta del mes anterior, que se posiciona
@@ -55,11 +54,9 @@ export default function BonusPipeline({ detalle = false }: { detalle?: boolean }
       {detalle && <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-2.5 text-sm">
         <span className="font-semibold text-neutral-900">Bono del mes</span>
         <span className="text-neutral-500">
+          {/* 22-11 (el dueño: «solo quiero ver cuánto bono le corresponde en el mes»): sin «faltan» ni «bono de N». */}
           Vendido <b className="text-neutral-900 num">${usd(salesAmount)}</b>
-          {ganado > 0 && <> · bono ganado <b className="text-emerald-600 num">{ganado}</b></>}
-          {proximo
-            ? <> · faltan <b className="text-neutral-900 num">${usd(proximo.end - salesAmount)}</b> para el bono de {proximo.bonus}</>
-            : <> · ¡todas las metas cumplidas!</>}
+          {' · '}Bono <b className={`num ${ganado > 0 ? 'text-emerald-600' : 'text-neutral-900'}`}>${usd(ganado)}</b>
         </span>
       </div>}
       <div className="flex items-center w-full gap-1">
