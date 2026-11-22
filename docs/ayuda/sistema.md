@@ -648,6 +648,14 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   las vuelve a poner con el mismo %. **Renovar** (vencida o por vencer en 3 días) crea una campaña nueva desde hoy con
   el mismo nombre y % y propone las mismas publicaciones. **Borrar campaña** la quita para siempre (primero les quita el
   descuento). Por Telegram avisa 3 días antes de que venza una campaña propia.
+  **Tus campañas vencidas** (22-11): cuando una campaña propia vence, ML deja de mostrarla, pero el sistema la guarda en
+  una sección plegada con su nombre, %, fechas y cuántas publicaciones tenía. **↻ Volver a crear** es Renovar: campaña
+  nueva desde hoy con el mismo nombre y % y después eliges cuáles de sus publicaciones entran (con las protecciones de
+  siempre). **Quitar de la lista** la oculta (no toca ML). Las que **borras** a mano no aparecen ahí.
+  **Filtros** (22-11, más simples): **Todas · En promoción · Sin promoción · ⚠ Para revisar**. «Para revisar» junta las
+  que tienen algún problema y abre debajo solo los que tienen algo, del más urgente al menos: La promo quita el envío,
+  Cobro a destino, La promo quita ZOOM, Rentabilidad < X %, Más del doble de lo habitual y Sin peso (cada uno explica
+  para qué es al pasar el cursor). Ya no está «Pueden entrar» (casi todas pueden entrar a alguna campaña).
 
 **Editar** sirve para cambiar tus publicaciones **sin entrar a ML**, con una pantalla parecida a la de ML.
 
@@ -1396,7 +1404,7 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   (el % que más se repite entre tus promos vigentes, ej. 10%; no el más bajo, porque unas pocas promos de ML en 1-2%
   lo distorsionaban). Toda publicación con **más del doble** (más de 20% en ese ejemplo; si lo habitual es 5%, más de
   10%) sale con el descuento en rojo y «⚠ 30% es +200% sobre tu descuento habitual (10%)». El filtro rápido
-  **«⚠ Más del doble de lo habitual»** (aparece cuando hay alguna) las junta para revisarlas. Al **agregar** a una
+  **«Más del doble de lo habitual»** (dentro de «⚠ Para revisar», aparece cuando hay alguna) las junta para revisarlas. Al **agregar** a una
   campaña o cambiar el %, si alguna quedaría con más del doble de lo habitual o de otra promoción de esa misma
   publicación, sale un recuadro rojo «Ojo: más del doble de descuento» con el ejemplo, la fila marcada en rojo y una
   confirmación antes de mandarla.
@@ -1587,7 +1595,8 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   abren Cambiar stock (un cuadro por variante, directo a ML). Tocar una abre el editor; lo
   guardado va directo a ML y los cambios en lote van por la cola.
 - **Promociones:** campañas de ML, qué publicaciones entran y hasta dónde bajar; antes de entrar, la rentabilidad al
-  precio de la promo y si mantiene el envío gratis. **+ Campaña propia**.
+  precio de la promo y si mantiene el envío gratis. **+ Campaña propia**. Filtros: Todas · En promoción · Sin promoción ·
+  ⚠ Para revisar (adentro, los problemas que tienen algo). **Tus campañas vencidas** (plegada): Volver a crear o Quitar de la lista.
 - **Stock vs inventario** (Publicaciones): cada producto con todas sus publicaciones; arriba Vende de más (urgente),
   Tienes y no vendes y Por ajustar. **Poner en ML** cambia la publicación; **Corregir stock** cambia el inventario.
   **🔗 N vínculos** abre Vincular de ese producto en un panel, sin salir. Más de 10 a la vez van por la cola. Por publicación, también en Mis publicaciones. «⚠ Desde N u. pierde envío gratis»
