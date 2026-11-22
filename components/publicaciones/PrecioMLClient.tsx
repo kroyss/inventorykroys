@@ -52,6 +52,7 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
   const [pagina, setPagina] = useState(0)
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set())
   const [confirmar, setConfirmar] = useState(false)
+  const [verRestaurar, setVerRestaurar] = useState(false)
   const [releyendo, setReleyendo] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
 
@@ -145,11 +146,21 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
       </div>}
 
       {restaurar.length > 0 && (
-        <section className="rounded-xl border border-amber-300 bg-amber-50 p-3">
-          <p className="text-sm font-semibold text-amber-900">Por restaurar: {restaurar.length} publicaci{restaurar.length === 1 ? 'ón perdió sus' : 'ones perdieron sus'} promociones al cambiar el precio</p>
-          <p className="mt-0.5 text-xs text-amber-800">Vuelve a meterlas desde Promociones (revisa el descuento: el precio cambió). Salen de aquí solas al volver a la campaña, o con «Ya la revisé».</p>
-          <ul className="mt-2 divide-y divide-amber-200">
-            {restaurar.slice(0, 30).map(x => (
+        // 22-11 (el dueño: «me salen muchas por restaurar»): un aviso corto con la cantidad; la lista se abre a pedido.
+        <section className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-amber-900">
+              <span className="font-semibold">⚠ {restaurar.length} publicaci{restaurar.length === 1 ? 'ón quedó' : 'ones quedaron'} sin sus promociones</span>
+              <span className="text-amber-800"> · vuelve a meterlas desde Promociones (el precio cambió: revisa el descuento)</span>
+            </p>
+            <button onClick={() => setVerRestaurar(v => !v)} aria-expanded={verRestaurar}
+              className="shrink-0 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100">
+              {verRestaurar ? 'Ocultar' : 'Ver cuáles'}</button>
+          </div>
+          {verRestaurar && <>
+          <p className="mt-1 text-xs text-amber-800">Salen de aquí solas al volver a la campaña, o con «Ya la revisé».</p>
+          <ul className="mt-1 max-h-80 divide-y divide-amber-200 overflow-y-auto">
+            {restaurar.map(x => (
               <li key={`${x.lote_id}:${x.item_id}`} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 text-sm">
                   <p className="truncate font-medium text-neutral-900">{x.titulo ?? x.item_id}</p>
@@ -162,6 +173,7 @@ export default function PrecioMLClient({ inicial, buscarInicial = '' }: { inicia
               </li>
             ))}
           </ul>
+          </>}
         </section>
       )}
 
