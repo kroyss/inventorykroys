@@ -916,7 +916,8 @@ días, para intentar que las cambien.
   venta** y hasta **30 días** después de recibirla. Tienes que estar dentro de ML con esa cuenta.
 - Después el comprador tiene unos **5 días** para responder; si no responde, ML la quita.
 - **Contradictoria:** el comprador dijo que la venta SÍ se concretó y tú marcaste que NO. Se arregla corrigiendo tu
-  calificación.
+  calificación. Si es al revés (tú dijiste SÍ y el comprador NO) no aparece: MercadoLibre Venezuela deja mejorar una
+  calificación pero no empeorarla, la venta ya quedó concretada y cobrada.
 - Abajo ves cómo terminaron los pedidos de cambio de los últimos 90 días.
 
 ---
@@ -1045,8 +1046,10 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   Reportes → Ventas → Por producto con esas fechas); a la derecha **Por cuenta de MercadoLibre** (ventas, «antes N» y el
   monto en **$**; en VE, los Bs pasados a $ con la tasa oficial de cada día y al lado los Bs), **Atención en MercadoLibre** (preguntas, tiempo de respuesta, cuántas respondió la
   IA, ventas por pregunta) y **Calificaciones** (con 1 o 3 cuentas va como tarjeta al lado de la última cuenta; con 2 o 4, en
-  una línea abajo; las negativas y contradictorias se marcan solo si hay;
-  lleva a Reputación). Ganancia y costos solo con el permiso de costos.
+  una línea abajo; las negativas y contradictorias se marcan solo si hay. **Cada número lleva a su lista** en
+  Calificaciones → Me calificaron: neutrales, negativas o contradictorias, filtradas, con «Ver todas»; positivas y el
+  título, a la página completa con el termómetro. Contradictorias cuenta solo las que se pueden corregir: el comprador
+  dijo SÍ y tú NO; al revés MercadoLibre ya la dio por concretada y no se puede cambiar). Ganancia y costos solo con el permiso de costos.
   **Inicio sin el permiso de costos** (empleado): el mismo bloque de arriba (Ventas, Compras, Inventario y tasa, con
   lo que su usuario puede hacer); el bono (si lo ve); **Ventas
   del mes** (cuántas van sumadas día a día, en azul, con el ▲▼ contra el mes pasado a la fecha y en gris cómo iban los

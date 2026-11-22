@@ -58,7 +58,8 @@ export async function GET(req: NextRequest) {
                 COUNT(*) FILTER (WHERE cal_recibida = 'neutral' AND ${ENTRE('cal_recibida_at', 1, 2)})::int AS neutrales,
                 COUNT(*) FILTER (WHERE cal_recibida = 'negative' AND ${ENTRE('cal_recibida_at', 1, 2)})::int AS negativas,
                 COUNT(*) FILTER (WHERE cal_recibida = 'negative' AND ${ENTRE('cal_recibida_at', 3, 4)})::int AS antes_negativas,
-                COUNT(*) FILTER (WHERE cal_contradictoria AND ${ENTRE('cal_recibida_at', 1, 2)})::int AS contradictorias
+                -- 21-11: la misma regla que Reputación: el comprador dice que SÍ se concretó y nosotros que NO (al revés ML la cobra igual y no se puede cambiar)
+                COUNT(*) FILTER (WHERE cal_contradictoria AND cal_recibida_concretada AND ${ENTRE('cal_recibida_at', 1, 2)})::int AS contradictorias
          FROM ml_ordenes WHERE ${SQL_NO_PRACTICA_DEMO('id')} AND (${ENTRE('cal_recibida_at', 1, 2)} OR ${ENTRE('cal_recibida_at', 3, 4)})`, P).then(x => x.rows[0]) : null,
       // ¿Las ventas de ML guardadas (~120 días) llegan al inicio del período anterior?
       ml ? db.query(`SELECT MIN(fecha) <= $1::date AS alcanza FROM ml_ordenes`, [r.antesDesde]).then(x => !!x.rows[0]?.alcanza) : false,

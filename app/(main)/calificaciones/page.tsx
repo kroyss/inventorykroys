@@ -17,7 +17,7 @@ export const metadata = { title: 'Calificaciones' }
 // Automatizaciones → Calificaciones (módulo `preguntas`), con dos vistas:
 //   - Calificar ventas (por defecto): las que calificamos nosotros, en bloque. Los textos los edita el admin.
 //   - Me calificaron (?ver=recibidas): la Reputación (lib/reputacionML.ts), lo que nos dieron los compradores.
-export default async function CalificacionesPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+export default async function CalificacionesPage({ searchParams }: { searchParams: Promise<{ ver?: string; tipo?: string }> }) {
   const session = await getServerSession(authOptions)
   if (!tieneModulo(session?.user, 'preguntas') || !puede(session?.user, 'ver_calificaciones')) redirect('/automatizaciones')
   if (await sinCuentasML(session!)) {
@@ -26,13 +26,16 @@ export default async function CalificacionesPage({ searchParams }: { searchParam
         'Tu termómetro de MercadoLibre, con aviso en rojo por cada negativa y en naranja por cada neutral.',
         'Los 30 días que tienes para pedirle al comprador que la cambie, contados para cada una.']} />
   }
-  const recibidas = (await searchParams).ver === 'recibidas'
+  const sp = await searchParams
+  const recibidas = sp.ver === 'recibidas'
+  // 21-11: desde el Inicio cada número de Calificaciones llega filtrado (?tipo=neutrales|negativas|contradictorias).
+  const tipo = ['neutrales', 'negativas', 'contradictorias'].includes(sp.tipo ?? '') ? sp.tipo as 'neutrales' | 'negativas' | 'contradictorias' : null
   // 12-11 (rapidez): la primera carga viene en el HTML (mismo GET de la API).
   const inicial = recibidas ? await deApi(() => reputacion(), '/api/reputacion') : await deApi(calificaciones, '/api/calificaciones?vista=listas')
   return (
     <div className="space-y-3">
       <VistasCalificaciones recibidas={recibidas} />
-      {recibidas ? <ReputacionClient inicial={inicial} /> : <CalificacionesClient inicial={inicial} isAdmin={puede(session!.user, 'automatizaciones_config')}
+      {recibidas ? <ReputacionClient key={tipo ?? 'todas'} inicial={inicial} tipo={tipo} /> : <CalificacionesClient inicial={inicial} isAdmin={puede(session!.user, 'automatizaciones_config')}
         despachaVE={session!.user.country === 'VE' && tieneModulo(session!.user, 'despachos')} />}
     </div>
   )
