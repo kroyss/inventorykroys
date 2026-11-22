@@ -266,7 +266,11 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
     sin_peso: v => v.envio.estado === 'sin_peso',
   }
   const q = buscar.trim().toLowerCase()
-  const lista = base.filter(filtros[filtro]).filter(v => !q || v.titulo.toLowerCase().includes(q) || v.id.toLowerCase().includes(q) || (v.producto ?? '').toLowerCase().includes(q))
+  // 22-11 (Precio vs sistema → «Por restaurar»): varios códigos MLV… separados por coma o espacio = esas publicaciones.
+  const ids = q.split(/[\s,]+/).filter(Boolean)
+  const varios = ids.length > 1 && ids.every(x => /^ml[a-z]\d+$/.test(x)) ? new Set(ids) : null
+  const lista = base.filter(filtros[filtro]).filter(v => !q || (varios ? varios.has(v.id.toLowerCase())
+    : v.titulo.toLowerCase().includes(q) || v.id.toLowerCase().includes(q) || (v.producto ?? '').toLowerCase().includes(q)))
   const visibles = lista.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
   const toggle = (k: string) => setSel(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
   // Con una campaña elegida, las que YA están en ella no se seleccionan (no hay nada que agregar).

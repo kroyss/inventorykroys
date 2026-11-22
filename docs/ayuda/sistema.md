@@ -631,7 +631,7 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   al mandar. «Elegir las N de este filtro» no toma las que están en promo, los combos ni las «No sincronizar» (esas se
   eligen a mano). **En promo:** avisa que pierden TODAS sus promociones: primero se sacan de cada una, después se cambia
   el precio (si alguna no sale, el precio no se toca). Quedan en **Por restaurar**: arriba sale un aviso corto con la cantidad y «Ver cuáles» abre la lista con las promociones que
-  tenían, hasta volver a esa campaña o tocar «Ya la revisé»; **Abrir en Promociones** las lleva a meterlas de nuevo
+  tenían, hasta volver a esa campaña o tocar «Ya la revisé»; se eligen (o «Elegir todas») y **Abrir en Promociones (N)** las abre TODAS juntas allá para meterlas de nuevo
   (revisa el descuento: el precio cambió). **Volver a leer de ML** trae los precios de ML al momento. Tocar el **producto**
   abre su ficha en Productos (pestaña nueva) y tocar el **precio en ML** abre la publicación encima de la lista, sin salir.
 - **Vincular** y **Pesos y envío gratis** (antes en «Preparar»): se abren desde los botones de Mis publicaciones o

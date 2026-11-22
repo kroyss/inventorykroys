@@ -110,7 +110,7 @@ export default async function PromocionesPage({ searchParams }: { searchParams: 
       pesosAl={pesosAl}
       conPagosME={tieneModulo(session.user, 'pagos_me')}
       historial={acciones.slice(0, 60) as AccionHecha[]}
-      buscarInicial={buscar?.slice(0, 80) ?? ''}
+      buscarInicial={buscar?.slice(0, 3000) ?? ''}
     />
   </>)
 }
