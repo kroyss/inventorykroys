@@ -253,6 +253,11 @@ export async function borradorPrueba(db: Pool, pack: string) {
   return b ?? null
 }
 
+/** 22-11 (el dueño: «borra lo viejo, pon los datos nuevos desde la última implantación»): IA en prueba mide desde la subida
+ *  de Mensajes v2. Lo viejo que nunca se mandó se borró; lo viejo que SÍ se mandó queda en la base (dice «Respondió la IA»
+ *  y le marca a la IA qué no copiar), pero ya no sale aquí. En la próxima versión: mover esta fecha. */
+export const PRUEBA_MENSAJES_DESDE = '2026-11-21T19:19:00-04:00'
+
 /** Para Mensajes → IA en prueba: los casos con lo que respondió el equipo después, y el resumen. */
 export async function listaPrueba(db: Pool) {
   const { rows } = await db.query(
@@ -264,7 +269,8 @@ export async function listaPrueba(db: Pool) {
      FROM ml_mensajes_ia i
      LEFT JOIN ml_conversaciones c ON c.pack_id = i.pack_id
      LEFT JOIN ml_conexiones x ON x.id = i.conexion_id
-     ORDER BY i.mensaje_at DESC LIMIT 300`)
+     WHERE i.creado_at >= $1::timestamptz
+     ORDER BY i.mensaje_at DESC LIMIT 300`, [PRUEBA_MENSAJES_DESDE])
   // Publicaciones que se contradicen (fotos / ficha / descripción, mig 146). 09-11: primero las que más preguntas
   // reciben (90 días), para corregir las que importan; se resuelven desde la lista (api/mensajes/ia-prueba/contradiccion).
   const { rows: contradicciones } = await db.query(
