@@ -19,6 +19,8 @@ export const NUEVOS = {
   manual_automatizaciones: '2026-12-18',
   // 22-11: Configuración en Mensajes (Al recibir compra con hasta 2 mensajes, Mi IA, Respuestas rápidas, Datos, IA en prueba).
   config_mensajes: '2026-12-22',
+  // 22-11: Publicaciones → Precio vs sistema (solo SolucionesMC).
+  precio_vs_ml: '2026-12-22',
 } as const
 export type ClaveNuevo = keyof typeof NUEVOS
 

@@ -18,7 +18,7 @@ import PendientesPreparar from '@/components/productos/PendientesPreparar'
 export const RUTAS_PUBLICACIONES = ['/publicaciones', '/vincular-ml', '/inventario/stock-ml', '/productos/promociones', '/productos/mercadoenvios']
 export const enPublicaciones = (pathname: string) => RUTAS_PUBLICACIONES.some(r => pathname === r || pathname.startsWith(r + '/'))
 
-export type PestanaML = 'editar' | 'vincular' | 'stock' | 'promociones' | 'envios' | 'tareas'
+export type PestanaML = 'editar' | 'vincular' | 'stock' | 'precios' | 'promociones' | 'envios' | 'tareas'
 type UsuarioML = { role?: UserRole; permisos?: string[]; modulos?: string[]; country?: string }
 
 /** Lo que este usuario puede abrir, en el orden del menú (el primero es adonde lleva «Publicaciones»). */
@@ -28,6 +28,9 @@ export function pestanasML(user: UsuarioML) {
   if (tieneModulo(user, 'publicaciones') && tieneModulo(user, 'preguntas') && puede(user, 'editar_publicaciones')) p.push({ k: 'editar', t: 'Mis publicaciones', href: '/publicaciones' })
   if (user.country === 'VE' && tieneModulo(user, 'promociones') && puede(user, 'promociones') && puede(user, 'ver_productos')) p.push({ k: 'promociones', t: 'Promociones', href: '/productos/promociones' })
   if (tieneModulo(user, 'inventario') && tieneModulo(user, 'preguntas') && puede(user, 'ver_inventario')) p.push({ k: 'stock', t: 'Stock vs inventario', href: '/inventario/stock-ml' })
+  // 22-11 (el dueño): precio de lista en ML contra el precio con exceso del sistema. Módulo precio_vs_ml (solo SolucionesMC).
+  if (user.country === 'VE' && tieneModulo(user, 'precio_vs_ml') && tieneModulo(user, 'inventario') && tieneModulo(user, 'preguntas')
+      && tieneModulo(user, 'publicaciones') && puede(user, 'editar_publicaciones') && puede(user, 'ver_productos')) p.push({ k: 'precios', t: 'Precio vs sistema', href: '/publicaciones/precios' })
   // Preparar: Vincular y Pesos (MercadoEnvíos, 13-11 viene de Productos; 14-11 para toda empresa de Venezuela con Inventario).
   if (puede(user, 'vincular_ml') || (puede(user, 'ver_productos') && puede(user, 'importar_ml'))) p.push({ k: 'vincular', t: 'Vincular', href: '/vincular-ml' })
   if (user.country === 'VE' && tieneModulo(user, 'inventario') && puede(user, 'ver_productos')) p.push({ k: 'envios', t: 'Pesos y envío gratis', href: '/productos/mercadoenvios' })
@@ -64,6 +67,7 @@ export default function PublicacionesMLTabs({ user, actual }: { user: UsuarioML;
               {x.t}{x.k === 'stock' && <NumeritoAviso clave="vende_de_mas" className="ml-1.5" />}
               {!conMis && PREPARAR.includes(x.k) && <PendientesPreparar de={x.k === 'vincular' ? 'sinVincular' : 'sinPeso'} />}
               {x.k === 'editar' && actual !== 'editar' && !enPreparar && <Nuevo clave="mis_publicaciones" />}
+              {x.k === 'precios' && <Nuevo clave="precio_vs_ml" />}
             </Link>
           ))}
         </nav>

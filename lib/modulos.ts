@@ -63,6 +63,8 @@ export const MODULOS = {
   // 08-11 (migración 153): Ventas → Presupuestos (cotización imprimible; aceptado → venta) y Reportes → Resumen.
   presupuestos:       'Presupuestos: cotizaciones imprimibles con logo (cliente, productos, validez); aceptado se pasa a venta (Ventas)',
   metricas:           'Métricas: en el Inicio, con el período del gráfico contra el anterior: más vendidos, cuentas de ML, atención y calificaciones',
+  // 22-11 (migración 195): Publicaciones → «Precio vs sistema». En prueba solo SolucionesMC.
+  precio_vs_ml:       'Precio vs sistema: el precio de cada publicación de ML contra el precio con exceso del sistema, y ponerlo en ML por la cola (VE, con inventario)',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -90,6 +92,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/productos/mercadoenvios': 'inventario',   // 14-11: los pesos son para todos (antes Descuento ML)
   '/productos/margenes':      'descuento_ml',
   '/productos/promociones':   'promociones',
+  '/publicaciones/precios':   'precio_vs_ml',
   '/productos/catalogo':      'catalogo_pdf',
   '/ventas/presupuestos':     'presupuestos',
 }
