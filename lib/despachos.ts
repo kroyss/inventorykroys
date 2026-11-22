@@ -245,6 +245,8 @@ export interface EtiquetaValidada {
   no_concretada?: boolean
   /** Sin inventario: marcada "Ya la despaché por fuera" en Pagos ME (mig 120): no se vuelve a despachar. */
   fuera?: boolean
+  /** Con las ventas de ML (22-11): la venta está registrada en Ventas (con inventario = se descontó del stock). */
+  registrada?: boolean
   estado: EstadoEtiqueta
   detalle: string | null
 }
@@ -267,6 +269,8 @@ const SQL_DESDE_ML = `
          COALESCE(NULLIF(o.comprador_nombre, ''), (SELECT NULLIF(TRIM(c.comprador_nombre), '') FROM ml_conversaciones c
            WHERE c.pack_id = COALESCE(o.pack_id, o.id) LIMIT 1)) AS comprador_nombre,
          o.id::text AS orden_ml, o.no_concretada_at IS NOT NULL AS no_concretada, o.fuera_at IS NOT NULL AS fuera,
+         -- 22-11: ¿se registró en Ventas? (con inventario, si no, no se descontó del stock; Despachos lo avisa).
+         EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (e.venta, o.id::text, o.pack_id::text)) AS registrada,
          COALESCE((
            SELECT JSON_AGG(JSON_BUILD_OBJECT(
                     'product_name', (d->>'titulo') || COALESCE(' (' || (d->>'variante') || ')', ''),
@@ -356,7 +360,7 @@ async function conPagosME(db: Pool, loteId: number, etiquetas: EtiquetaValidada[
     const pago = { verificacion: p.verificacion, forzado_por: p.forzado_por ?? null }
     if (IMPRIMIBLE[e.estado] && !e.impresa && p.verificacion !== 'valido' && !p.forzado_por) {
       return { ...e, pago, estado: 'PAGO' as const,
-        detalle: p.verificacion === 'invalido' ? 'El pago se marcó INVÁLIDO en Pagos ME' : 'El pago no está verificado en Pagos ME' }
+        detalle: p.verificacion === 'invalido' ? 'El pago se marcó INVÁLIDO en Pagos ME' : 'Revisa el pago y márcalo como correcto antes de imprimir' }
     }
     return { ...e, pago }
   })

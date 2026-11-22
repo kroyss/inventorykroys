@@ -33,6 +33,8 @@ interface Etiqueta {
   items: { product_name: string; quantity: number; notes: string | null }[]
   // Pagos MercadoEnvíos (solo la empresa de la plataforma): pago traído del portal
   pago?: { verificacion: 'pendiente' | 'valido' | 'invalido'; forzado_por: string | null } | null
+  /** Con las ventas de ML: si la venta está registrada en Ventas (22-11: con inventario, si no, no se descontó del stock). */
+  registrada?: boolean
   reimprimir?: boolean        // 12-11: «Reimprimir igual» pedido (la guía ya salió en otro lote)
   impresa?: boolean
   estado: Estado
@@ -74,7 +76,7 @@ const ESTADO_UI: Record<Estado, { label: string; cls: string }> = {
   SIN_PRODUCTOS: { label: 'Sin productos',    cls: 'bg-red-100 text-red-800' },
   DUPLICADA:     { label: 'Duplicada',        cls: 'bg-red-100 text-red-800' },
   YA_IMPRESA:    { label: 'Ya impresa',       cls: 'bg-red-100 text-red-800' },
-  PAGO:          { label: 'Pago sin verificar', cls: 'bg-amber-100 text-amber-800' },
+  PAGO:          { label: 'Falta confirmar el pago', cls: 'bg-amber-100 text-amber-800' },
 }
 
 // Sin inventario las ventas salen de MercadoLibre: los mismos estados, dichos para ese caso.
@@ -119,7 +121,7 @@ const esPdf = (f: File) => f.type === 'application/pdf' || f.name.toLowerCase().
 /** 12-11 (rapidez): lo de la primera carga que viene en el HTML (cada parte null = la pide el navegador). */
 export interface DespachosInicial { ov: Overview | null; lotes: LoteDetalle[] | null; espera: Apartado[] | null; primera: { hoy: string; envios: never[] } | null }
 
-export default function DespachosClient({ isAdmin, reportador, desdeML = false, inicial = null }: { isAdmin: boolean; reportador: boolean; desdeML?: boolean; inicial?: DespachosInicial | null }) {
+export default function DespachosClient({ isAdmin, reportador, desdeML = false, conInventario = false, inicial = null }: { isAdmin: boolean; reportador: boolean; desdeML?: boolean; conInventario?: boolean; inicial?: DespachosInicial | null }) {
   const confirm = useConfirm()
   const [data, setData]         = useState<Overview | null>(null)
   const [lotes, setLotes]       = useState<Record<number, LoteDetalle>>({})
@@ -424,7 +426,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false, 
       <Dropzone onFiles={f => subir(f, loteDestino)} busy={busy === 'subir'} agregaALote={loteDestino} />
 
       {pendientes.map(l => (
-        <LotePendiente key={l.id} lote={l} busy={busy} desdeML={desdeML}
+        <LotePendiente key={l.id} lote={l} busy={busy} desdeML={desdeML} conInventario={conInventario}
           impresion={impresion} onImpresion={isAdmin ? cambiarImpresion : undefined}
           formato={formato} onFormato={setFormato}
           onNota={(e, nota) => patchEtiqueta(l.id, e, { nota })}
@@ -650,9 +652,11 @@ function NotaEditable({ e, onGuardar }: { e: Etiqueta; onGuardar: (nota: string 
 }
 
 // ── Lote pendiente (revisión antes de generar) ──────────────────────────────
-function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, formato, onFormato, onNota, onToggle, onForzarPago, onReimprimir, onQuitar, onApartar, onRevalidar, onAgregar, onGenerar, onDescartar }: {
+function LotePendiente({ lote, busy, desdeML, conInventario, impresion, onImpresion, formato, onFormato, onNota, onToggle, onForzarPago, onReimprimir, onQuitar, onApartar, onRevalidar, onAgregar, onGenerar, onDescartar }: {
   lote: LoteDetalle
   desdeML: boolean
+  /** 22-11: lleva inventario (con las ventas de ML avisa las que no se registraron = no se descontaron del stock). */
+  conInventario: boolean
   impresion: Impresion
   onImpresion?: (cambio: Partial<Impresion>) => void
   formato: Formato
@@ -785,6 +789,20 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, formato, o
                         title="Volver a la venta para corregir productos, cantidades o la nota">
                         Editar venta →
                       </a>
+                    )}
+                    {/* 22-11 (bug SHOPIT_VE): decir DÓNDE se confirma el pago. Con las ventas de ML, la lista de Pagos ME
+                        (Automatiza); con las registradas, Ventas → Por confirmar. Abre la lista ya filtrada por la venta. */}
+                    {e.estado === 'PAGO' && e.venta && (
+                      <a href={desdeML ? `/pagos-me?buscar=${encodeURIComponent(e.venta)}` : `/ventas?vista=confirmar&buscar=${encodeURIComponent(e.venta)}`}
+                        className="mt-1 block font-medium text-sky-700 hover:underline" title="Revisar el pago y marcarlo como correcto">
+                        Confirmar pago →
+                      </a>
+                    )}
+                    {/* 22-11: con inventario y las ventas de ML se imprime sin registrar la venta: avisar que no se descontó. */}
+                    {desdeML && conInventario && e.registrada === false && !e.impresa && !e.apartado && e.venta && (
+                      <div className="mt-0.5 text-neutral-500" title="Regístrala desde Pagos ME o Ventas → Por confirmar para que se descuente del inventario">
+                        Venta no registrada: no se descontó del stock
+                      </div>
                     )}
                     {/* Pagos ME: despachar con el pago sin verificar queda registrado (quién). */}
                     {e.estado === 'PAGO' && (
