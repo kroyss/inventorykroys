@@ -7,6 +7,8 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
 import { DIA_AUTO_NO_CONCRETADA, MAX_DIAS_NO_CONCRETADA, ML_CONCRETA_SOLA_DIAS, diasParaConcretarSola } from '@/lib/noConcretada'
 import { useAlActualizar } from '@/lib/useAlActualizar'
+import CalificarVenta, { MOTIVOS, TIPOS, etiquetaTipo, plantillaDe, type TipoCal } from '@/components/preguntas/CalificarVenta'
+import { Nuevo } from '@/components/ui/Nuevo'
 
 interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
@@ -23,10 +25,12 @@ interface Orden {
   sin_traer?: boolean   // no se buscaron los pagos desde la venta
   enlazada_local?: boolean; numero_venta?: string   // mig 165: enlazada a una venta LOCAL (con inventario)
   chat?: { at: string; comprador: boolean | null } | null   // último mensaje de la venta (y si fue del comprador)
+  duplicada_de?: string | null   // 23-11: posible compra duplicada (la gemela del mismo día sí se concretó)
 }
 interface Plantillas {
   concretada: { rating: string; mensaje: string }
   noConcretada: { rating: string; motivo: string; mensaje: string; dias: number }
+  noConcretadaOk: { rating: string; motivo: string; mensaje: string }
   esperaDias: number
   auto: boolean
   hora?: number
@@ -45,7 +49,7 @@ interface Datos {
   autoUltimo: { fecha: string; estado: string; at?: string; calificadas?: number; errores?: number; quitadas?: number } | null
   autoNcUltimo?: { fecha: string; estado: string; at?: string; calificadas?: number; errores?: number; quitadas?: number } | null
 }
-type Tipo = 'concretada' | 'no_concretada'
+type Tipo = TipoCal
 /** 'YYYY-MM-DD' → 'dd/mm' (sin pasar por Date: no se corre un día). */
 const diaMes = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
 
@@ -53,6 +57,7 @@ const RATING: Record<string, string> = { positive: 'positiva', neutral: 'neutral
 
 /** La sugerencia de cada venta; si el comprador dijo que SÍ se concretó, se sigue eso (22-10). */
 const sugeridaDe = (o: Orden): Tipo => o.cal_recibida_concretada === true ? 'concretada'
+  : o.duplicada_de ? 'no_concretada_ok'   // 23-11: la compra repetida (la otra se concretó): «sin problema»
   : (o.sugerencia === 'esperar' || o.sugerencia === 'revisar' ? 'concretada' : o.sugerencia)
 
 /** "Te calificó: Concretada · Positiva — 'comentario'" (verde / gris / rojo según la calificación). */
@@ -76,13 +81,6 @@ function LoQueDijo({ o, leyendo }: { o: Orden; leyendo: boolean }) {
     </div>
   )
 }
-const MOTIVOS: Record<string, string> = {
-  BUYER_NOT_ENOUGH_MONEY: 'El comprador no pagó / no tenía el dinero',
-  BUYER_REGRETS: 'El comprador se arrepintió',
-  THEY_DIDNT_ANSWER: 'El comprador no respondió',
-  OUT_OF_STOCK: 'No tenía el producto (sin stock)',
-  THEY_NOT_HONORING_POLICIES: 'El comprador no respetó las condiciones',
-}
 
 /** Calificaciones en bloque: ventas de ML sin calificar, cruzadas con el sistema. */
 export default function CalificacionesClient({ isAdmin, despachaVE = false, inicial = null }: { isAdmin: boolean; despachaVE?: boolean
@@ -98,6 +96,7 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
   const [corriendo, setCorriendo] = useState(false)
   const [progreso, setProgreso] = useState<{ hechas: number; total: number; errores: string[]; quitadas: string[] } | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [ya, setYa] = useState<Orden | null>(null)   // 23-11: «Calificar ya» de Próximas
   const parar = useRef(false)
 
   const primera = usePrimera(inicial as Datos | null)
@@ -155,8 +154,7 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
     const ok = await confirm({
       title: `Calificar ${aCalificar.length} ventas`,
       message: `Es público en MercadoLibre y no se puede deshacer desde aquí.\n\n` +
-        (n('concretada') ? `• ${n('concretada')} concretadas → ${RATING[p.concretada.rating]}: "${p.concretada.mensaje}"\n` : '') +
-        (n('no_concretada') ? `• ${n('no_concretada')} no concretadas → ${RATING[p.noConcretada.rating]}: "${p.noConcretada.mensaje}"` : ''),
+        TIPOS.filter(t => n(t.k)).map(t => `• ${n(t.k)} ${t.titulo.toLowerCase()} → ${RATING[plantillaDe(p, t.k).rating]}: "${plantillaDe(p, t.k).mensaje}"`).join('\n'),
       confirmText: 'Calificar',
     })
     if (!ok) return
@@ -199,13 +197,16 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
             {datos.conReportador ? <>{datos.desdeML ? ' y ya la reportaste' : ' y, si lleva guía, ya la reportaste'} (Reportador); la espera cuenta desde el reporte</> : ''}.</li>
           <li><b className="font-medium text-neutral-800">No concretada</b>: {datos.desdeML ? 'cancelada en MercadoLibre, o ' : ''}sin {datos.desdeML ? 'guía' : 'cargar'} después de {datos.plantillas.noConcretada.dias} días.</li>
           <li><b className="font-medium text-neutral-800">Revisar</b>: el sistema no puede saberlo{datos.conReportador ? ` (la guía se imprimió pero a los ${datos.topeDias ?? 10} días no se reportó)` : ''}{datos.pagosME ? ', o no buscaste los pagos (Traer pagos y guías) después de la venta' : ''}: decides tú. Puedes cambiar cada una antes de calificar.</li>
-          {datos.plantillas.esperaDias ? <li><b className="font-medium text-neutral-800">Próximas</b>: ya se sabe cómo calificarlas, pero están en tu espera de {datos.plantillas.esperaDias} día{datos.plantillas.esperaDias === 1 ? '' : 's'}{datos.conReportador ? ' desde que se reportó la guía' : ' desde la compra'}. No tienes que hacer nada.</li> : null}
+          {datos.plantillas.esperaDias ? <li><b className="font-medium text-neutral-800">Próximas</b>: ya se sabe cómo calificarlas, pero están en tu espera de {datos.plantillas.esperaDias} día{datos.plantillas.esperaDias === 1 ? '' : 's'}{datos.conReportador ? ' desde que se reportó la guía' : ' desde la compra'}. No tienes que hacer nada; si ya lo recibió, «Calificar ya».</li> : null}
+          <li><b className="font-medium text-neutral-800">No concretada · sin problema</b>: no se concretó pero el comprador no hizo nada malo (compra duplicada, anulada de acuerdo). Solo a mano. Si es la misma compra repetida el mismo día, se sugiere sola. También puedes calificar una venta desde Mensajes.</li>
           {(datos.plantillas.auto || datos.plantillas.autoNoConcretada) && <li><b className="font-medium text-neutral-800">Automática</b>:{' '}
             {datos.plantillas.auto ? <>todos los días desde las {horaTxt(datos.plantillas.hora)} se califican solas las concretadas</> : <>las concretadas las calificas tú</>}
             {datos.plantillas.autoNoConcretada ? <>, y el día {DIA_AUTO_NO_CONCRETADA} desde las {horaTxt(datos.plantillas.horaNc)} las no concretadas que se te pasaron.</> : <>; las no concretadas esperan que las revises.</>}</li>}
         </PanelInfo>
       )}
       {aviso && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{aviso}</div>}
+      {ya && datos && <CalificarVenta ventas={[ya]} plantillas={datos.plantillas} comprador={ya.comprador} verEnCalificaciones={false}
+        onCerrar={() => setYa(null)} onListo={() => { cargar() }} />}
 
       <Tabs value={vista} onChange={setVista} items={[
         { value: 'listas', label: 'Por calificar', count: datos ? datos.contadores.concretadas + datos.contadores.no_concretadas + (datos.contadores.revisar ?? 0) : undefined },
@@ -216,7 +217,8 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
         ...(isAdmin ? [{ value: 'config' as const, label: 'Configuración' }] : []),
       ]} />
 
-      {!datos ? <Cargando /> : vista === 'config' ? <Configuracion plantillas={datos.plantillas} desdeML={!!datos.desdeML} onGuardado={cargar} /> : (
+      {!datos ? <Cargando /> : vista === 'config' ? <Configuracion plantillas={datos.plantillas} desdeML={!!datos.desdeML} conReportador={!!datos.conReportador}
+        onGuardado={pl => setDatos(d => d && { ...d, plantillas: pl })} /> : (
         <>
           {(datos.plantillas.auto || datos.plantillas.autoNoConcretada) && vista === 'listas' && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900"
@@ -378,11 +380,17 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
                         <td className="px-3 py-2">
                           {o.en_espera ? null : <select value={elegidas[o.id] ?? ''} onChange={e => setElegidas(x => ({ ...x, [o.id]: (e.target.value || null) as Tipo | null }))}
                             className={`border rounded-lg px-2 py-1 text-xs ${elegidas[o.id] === 'concretada' ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                              : elegidas[o.id] === 'no_concretada' ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-neutral-300'}`}>
-                            <option value="concretada">Concretada · {RATING[datos.plantillas.concretada.rating]}</option>
-                            <option value="no_concretada">No concretada · {RATING[datos.plantillas.noConcretada.rating]}</option>
+                              : elegidas[o.id] === 'no_concretada' ? 'border-amber-300 bg-amber-50 text-amber-900'
+                              : elegidas[o.id] === 'no_concretada_ok' ? 'border-sky-300 bg-sky-50 text-sky-900' : 'border-neutral-300'}`}>
+                            {TIPOS.map(t => <option key={t.k} value={t.k}>{etiquetaTipo(datos.plantillas, t.k)}</option>)}
                             <option value="">No calificar ahora</option>
                           </select>}
+                          {/* 23-11: misma compra repetida el mismo día (la otra sí se concretó): se sugiere «sin problema». */}
+                          {!o.en_espera && o.duplicada_de && (
+                            <p className="mt-1 max-w-[14rem] text-[11px] leading-snug text-sky-800" title={`La otra venta (${o.duplicada_de}) del mismo comprador y producto, ese mismo día, sí se concretó`}>
+                              🤝 Posible compra duplicada: la otra (…{o.duplicada_de.slice(-6)}) sí se concretó.
+                            </p>
+                          )}
                           {/* Lo contrario de lo que dijo el comprador queda "contradictoria" en ML. */}
                           {!o.en_espera && elegidas[o.id] && o.cal_recibida_concretada != null && (elegidas[o.id] === 'concretada') !== o.cal_recibida_concretada && (
                             <p className="mt-1 max-w-[14rem] text-[11px] leading-snug text-amber-700">
@@ -397,6 +405,12 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
                             {o.sugerencia === 'concretada' ? 'Concretada' : o.sugerencia === 'revisar' ? 'Revisar' : 'No concretada'}
                           </span>
                           <span className="text-neutral-500"> · {o.sugerencia === 'concretada' && datos.plantillas.auto ? 'se califica sola el' : 'pasa a Por calificar el'} {diaMes(o.lista_el)}</span>
+                          {/* 23-11: si el comprador ya lo recibió o retiró, no hay que esperar. */}
+                          <div className="mt-1.5">
+                            <button onClick={() => setYa(o)} className="inline-flex items-center rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-800 hover:border-neutral-400 hover:bg-neutral-50">
+                              Calificar ya<Nuevo clave="calificar_mensajes" />
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -411,113 +425,203 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
   )
 }
 
-function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Plantillas; desdeML: boolean; onGuardado: () => void }) {
+
+/** ⓘ que se toca (también en el celular): abre su texto debajo de la fila (no un globo que se sale de la pantalla). */
+function BotonTip({ abierto, onClick, etiqueta }: { abierto: boolean; onClick: () => void; etiqueta: string }) {
+  return (
+    <button type="button" onClick={onClick} aria-expanded={abierto} aria-label={etiqueta} title={etiqueta}
+      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold leading-none ${abierto ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 text-neutral-500 hover:border-neutral-500 hover:text-neutral-800'}`}>i</button>
+  )
+}
+function Interruptor({ on, onCambio, etiqueta }: { on: boolean; onCambio: (v: boolean) => void; etiqueta: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={etiqueta} onClick={() => onCambio(!on)}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 ${on ? 'bg-emerald-500' : 'bg-neutral-300'}`}>
+      <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : 'translate-x-0.5'}`} />
+    </button>
+  )
+}
+
+type Fila = 'concretada' | 'no_concretada' | 'no_concretada_ok' | 'cuando_c' | 'cuando_nc'
+const TOPE_DIAS_TXT = 10
+
+/** 23-11 (el dueño: «no quiero saturar»): dos bloques compactos. 1) Mensajes de calificación: una línea por tipo con
+ *  «Editar» que la abre en su lugar. 2) Cuándo y automático: una fila por caso con sus interruptores. Lo explicativo va
+ *  en ⓘ y el aviso legal solo junto a lo automático prendido. Cada fila se guarda sola («✓ Guardado»). */
+function Configuracion({ plantillas, desdeML, conReportador, onGuardado }: {
+  plantillas: Plantillas; desdeML: boolean; conReportador: boolean; onGuardado: (p: Plantillas) => void
+}) {
   const [p, setP] = useState(plantillas)
-  const [msg, setMsg] = useState<string | null>(null)
-  const guardar = async () => {
+  const [editando, setEditando] = useState<TipoCal | null>(null)
+  const [borrador, setBorrador] = useState<{ rating: string; motivo: string; mensaje: string } | null>(null)
+  const [estado, setEstado] = useState<{ fila: Fila; ok: boolean; guardando?: boolean } | null>(null)
+  const [tip, setTip] = useState<string | null>(null)
+  const quitar = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const guardar = async (nuevo: Plantillas, fila: Fila) => {
+    const antes = p
+    setP(nuevo); setEstado({ fila, ok: true, guardando: true })
     const r = await fetch('/api/settings', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ calificaciones_plantillas: JSON.stringify(p) }),
-    })
-    setMsg(r.ok ? 'Guardado' : 'No se pudo guardar'); if (r.ok) onGuardado()
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ calificaciones_plantillas: JSON.stringify(nuevo) }),
+    }).catch(() => null)
+    if (!r?.ok) { setP(antes); setEstado({ fila, ok: false }); return false }
+    setEstado({ fila, ok: true }); onGuardado(nuevo)
+    if (quitar.current) clearTimeout(quitar.current)
+    quitar.current = setTimeout(() => setEstado(e => e?.fila === fila && e.ok ? null : e), 2500)
+    return true
   }
-  const sel = 'max-w-full min-w-0 border border-neutral-300 rounded-lg bg-white px-2 py-1.5 text-sm'
-  const num = 'w-16 border border-neutral-300 rounded-lg bg-white px-2 py-1.5 text-sm'
+  const guardado = (fila: Fila) => estado?.fila !== fila ? null
+    : estado.guardando ? <span className="text-xs text-neutral-400">Guardando…</span>
+    : estado.ok ? <span className="text-xs font-medium text-emerald-700">✓ Guardado</span>
+    : <span className="text-xs font-medium text-red-700">No se pudo guardar</span>
+  const tipBoton = (k: string) => <BotonTip abierto={tip === k} onClick={() => setTip(t => t === k ? null : k)} etiqueta="Más información" />
+  const tipTexto = (k: string, children: ReactNode) => tip !== k ? null
+    : <p className="mt-2 rounded-lg bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-600">{children}</p>
+
+  const sel = 'rounded-lg border border-neutral-300 bg-white px-2 py-1 text-sm'
   const horas = Array.from({ length: 17 }, (_, i) => i + 6).map(h => <option key={h} value={h}>{horaTxt(h)}</option>)
   const ratings = <><option value="positive">Positiva</option><option value="neutral">Neutral</option><option value="negative">Negativa</option></>
-  // 24-10 (pedido del dueño: "hasta para mí es enredado"): UN cuadro por caso con todo lo suyo, en el orden en que
-  // pasa: con qué texto → cuándo → si se hace sola. Antes eran 5 cuadros y los días de espera parecían de los dos.
-  const paso = (n: number, titulo: string, cuerpo: ReactNode) => (
-    <div className="flex gap-3">
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[11px] font-semibold text-white">{n}</span>
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <p className="text-sm font-medium text-neutral-900">{titulo}</p>
-        {cuerpo}
-      </div>
-    </div>
-  )
-  const caja = (verde: boolean) => `rounded-xl border shadow-sm p-4 space-y-4 ${verde ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`
+  const diasEspera = [...new Set([...Array.from({ length: 16 }, (_, i) => i), p.esperaDias])].sort((a, b) => a - b)
+  const plantilla = (t: TipoCal) => plantillaDe(p, t) as { rating: string; motivo?: string; mensaje: string }
+
+  const abrir = (t: TipoCal) => { const x = plantilla(t); setEditando(t); setBorrador({ rating: x.rating, motivo: x.motivo ?? 'BUYER_REGRETS', mensaje: x.mensaje }) }
+  const guardarTipo = async () => {
+    if (!editando || !borrador || !borrador.mensaje.trim()) return
+    const m = borrador.mensaje.trim().slice(0, 160)
+    const nuevo: Plantillas = editando === 'concretada' ? { ...p, concretada: { rating: borrador.rating, mensaje: m } }
+      : editando === 'no_concretada' ? { ...p, noConcretada: { ...p.noConcretada, rating: borrador.rating, motivo: borrador.motivo, mensaje: m } }
+      : { ...p, noConcretadaOk: { rating: borrador.rating, motivo: borrador.motivo, mensaje: m } }
+    if (await guardar(nuevo, editando)) setEditando(null)
+  }
+
+  const caja = 'rounded-xl border border-neutral-200 bg-white shadow-sm'
+  const legal = <p className="mt-2 text-[11px] leading-snug text-neutral-500">Las calificaciones son públicas y salen a tu nombre: con esto prendido se publican sin revisarlas una por una.</p>
+
   return (
-    <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-      <section className={caja(p.auto)}>
-        <div>
-          <h2 className="font-semibold text-neutral-900">✅ Ventas concretadas</h2>
-          <p className="text-xs text-neutral-500">Las que despachaste con <b>Despachos</b> y reportaste con <b>Reportador</b>{desdeML ? '' : ' (o que están en el sistema sin guía)'}.</p>
-        </div>
-        {paso(1, 'Calificación', <>
-          <select value={p.concretada.rating} onChange={e => setP({ ...p, concretada: { ...p.concretada, rating: e.target.value } })} className={sel}>{ratings}</select>
-          <input value={p.concretada.mensaje} maxLength={160} onChange={e => setP({ ...p, concretada: { ...p.concretada, mensaje: e.target.value } })}
-            className="w-full border border-neutral-300 rounded-lg bg-white px-3 py-2 text-sm" />
-        </>)}
-        {paso(2, 'Cuándo', <>
-          <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-700">
-            <input type="number" min={0} max={60} value={p.esperaDias}
-              onChange={e => setP({ ...p, esperaDias: Math.max(0, Math.min(60, Math.round(Number(e.target.value) || 0))) })} className={num} />
-            días después de <b>reportar la guía</b>
-          </label>
-          <p className="text-xs text-neutral-500">
-            Ej.: con 2, una guía reportada el lunes se califica el miércoles (cuando ya le llegó). 0 = el mismo día del reporte.
-            {' '}Las ventas sin guía (retiro en tienda) cuentan desde la compra. A los 10 días de la compra se califica igual.
-          </p>
-        </>)}
-        {paso(3, 'Calificarlas solas', <>
-          <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-700 cursor-pointer">
-            <input type="checkbox" checked={p.auto} onChange={e => setP({ ...p, auto: e.target.checked })} className="w-4 h-4" />
-            Todos los días a las
-            <select value={p.hora ?? 10} onChange={e => setP({ ...p, hora: Number(e.target.value) })} className={sel}>{horas}</select>
-          </label>
-          <p className="text-xs text-neutral-500">
-            Sin Despachos y Reportador el sistema no sabe cuáles se concretaron y no califica nada solo. Las de <b>revisar</b> nunca se califican solas.
-            {' '}Si eliges una hora que ya pasó y hoy no corrió, califica en el próximo minuto.
-          </p>
-        </>)}
+    <div className="space-y-4">
+      {/* 1) Mensajes de calificación */}
+      <section className={caja}>
+        <h2 className="border-b border-neutral-100 px-4 py-3 text-sm font-semibold text-neutral-900">Mensajes de calificación</h2>
+        <ul className="divide-y divide-neutral-100">
+          {TIPOS.map(t => {
+            const x = plantilla(t.k)
+            const b = editando === t.k ? borrador : null
+            return (
+              <li key={t.k} className="px-4 py-3">
+                {!b ? (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
+                    <span className="shrink-0 text-sm font-medium text-neutral-900">{t.icono} {t.titulo}
+                      {t.k === 'no_concretada_ok' && <Nuevo clave="calificar_mensajes" />}</span>
+                    <span className="shrink-0 text-xs text-neutral-500">{RATING[x.rating] ?? x.rating}{t.k !== 'concretada' && x.motivo ? ` · ${MOTIVOS[x.motivo] ?? x.motivo}` : ''}</span>
+                    <span className="min-w-0 flex-1 basis-full truncate text-sm text-neutral-600 sm:basis-auto" title={x.mensaje}>“{x.mensaje}”</span>
+                    <span className="ml-auto flex shrink-0 items-center gap-2">
+                      {guardado(t.k)}
+                      <button onClick={() => abrir(t.k)} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50">Editar</button>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-neutral-900">{t.icono} {t.titulo}</p>
+                    {t.k === 'no_concretada_ok' && (
+                      <p className="text-xs text-neutral-500">Para cuando no se concretó pero el comprador no hizo nada malo (compra duplicada por error, se anuló de acuerdo). Solo a mano: lo automático nunca lo usa.</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <select value={b.rating} onChange={e => setBorrador({ ...b, rating: e.target.value })} className={sel} aria-label="Calificación">{ratings}</select>
+                      {t.k !== 'concretada' && (
+                        <select value={b.motivo} onChange={e => setBorrador({ ...b, motivo: e.target.value })} className={`${sel} min-w-0 max-w-full`} aria-label="Motivo">
+                          {Object.entries(MOTIVOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                        </select>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input value={b.mensaje} maxLength={160} onChange={e => setBorrador({ ...b, mensaje: e.target.value })}
+                        onKeyDown={e => { if (e.key === 'Enter') guardarTipo(); if (e.key === 'Escape') setEditando(null) }} autoFocus
+                        aria-label="Mensaje" className="w-full rounded-lg border border-neutral-300 px-3 py-2 pr-14 text-sm" />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-neutral-400">{b.mensaje.length}/160</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      {guardado(t.k)}
+                      <button onClick={() => setEditando(null)} className="btn-ghost text-sm">Cancelar</button>
+                      <button onClick={guardarTipo} disabled={!b.mensaje.trim() || !!estado?.guardando} className="btn-primary text-sm">Guardar</button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
       </section>
 
-      <section className={caja(!!p.autoNoConcretada)}>
-        <div>
-          <h2 className="font-semibold text-neutral-900">⛔ Ventas no concretadas</h2>
-          <p className="text-xs text-neutral-500">Las que nunca {desdeML ? 'despachaste' : 'cargaste en Ventas'}: el comprador no pagó o no se hizo.</p>
-        </div>
-        {paso(1, 'Calificación', <>
-          <div className="flex flex-wrap gap-2">
-            <select value={p.noConcretada.rating} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, rating: e.target.value } })} className={sel}>{ratings}</select>
-            <select value={p.noConcretada.motivo} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, motivo: e.target.value } })} className={sel}>
-              {Object.entries(MOTIVOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
+      {/* 2) Cuándo y automático */}
+      <section className={caja}>
+        <h2 className="border-b border-neutral-100 px-4 py-3 text-sm font-semibold text-neutral-900">Cuándo y automático</h2>
+        <div className="divide-y divide-neutral-100">
+          <div className="px-4 py-3">
+            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-6">
+              <span className="w-36 shrink-0 text-sm font-medium text-neutral-900">✅ Concretadas</span>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700">
+                <Interruptor on={p.auto} onCambio={v => guardar({ ...p, auto: v }, 'cuando_c')} etiqueta="Calificar solas las concretadas" />
+                <span>Calificarlas solas a las</span>
+                <select value={p.hora ?? 10} onChange={e => guardar({ ...p, hora: Number(e.target.value) }, 'cuando_c')} className={sel} aria-label="Hora">{horas}</select>
+                {tipBoton('auto')}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 text-sm text-neutral-700">
+                <select value={p.esperaDias} onChange={e => guardar({ ...p, esperaDias: Number(e.target.value) }, 'cuando_c')} className={sel} aria-label="Días de espera">
+                  {diasEspera.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <span>{p.esperaDias === 1 ? 'día' : 'días'} después de {conReportador ? 'reportar la guía' : desdeML ? 'imprimir la guía' : 'la venta'}</span>
+                {tipBoton('espera')}
+              </div>
+              <span className="lg:ml-auto">{guardado('cuando_c')}</span>
+            </div>
+            {tipTexto('auto', <>
+              Una vez al día, a la hora elegida, califica las que el sistema sabe concretadas y ya cumplieron la espera. Sin Despachos
+              {conReportador ? ' y Reportador' : ''} el sistema no sabe cuáles se concretaron y no califica nada solo. Las de «Revisar» y
+              las «sin problema» nunca se califican solas.
+            </>)}
+            {tipTexto('espera', <>
+              Ej.: con 2, una guía reportada el lunes se califica el miércoles (cuando ya le llegó). 0 = el mismo día. Las ventas sin guía
+              (retiro en tienda) cuentan desde la compra. A los {TOPE_DIAS_TXT} días de la compra se califica igual. Si el comprador ya lo
+              tiene antes, usa «Calificar ya» en Próximas o «Calificar» en Mensajes.
+            </>)}
+            {p.auto && legal}
           </div>
-          <input value={p.noConcretada.mensaje} maxLength={160} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, mensaje: e.target.value } })}
-            className="w-full border border-neutral-300 rounded-lg bg-white px-3 py-2 text-sm" />
-        </>)}
-        {paso(2, 'Cuándo', <>
-          <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-700">
-            Aparecen en tu lista a los
-            <input type="number" min={1} max={MAX_DIAS_NO_CONCRETADA} value={p.noConcretada.dias}
-              onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, dias: Math.max(1, Math.min(MAX_DIAS_NO_CONCRETADA, Math.round(Number(e.target.value) || 3))) } })}
-              className={num} />
-            días {desdeML ? 'sin despachar' : 'sin cargar en Ventas'}
-          </label>
-          <p className={`text-xs ${p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA ? 'text-red-700 font-medium' : 'text-neutral-500'}`}>
-            Ahí <b>no se califican solas</b>: las revisas tú en «Por calificar». Máximo {MAX_DIAS_NO_CONCRETADA};
-            {p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA ? ` con ${MAX_DIAS_NO_CONCRETADA} te queda muy poco tiempo para revisarlas: mejor 3 o 4.` : ' recomendado: 3 o 4.'}
-          </p>
-        </>)}
-        {paso(3, 'Red de seguridad', <>
-          <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-700 cursor-pointer">
-            <input type="checkbox" checked={!!p.autoNoConcretada} onChange={e => setP({ ...p, autoNoConcretada: e.target.checked })} className="w-4 h-4" />
-            Las que nadie calificó, calificarlas solas el <b>día {DIA_AUTO_NO_CONCRETADA}</b> a las
-            <select value={p.horaNc ?? 10} onChange={e => setP({ ...p, horaNc: Number(e.target.value) })} className={sel}>{horas}</select>
-          </label>
-          <p className="text-xs text-neutral-500">
-            MercadoLibre las da por <b>concretadas solas el día {ML_CONCRETA_SOLA_DIAS}</b> y cobra la comisión. Solo toca las que no tienen pago traído ni
-            {' '}{desdeML ? 'guía en Despachos' : 'venta cargada ni guía en Despachos'}. Ojo: una venta cobrada por fuera del sistema (cobro a destino, una venta personal) también quedaría como no concretada.
-          </p>
-        </>)}
-      </section>
 
-      <p className="lg:col-span-2 text-xs text-neutral-500">Las calificaciones son públicas en MercadoLibre y salen a tu nombre: al prender lo automático aceptas que se publiquen sin revisarlas una por una.</p>
-      <div className="lg:col-span-2 flex items-center justify-end gap-3">
-        {msg && <span className="text-xs text-neutral-600">{msg}</span>}
-        <button onClick={guardar} className="btn-primary text-sm">Guardar configuración</button>
-      </div>
+          <div className="px-4 py-3">
+            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-6">
+              <span className="w-36 shrink-0 text-sm font-medium text-neutral-900">⛔ No concretadas</span>
+              <div className="flex flex-wrap items-center gap-1.5 text-sm text-neutral-700">
+                <span>Aparecen en Por calificar a los</span>
+                <select value={p.noConcretada.dias} onChange={e => guardar({ ...p, noConcretada: { ...p.noConcretada, dias: Number(e.target.value) } }, 'cuando_nc')} className={sel} aria-label="Días">
+                  {Array.from({ length: MAX_DIAS_NO_CONCRETADA }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <span>días</span>
+                {tipBoton('nc_dias')}
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700">
+                <Interruptor on={!!p.autoNoConcretada} onCambio={v => guardar({ ...p, autoNoConcretada: v }, 'cuando_nc')} etiqueta="Red de seguridad de no concretadas" />
+                <span>Red de seguridad: calificar solas el día {DIA_AUTO_NO_CONCRETADA} a las</span>
+                <select value={p.horaNc ?? 10} onChange={e => guardar({ ...p, horaNc: Number(e.target.value) }, 'cuando_nc')} className={sel} aria-label="Hora">{horas}</select>
+                {tipBoton('red')}
+              </div>
+              <span className="lg:ml-auto">{guardado('cuando_nc')}</span>
+            </div>
+            {p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA && (
+              <p className="mt-2 text-xs font-medium text-red-700">Con {MAX_DIAS_NO_CONCRETADA} te queda muy poco tiempo para revisarlas: mejor 3 o 4.</p>
+            )}
+            {tipTexto('nc_dias', <>
+              Las que nunca {desdeML ? 'despachaste' : 'cargaste en Ventas'} (no pagó o no se hizo). Ahí no se califican solas: las revisas tú.
+              Máximo {MAX_DIAS_NO_CONCRETADA}; recomendado 3 o 4.
+            </>)}
+            {tipTexto('red', <>
+              MercadoLibre las da por concretadas solas el día {ML_CONCRETA_SOLA_DIAS} y cobra la comisión. Las que nadie calificó se califican
+              solas el día {DIA_AUTO_NO_CONCRETADA}, solo si no tienen pago traído ni {desdeML ? 'guía en Despachos' : 'venta cargada ni guía en Despachos'}.
+              Ojo: una venta cobrada por fuera del sistema (cobro a destino, una venta personal) también quedaría como no concretada.
+            </>)}
+            {p.autoNoConcretada && legal}
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

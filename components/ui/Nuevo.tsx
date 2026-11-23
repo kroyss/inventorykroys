@@ -21,6 +21,8 @@ export const NUEVOS = {
   config_mensajes: '2026-12-22',
   // 22-11: Publicaciones → Precio vs sistema (solo SolucionesMC).
   precio_vs_ml: '2026-12-22',
+  // 23-11: Calificar desde Mensajes y el tipo «No concretada, sin problema».
+  calificar_mensajes: '2026-12-23',
 } as const
 export type ClaveNuevo = keyof typeof NUEVOS
 

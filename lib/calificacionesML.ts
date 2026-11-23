@@ -18,6 +18,9 @@ export const DIAS_RECIENTES = 9         // lo que se relee cada SYNC_MINUTOS (Po
 export interface PlantillasCalificacion {
   concretada:   { rating: 'positive' | 'neutral' | 'negative'; mensaje: string }
   noConcretada: { rating: 'positive' | 'neutral' | 'negative'; motivo: string; mensaje: string; dias: number }
+  /** 23-11 (el dueño): «No concretada, sin problema» — no se concretó pero el comprador no hizo nada malo (compra
+   *  duplicada por error, se pusieron de acuerdo en anularla). Solo a mano: la automática nunca la usa. */
+  noConcretadaOk: { rating: 'positive' | 'neutral' | 'negative'; motivo: string; mensaje: string }
   /** Días de espera antes de calificar: con 2, hoy (día 3) solo entran al lote las ventas del día 1
    *  hacia atrás (las más nuevas se ven, pero no se pueden calificar todavía). 0 = sin espera. */
   esperaDias: number
@@ -34,6 +37,7 @@ export interface PlantillasCalificacion {
 export const PLANTILLAS_DEFAULT: PlantillasCalificacion = {
   concretada:   { rating: 'positive', mensaje: 'Excelente, persona seria y responsable, un placer !' },
   noConcretada: { rating: 'neutral', motivo: 'BUYER_NOT_ENOUGH_MONEY', mensaje: 'No tenemos su compra registrada', dias: 3 },
+  noConcretadaOk: { rating: 'positive', motivo: 'BUYER_REGRETS', mensaje: 'Compra duplicada por error, gracias por avisar. ¡Un placer!' },
   esperaDias: 0,
   auto: false,
   hora: 10,
@@ -51,6 +55,7 @@ export function leerPlantillasCal(json: string | null | undefined): PlantillasCa
         // Tope (23-10): a los 7 días ML ya la concretó sola; lo guardado por encima del tope vale como el tope (5).
         return { ...nc, dias: Math.max(1, Math.min(MAX_DIAS_NO_CONCRETADA, Math.round(Number(nc.dias) || 3))) }
       })(),
+      noConcretadaOk: { ...PLANTILLAS_DEFAULT.noConcretadaOk, ...(v?.noConcretadaOk ?? {}) },
       esperaDias: Math.max(0, Math.min(60, Math.round(Number(v?.esperaDias) || 0))),
       auto: v?.auto === true,
       hora: Number.isInteger(v?.hora) && v.hora >= 0 && v.hora <= 23 ? v.hora : PLANTILLAS_DEFAULT.hora,
@@ -188,6 +193,19 @@ export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = 
 //   - la empresa no usa Despachos y pasaron los días de "no concretada": la venta pudo despacharse por
 //     fuera (antes salía "no concretada" y se podía calificar mal a un comprador real).
 export type Sugerencia = 'concretada' | 'no_concretada' | 'esperar' | 'revisar'
+/** Cómo se califica: los dos de siempre + «No concretada, sin problema» (23-11, solo a mano). */
+export type TipoCal = 'concretada' | 'no_concretada' | 'no_concretada_ok'
+export const TIPOS_CAL = ['concretada', 'no_concretada', 'no_concretada_ok'] as const
+
+/** 23-11: posible compra DUPLICADA — mismo comprador, misma cuenta, mismo día y algún producto en común con otra venta
+ *  (de otro paquete). La pantalla la sugiere «No concretada, sin problema» si la otra se concretó; decide la persona.
+ *  Devuelve las gemelas como [{id, conc}] (conc = ML ya la tiene calificada como concretada). Sobre la bandeja `b`. */
+export const sqlGemelas = (b = 'b') => `(SELECT json_agg(json_build_object('id', d.id::text, 'conc', d.cal_concretada))
+   FROM ml_ordenes yo JOIN ml_ordenes d ON d.empresa_id = yo.empresa_id AND d.conexion_id = yo.conexion_id AND d.comprador = yo.comprador AND d.id <> yo.id
+     AND COALESCE(d.pack_id, d.id) <> COALESCE(yo.pack_id, yo.id)
+     AND d.fecha >= date_trunc('day', yo.fecha) AND d.fecha < date_trunc('day', yo.fecha) + INTERVAL '1 day'
+     AND d.items && yo.items AND COALESCE(d.estado, '') <> 'cancelled'
+   WHERE yo.id = ${b}.id::bigint AND yo.comprador IS NOT NULL)`
 
 /** VENTA CONCRETADA (decisión del dueño, 2026-10-15): con Reportador, la que tiene la guía REPORTADA (salió
  *  de verdad; impresa no alcanza: oficina cerrada, envío al día siguiente…) y los días de espera cuentan

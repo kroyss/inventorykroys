@@ -473,6 +473,13 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 **Cómo se usa:**
 - Elige una conversación. Ves los mensajes, los productos, el total de la venta y, si usas Despachos, si su guía ya
   salió.
+- **Calificar desde la conversación:** arriba, junto al comprador y el número de venta, un botón dice cómo está su
+  calificación: **☆ Calificar**, **⏳ Calificar (en espera hasta dd/mm)** o **✓ Calificada: concretada / no concretada**.
+  Al tocarlo eliges **Concretada**, **No concretada** o **No concretada · sin problema** (compra duplicada o anulada de
+  acuerdo), el mensaje de tu plantilla sale ya escrito y lo puedes cambiar para esa venta; luego **Calificar**. Si la
+  venta sigue en tus días de espera (o el sistema todavía no la ve despachada) primero pregunta **«¿El comprador ya lo
+  recibió o retiró?»**. Si el sistema ve que es una compra repetida (mismo comprador, mismo producto, mismo día y la
+  otra sí se concretó), te sugiere «sin problema». Solo lo ve quien tiene acceso a Calificaciones. Es público en ML.
 - **Leer un mensaje aquí NO lo marca como leído en MercadoLibre:** se marca cuando respondes o tocas el sobre.
 - **Por atender tiene tres chips:** **Responder** (lo de siempre: mensajes del comprador sin contestar), **Pedir pago**
   y **Escribirle**. «Pedir pago» = ventas de ML sin ninguna señal de pago dentro de los días de plazo que pusiste en
@@ -933,10 +940,25 @@ Tus ventas de MercadoLibre **sin calificar**, cruzadas con el sistema para saber
   en Revisar (nunca se califica sola); al traer los pagos se aclara sola. Busca los pagos antes de calificar.
 - **Por definir:** todavía no se sabe. Cada venta dice qué falta: «Sin pago todavía», «Falta traer pagos», «Pagó ·
   falta la guía» o «Falta reportar la guía».
+- **Próximas:** ya se sabe cómo calificarlas pero están en tus días de espera. Si el comprador ya lo recibió o lo
+  retiró, toca **Calificar ya** (pregunta antes si ya lo tiene).
+
+**Tres formas de calificar:** **Concretada** (se entregó o retiró), **No concretada** (no pagó o no se hizo) y **No
+concretada · sin problema** (no se concretó pero el comprador no hizo nada malo: compra duplicada por error, se anuló
+de acuerdo; por defecto positiva con «Compra duplicada por error, gracias por avisar. ¡Un placer!»). La tercera es
+**solo a mano**: la calificación automática nunca la usa. **Compra duplicada:** si el mismo comprador compró lo mismo
+el mismo día en la misma cuenta y una de las ventas se concretó, la otra sale sugerida «sin problema» con el aviso
+«🤝 Posible compra duplicada»; decides tú. También se puede calificar una venta suelta desde **Mensajes** (botón
+Calificar junto al comprador).
 
 Sin Despachos y Reportador el sistema no sabe cuáles se concretaron: decides tú cada una (solo las canceladas en ML
 salen como no concretadas). Puedes cambiar cada una antes de calificar. Motivos de no concretada: no pagó, se
 arrepintió, no respondió, sin stock, no respetó las condiciones.
+
+**Configuración** (administrador), en dos bloques: **Mensajes de calificación** (una línea por tipo con su
+calificación, motivo y texto; **Editar** la abre ahí mismo) y **Cuándo y automático** (Concretadas: calificarlas solas a
+la hora que elijas y cuántos días después de reportar la guía; No concretadas: a los cuántos días aparecen y la red de
+seguridad del día 6). Cada cambio **se guarda solo** («✓ Guardado»); lo explicativo está en las ⓘ de cada fila.
 
 **Calificación automática:** las concretadas se califican solas unos días después de reportar la guía, a la hora
 que elijas. Las no concretadas aparecen en tu lista y no se califican solas. **Las calificaciones son públicas y
@@ -1627,6 +1649,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   Historial = lo respondido; Configuración (administrador): Mi IA, datos de productos, respuestas rápidas.
 - **Mensajes:** leer aquí no lo marca leído en ML (se marca al responder o tocar el sobre). **Por atender**: Responder,
   Pedir pago y Escribirle (más de 12 h sin mensajes). **Atendidas** con buscador. Recordatorios y Pedir calificación.
+  En cada conversación, el botón **Calificar** (junto al comprador) califica esa venta ahí mismo.
   **Configuración**: Al recibir compra (hasta 2 mensajes), Mi IA, Respuestas rápidas y Datos de productos (los mismos de Preguntas).
 - **Stock** (Automatizaciones): lo vendido en los últimos 30 días que se agotó o está por agotarse; el aviso cuenta 7
   días; se revisa sola cada hora y con ↻ Actualizar (arriba) como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
@@ -1645,5 +1668,6 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
 - **Reportador:** reporta las guías impresas en Despachos al cerrar la jornada (las de TEALCA, al escribir la guía
   final); lo impreso directo en ML no se entera. Trabaja en el servidor (se puede cerrar la pantalla) y revisa la
   conversación para no repetir. **Vista previa** no manda nada. ML corta mensajes largos y rechaza links de Facebook.
-- **Calificaciones:** Concretada / No concretada / Revisar (decides tú), Próximas (en tu espera) y Automática si la
-  tienes prendida; los textos cambian según si usas Despachos, Reportador y Pagos ME.
+- **Calificaciones:** Concretada / No concretada / Revisar (decides tú), Próximas (en tu espera, con **Calificar ya**)
+  y Automática si la tienes prendida; el tercer tipo **No concretada · sin problema** (compra duplicada) es solo a mano;
+  los textos cambian según si usas Despachos, Reportador y Pagos ME.
