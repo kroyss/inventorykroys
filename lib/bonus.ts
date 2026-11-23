@@ -1,7 +1,7 @@
-// Bonos por ventas del mes — 4 fases acumulativas (la 4ª desde 2026-10-05: el equipo llegó al tope).
+// Bonos por ventas del mes — 4 fases (la 4ª desde 2026-10-05: el equipo llegó al tope).
 //
-// El vendedor cobra el bono de cada fase que alcanza: si el mes cierra en $16.000
-// con la config default cobró $100 + $200 = $300. Las metas y los montos son
+// 23-11 (el dueño): NO se suman. Se cobra el bono de la ÚLTIMA meta alcanzada: si el mes cierra
+// en $16.000 con la config default cobró $200 (no $100 + $200). Las metas y los montos son
 // editables por país en Ajustes (app_settings, keys `bono_meta_N` / `bono_monto_N`),
 // porque el volumen de VE y CO no es comparable.
 
@@ -55,4 +55,9 @@ export function parseBonusPhases(
     end,
     bonus: montos[i],
   }))
+}
+
+/** Bono del mes: el de la última meta alcanzada (no se suman las fases). */
+export function bonoGanado(phases: BonusPhase[], ventas: number): number {
+  return phases.filter(p => ventas >= p.end).reduce((a, p) => Math.max(a, p.bonus), 0)
 }

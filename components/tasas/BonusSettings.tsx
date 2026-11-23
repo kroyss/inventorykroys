@@ -52,8 +52,8 @@ export default function BonusSettings() {
     <div className="mt-1 border-t border-neutral-100 pt-4">
       <p className="text-sm font-semibold text-neutral-700 mb-1">Bonos por ventas del mes</p>
       <p className="text-[11px] text-neutral-500 mb-2">
-        Ventas del mes necesarias para cobrar cada bono. Son <b>acumulativas</b>: al llegar a la
-        meta 2 ya se cobró también el bono 1. Es lo que muestra la barra de bonos del dashboard.
+        Ventas del mes necesarias para cobrar cada bono. <b>No se suman</b>: se cobra el bono de la
+        última meta alcanzada (al llegar a la meta 2 se cobra el bono 2, no el 1 + el 2). Es lo que muestra la barra de bonos del dashboard.
       </p>
 
       <div className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 gap-y-1.5 items-center">

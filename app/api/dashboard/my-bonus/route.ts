@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { puede } from '@/lib/permisos'
-import { parseBonusPhases } from '@/lib/bonus'
+import { bonoGanado, parseBonusPhases } from '@/lib/bonus'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -49,8 +49,7 @@ export async function GET(_: NextRequest) {
     }
 
     const allComplete  = completedPhases.length === PHASES.length
-    const bonusEarned  = PHASES.filter(p => completedPhases.includes(p.phase))
-                               .reduce((s, p) => s + p.bonus, 0)
+    const bonusEarned  = bonoGanado(PHASES, salesAmount)
 
     return NextResponse.json({
       current_phase:        currentPhase?.phase ?? null,
