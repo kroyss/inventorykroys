@@ -11,6 +11,7 @@ import { avisarDuenoPlataforma, MODULOS_PRUEBA } from '@/lib/registro'
 import { precioRadarMes } from '@/lib/planes'
 import { currentDate } from '@/lib/tz'
 import { esc } from '@/lib/telegram'
+import { anotarEvento, corto } from '@/lib/registroEmbudo'
 
 // POST /api/registro — autoregistro público (26-10, migración 125): crea la cuenta al instante en prueba de 15 días
 // (arranca al conectar MercadoLibre, como siempre). Sin sesión. Protecciones: trampa para bots, tope por conexión,
@@ -32,6 +33,9 @@ const Registro = z.object({
   // 09-11 (mig. 159): link de promoción del Radar (registro?promo=…): solo esos entran al grupo de prueba de un día.
   // Sin promo el registro del Radar paga para entrar (Radar mensual).
   promo:    z.string().trim().regex(/^[a-z0-9_-]{0,30}$/i).optional(),
+  // 23-11 (mig. 196): de qué anuncio vino (utm_source / utm_campaign del link), para el embudo de Plataforma.
+  origen:   z.string().max(200).optional(),
+  campana:  z.string().max(200).optional(),
 }).refine(b => b.whatsapp || b.telegram, { message: 'Déjanos tu WhatsApp o tu Telegram (al menos uno) para ayudarte' })
 
 function ipDe(req: NextRequest) {
@@ -100,9 +104,11 @@ async function registrar(req: NextRequest): Promise<NextResponse> {
       origenOrgId: ORGANIZACION_PLATAFORMA, origen: radar ? 'radar' : 'autoregistro',
       registro: { correo: b.correo, whatsapp: b.whatsapp || null, telegram: b.telegram || null, ip_hash: ipHash,
                   ...(radar && b.promo ? { promo: b.promo.toLowerCase() } : {}),
+                  origen: corto(b.origen), campana: corto(b.campana, 80),
                   navegador: req.headers.get('user-agent')?.slice(0, 200) ?? null },
     })
     await client.query('COMMIT')
+    if (!radar) await anotarEvento(req, { evento: 'registro', origen: corto(b.origen), campana: corto(b.campana, 80) })
 
     avisarDuenoPlataforma(radar
       ? `📡 <b>Nuevo registro al Radar</b> ${b.promo ? `(promo ${esc(b.promo)})` : `(Radar mensual ${precioRadarMes(currentDate()).precio} USD: falta que pague)`}\n${esc(b.negocio)} · ${esc(b.nombre)} · ${esc(usuario)}\n${contacto}`

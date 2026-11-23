@@ -1,10 +1,11 @@
 'use client'
 import { signIn } from 'next-auth/react'
-import { useEffect, useState, FormEvent } from 'react'
+import { useEffect, useRef, useState, FormEvent } from 'react'
 import { TELEGRAM_SOPORTE } from '@/lib/cuenta'
 import type { Marca } from '@/lib/marca'
 import { eventoPixel, iniciarPixel } from '@/lib/metaPixel'
 import { LineaLegal } from '@/components/legal/PaginaLegal'
+import { CASO_FINAL } from '@/lib/despegue'
 
 // Prueba gratis de 15 días (26-10, app/registro/page.tsx → POST /api/registro). Mismo formato que la entrada:
 // panel negro de marca a la izquierda y el formulario a la derecha. Al crear la cuenta entra sola y va al inicio,
@@ -26,31 +27,68 @@ const PASOS = [
   'Conecta tu cuenta de MercadoLibre: tus 15 días corren desde que te registras.',
   'Al terminar, escríbenos para seguir sin perder nada.',
 ]
+// 23-11 (el dueño: llegan muchos y casi nadie se registra): un caso real y una persona detrás, arriba del formulario.
+const CASO = `Caso real: nuestra cuenta arrancó de cero y llegó a MercadoLíder en ${CASO_FINAL.dias} días usándolo.`
+const AYUDA = 'Te ayudamos a conectar tu cuenta por WhatsApp.'
 
 export default function RegistroForm({ marca }: { marca: Marca }) {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [verClave, setVerClave] = useState(false)
   const [creada, setCreada]     = useState<{ usuario: string; correo: string } | null>(null)
+  // Embudo (23-11, migración 196; lib/registroEmbudo.ts): de dónde vino, si tocó el formulario, el último campo que
+  // tocó y cuánto estuvo. Nunca se manda lo que escribe, solo el nombre del campo.
+  const link = useRef({ origen: '', campana: '' })
+  const paso = useRef({ inicio: 0, empezo: false, campo: '', listo: false })
+
+  function anotar(evento: string, extra: Record<string, unknown> = {}, alSalir = false) {
+    const body = JSON.stringify({ evento, ...link.current, ...extra })
+    try {
+      if (alSalir && navigator.sendBeacon) { navigator.sendBeacon('/api/registro/visita', new Blob([body], { type: 'text/plain' })); return }
+    } catch {}
+    fetch('/api/registro/visita', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {})
+  }
 
   // Contador de visitas (27-10, migración 128): una por carga en el navegador; de dónde vino = utm_source o el sitio.
   useEffect(() => {
     const q = new URLSearchParams(location.search)
     let ref = ''
     try { const h = document.referrer ? new URL(document.referrer).hostname : ''; ref = h && h !== location.hostname ? h.replace(/^(www|l|lm|m)\./, '') : '' } catch {}
-    const origen = q.get('utm_source') || (q.has('fbclid') ? 'facebook' : '') || ref
-    fetch('/api/registro/visita', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origen }), keepalive: true }).catch(() => {})
+    link.current = { origen: q.get('utm_source') || (q.has('fbclid') ? 'facebook' : '') || ref, campana: q.get('utm_campaign') || '' }
+    paso.current.inicio = Date.now()
+    anotar('vista')
     iniciarPixel()   // 19-11: píxel de Meta solo en esta página (lib/metaPixel.ts)
+    // Se fue sin registrarse: una sola vez (pagehide = cerrar o volver atrás; en el celular, pasar a otra app).
+    let avisado = false
+    const salir = () => {
+      if (avisado || paso.current.listo) return
+      avisado = true
+      anotar('salio', { detalle: paso.current.campo, segundos: (Date.now() - paso.current.inicio) / 1000 }, true)
+    }
+    const oculto = () => { if (document.visibilityState === 'hidden') salir() }
+    window.addEventListener('pagehide', salir)
+    document.addEventListener('visibilitychange', oculto)
+    return () => { window.removeEventListener('pagehide', salir); document.removeEventListener('visibilitychange', oculto) }
   }, [])
+
+  function tocoCampo(nombre: string) {
+    if (!nombre || nombre === 'sitio') return
+    paso.current.campo = nombre
+    if (!paso.current.empezo) { paso.current.empezo = true; anotar('empezo') }
+  }
 
   async function enviar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true); setError('')
     const f = new FormData(e.currentTarget)
     const datos = Object.fromEntries(['negocio', 'nombre', 'correo', 'whatsapp', 'telegram', 'clave', 'sitio'].map(k => [k, String(f.get(k) ?? '')]))
-    const r = await fetch('/api/registro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) })
+    const r = await fetch('/api/registro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...datos, ...link.current }) })
     const d = await r.json().catch(() => ({}))
-    if (!r.ok) { setError(d.error ?? 'No se pudo crear la cuenta. Intenta de nuevo.'); setLoading(false); return }
+    if (!r.ok) {
+      const msg = d.error ?? 'No se pudo crear la cuenta. Intenta de nuevo.'
+      setError(msg); setLoading(false); anotar('error', { detalle: msg }); return
+    }
+    paso.current.listo = true   // el registro lo anota el servidor
     await eventoPixel('CompleteRegistration')   // Meta aprende quién se registra (sin datos personales)
     const usuario = String(d.usuario ?? '')
     const s = usuario ? await signIn('credentials', { username: usuario, password: datos.clave, redirect: false }) : null
@@ -75,6 +113,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
           <p className="inline-flex w-fit rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">15 días gratis</p>
           <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight">{TITULO}</h1>
           <p className="text-neutral-400 mt-3 text-sm leading-relaxed">Sin tarjeta ni pago por adelantado. {marca.lema}</p>
+          <p className="mt-4 border-l-2 border-lime-400 pl-3 text-sm leading-relaxed text-neutral-300">{CASO}</p>
           <ul className="mt-8 space-y-4">
             {INCLUYE.map(p => (
               <li key={p.t} className="flex gap-3">
@@ -114,6 +153,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
           {EN_CELULAR.map(t => <li key={t} className="flex items-center gap-1"><span className="text-lime-400" aria-hidden="true">✓</span>{t}</li>)}
         </ul>
         <p className="relative mt-2 text-xs text-neutral-400">Sin tarjeta. Los 15 días corren desde que te registras.</p>
+        <p className="relative mt-3 border-l-2 border-lime-400 pl-2.5 text-xs leading-relaxed text-neutral-300">{CASO}</p>
       </header>
 
       {/* Formulario */}
@@ -131,12 +171,15 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
             </div>
           ) : <>
           <h2 className="text-2xl font-semibold text-neutral-900 tracking-tight">Crea tu cuenta</h2>
-          <p className="text-sm text-neutral-500 mt-1 mb-6">MercadoLibre Venezuela · prueba de 15 días.</p>
+          <p className="text-sm text-neutral-500 mt-1">MercadoLibre Venezuela · prueba de 15 días.</p>
+          <p className="mt-2 mb-6 flex items-center gap-2 text-sm text-neutral-700">
+            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-lime-100 text-[11px] text-lime-700" aria-hidden="true">✓</span>{AYUDA}
+          </p>
 
-          <form onSubmit={enviar} className="space-y-3.5">
+          <form onSubmit={enviar} onFocusCapture={e => tocoCampo((e.target as unknown as HTMLInputElement).name ?? "")} className="space-y-3.5">
             <div>
               <label htmlFor="negocio" className={etiqueta}>Nombre de tu negocio</label>
-              <input id="negocio" name="negocio" required maxLength={80} autoFocus className={campo} />
+              <input id="negocio" name="negocio" required maxLength={80} className={campo} />
             </div>
             <div>
               <label htmlFor="nombre" className={etiqueta}>Tu nombre</label>

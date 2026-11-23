@@ -181,7 +181,15 @@ function Numero({ titulo, valor, detalle, vivo }: { titulo: string; valor: numbe
 interface Visitas {
   visitas_hoy: number; personas_hoy: number; cuentas_hoy: number; visitas_7d: number; personas_7d: number; cuentas_7d: number
   visitas_total: number; personas_total: number; cuentas_total: number; origenes: { origen: string; personas: number }[]
+  embudo?: Embudo[]
 }
+interface Embudo {
+  origen: string; campana: string | null; personas: number; empezaron: number; con_error: number; registros: number
+  seg_mediana: number | null; campo_abandono: string | null
+}
+const CAMPO: Record<string, string> = { negocio: 'Negocio', nombre: 'Nombre', whatsapp: 'WhatsApp', telegram: 'Telegram', correo: 'Correo', clave: 'Contraseña' }
+const pct = (n: number, de: number) => (de ? `${Math.round(n / de * 100)} %` : '—')
+const tiempo = (s: number | null) => (s == null ? '—' : s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`)
 
 /** Visitas a /registro (27-10, migración 128): para medir la publicidad del link. Personas = navegadores distintos. */
 export function VisitasRegistro({ inicial = null }: { inicial?: unknown }) {
@@ -215,6 +223,50 @@ export function VisitasRegistro({ inicial = null }: { inicial?: unknown }) {
         {col('7 días', v.visitas_7d, v.personas_7d, v.cuentas_7d)}
         {col('Desde que se cuenta', v.visitas_total, v.personas_total, v.cuentas_total)}
       </div>
+      {!!v.embudo?.length && <EmbudoTabla filas={v.embudo} />}
     </section>
+  )
+}
+
+/** Embudo por anuncio, 7 días (23-11, migración 196): de cada 100 que llegan, cuántos tocan el formulario y cuántos
+ *  se registran; cuánto se quedan los que se van y en qué campo se van más. Anuncio = utm_source · utm_campaign. */
+function EmbudoTabla({ filas }: { filas: Embudo[] }) {
+  return (
+    <div className="mt-3 border-t border-neutral-100 pt-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-xs font-semibold text-neutral-700">Qué hacen al llegar · 7 días por anuncio</h3>
+        <span className="text-[11px] text-neutral-400">Formulario y salida se miden desde el 23-11</span>
+      </div>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full min-w-[560px] text-xs num">
+          <thead>
+            <tr className="text-left text-neutral-500">
+              <th className="py-1 pr-2 font-medium">Anuncio</th>
+              <th className="py-1 px-2 font-medium text-right">Llegaron</th>
+              <th className="py-1 px-2 font-medium text-right" title="Tocaron algún campo del formulario">Tocaron el formulario</th>
+              <th className="py-1 px-2 font-medium text-right" title="Enviaron y el sistema dijo que no (correo repetido, datos mal escritos…)">Con error</th>
+              <th className="py-1 px-2 font-medium text-right">Se registraron</th>
+              <th className="py-1 px-2 font-medium text-right" title="Mediana de lo que estuvieron en la página los que se fueron sin registrarse">Se quedaron</th>
+              <th className="py-1 pl-2 font-medium" title="El último campo que tocaron los que empezaron y se fueron (el más repetido)">Se fueron en</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map(f => (
+              <tr key={`${f.origen}|${f.campana ?? ''}`} className="border-t border-neutral-100">
+                <td className="py-1.5 pr-2 text-neutral-800">
+                  {f.origen}{f.campana && <span className="block text-[11px] text-neutral-400">{f.campana}</span>}
+                </td>
+                <td className="py-1.5 px-2 text-right text-neutral-800">{f.personas}</td>
+                <td className="py-1.5 px-2 text-right text-neutral-700">{f.empezaron} <span className="text-neutral-400">({pct(f.empezaron, f.personas)})</span></td>
+                <td className={`py-1.5 px-2 text-right ${f.con_error ? 'text-red-600' : 'text-neutral-400'}`}>{f.con_error}</td>
+                <td className="py-1.5 px-2 text-right font-semibold text-emerald-700">{f.registros} <span className="font-normal text-neutral-400">({pct(f.registros, f.personas)})</span></td>
+                <td className="py-1.5 px-2 text-right text-neutral-700">{tiempo(f.seg_mediana)}</td>
+                <td className="py-1.5 pl-2 text-neutral-700">{f.campo_abandono ? CAMPO[f.campo_abandono] ?? f.campo_abandono : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
