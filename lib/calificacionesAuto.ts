@@ -8,25 +8,29 @@
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
-import { CANCELADA_DESP, leerPlantillasCal, sqlBandeja, sqlLista, type PlantillasCalificacion } from '@/lib/calificacionesML'
+import { CANCELADA_DESP, leerPlantillasCal, sqlBandeja, sqlLista, type PlantillasCalificacion, type TipoCal } from '@/lib/calificacionesML'
 import { registrarUso } from '@/lib/usoAcciones'
 import { DIA_AUTO_NO_CONCRETADA, ML_CONCRETA_SOLA_DIAS } from '@/lib/noConcretada'
 
 export interface ResultadoCal { id: string; ok: boolean; detalle?: string; quitada?: boolean }
 
-/** Califica UNA venta con los textos de la empresa y relee para confirmar. */
-export async function calificarUna(db: Pool, id: string, tipo: 'concretada' | 'no_concretada',
-  p: PlantillasCalificacion, demo: boolean): Promise<ResultadoCal> {
+/** Califica UNA venta con los textos de la empresa y relee para confirmar.
+ *  23-11: `op.mensaje` = el texto editado a mano para esta venta (si no, el de la plantilla); `op.ya` = la persona
+ *  confirmó que el comprador ya lo recibió o retiró: se califica aunque siga en los días de espera. */
+export async function calificarUna(db: Pool, id: string, tipo: TipoCal,
+  p: PlantillasCalificacion, demo: boolean, op: { mensaje?: string; ya?: boolean } = {}): Promise<ResultadoCal> {
   const { rows: [fila] } = await db.query(
     `SELECT conexion_id, cal_vendedor, fecha::date > CURRENT_DATE - $2::int AS en_espera FROM ml_ordenes WHERE id = $1`,
     [id, p.esperaDias])
   if (!fila) return { id, ok: false, detalle: 'Venta no encontrada' }
   // La espera es para las concretadas; una no concretada no puede esperar (ML la concreta sola a los 7 días).
-  if (fila.en_espera && tipo === 'concretada') return { id, ok: false, detalle: `Todavía en los ${p.esperaDias} días de espera` }
+  if (fila.en_espera && tipo === 'concretada' && !op.ya) return { id, ok: false, detalle: `Todavía en los ${p.esperaDias} días de espera` }
   if (fila.cal_vendedor) return { id, ok: true, detalle: 'Ya estaba calificada' }
+  const pl: { rating: string; motivo?: string; mensaje: string } = tipo === 'concretada' ? p.concretada : tipo === 'no_concretada_ok' ? p.noConcretadaOk : p.noConcretada
+  const message = (op.mensaje?.trim() || pl.mensaje).slice(0, 160)
   const cuerpo = tipo === 'concretada'
-    ? { fulfilled: true, rating: p.concretada.rating, message: p.concretada.mensaje }
-    : { fulfilled: false, rating: p.noConcretada.rating, reason: p.noConcretada.motivo, message: p.noConcretada.mensaje }
+    ? { fulfilled: true, rating: pl.rating, message }
+    : { fulfilled: false, rating: pl.rating, reason: pl.motivo, message }
   if (demo) {
     await db.query(`UPDATE ml_ordenes SET cal_vendedor = $2, cal_concretada = $3, actualizada_at = NOW() WHERE id = $1`,
       [id, cuerpo.rating, cuerpo.fulfilled])

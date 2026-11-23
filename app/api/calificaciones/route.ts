@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
-import { leerPlantillasCal, sqlBandeja, sqlLista, sqlListaEl, TOPE_DIAS } from '@/lib/calificacionesML'
+import { leerPlantillasCal, sqlBandeja, sqlGemelas, sqlLista, sqlListaEl, TOPE_DIAS } from '@/lib/calificacionesML'
 import { ventasDesdeML, tieneModulo } from '@/lib/modulos'
 
 // GET /api/calificaciones?vista=listas|proximas|esperando
@@ -36,12 +36,21 @@ export async function GET(req: NextRequest) {
               (SELECT json_build_object('at', c.ultimo_at, 'comprador', c.ultimo_de_comprador)
                FROM ml_conversaciones c
                WHERE c.pack_id = (SELECT COALESCE(oo.pack_id, oo.id) FROM ml_ordenes oo WHERE oo.id = b.id::bigint)
-                 AND c.ultimo_at IS NOT NULL LIMIT 1) AS chat
+                 AND c.ultimo_at IS NOT NULL LIMIT 1) AS chat,
+              -- 23-11: posible compra duplicada (solo donde importa: las que no se concretaron o no se sabe).
+              CASE WHEN b.sugerencia <> 'concretada' THEN ${sqlGemelas()} END AS gemelas
        FROM (${SQL_BANDEJA}) b
        -- La más vieja primero (2026-10-13): es la que menos plazo le queda para calificar en ML.
        ORDER BY fecha ASC`, [dias]),
       s.db.query(`SELECT key, value FROM app_settings WHERE key IN ('calificaciones_auto_ultimo', 'calificaciones_auto_nc')`)])
-    type Fila = { sugerencia: string; en_espera: boolean | null }
+    type Fila = { id: string; sugerencia: string; en_espera: boolean | null; gemelas?: { id: string; conc: boolean | null }[] | null; duplicada_de?: string | null }
+    // 23-11: si su gemela (mismo comprador, mismo día, mismo producto) se concretó, esta es la compra repetida:
+    // la pantalla sugiere «No concretada, sin problema» (decide la persona).
+    const porId = new Map((todas as Fila[]).map(f => [f.id, f]))
+    for (const f of todas as Fila[]) {
+      f.duplicada_de = (f.gemelas ?? []).find(g => g.conc === true || porId.get(g.id)?.sugerencia === 'concretada')?.id ?? null
+      delete f.gemelas
+    }
     const lista = (f: Fila) => f.en_espera === false, enEspera = (f: Fila) => f.en_espera === true
     const rows = (todas as Fila[]).filter(f => vista === 'esperando' ? f.sugerencia === 'esperar'
       : f.sugerencia !== 'esperar' && (vista === 'proximas' ? enEspera(f) : lista(f))).slice(0, 1000)

@@ -3,14 +3,17 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { calificarUna, type ResultadoCal } from '@/lib/calificacionesAuto'
-import { leerPlantillasCal } from '@/lib/calificacionesML'
+import { leerPlantillasCal, TIPOS_CAL } from '@/lib/calificacionesML'
 import { esDemo } from '@/lib/demo'
 import { registrarUso } from '@/lib/usoAcciones'
 
 const Body = z.object({
   ordenes: z.array(z.object({
     id: z.string().regex(/^\d{10,20}$/),
-    tipo: z.enum(['concretada', 'no_concretada']),
+    tipo: z.enum(TIPOS_CAL),
+    // 23-11: texto editado para esta venta (Mensajes → Calificar) y «ya lo recibió» (califica aunque esté en espera).
+    mensaje: z.string().trim().max(160).optional(),
+    ya: z.boolean().optional(),
   })).min(1).max(10),
 })
 
@@ -27,7 +30,7 @@ export async function POST(req: NextRequest) {
     const resultados: ResultadoCal[] = []
     const demo = await esDemo(s.db)   // lib/demo.ts: se registra sin llamar a MercadoLibre
 
-    for (const o of ordenes) resultados.push(await calificarUna(s.db, o.id, o.tipo, p, demo))
+    for (const o of ordenes) resultados.push(await calificarUna(s.db, o.id, o.tipo, p, demo, { mensaje: o.mensaje, ya: o.ya }))
     await registrarUso(s.db, 'calificacion', resultados.filter(r => r.ok && r.detalle !== 'Ya estaba calificada').length)
     return NextResponse.json({ resultados })
   } catch (err) {

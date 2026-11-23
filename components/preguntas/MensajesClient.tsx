@@ -25,6 +25,7 @@ import type { MensajeRapido } from '@/lib/mensajesRapidos'
 import RecordatoriosPago from '@/components/preguntas/RecordatoriosPago'
 import MensajeAlComprar from '@/components/preguntas/MensajeAlComprar'
 import PedirCalificacion from '@/components/preguntas/PedirCalificacion'
+import ChipCalificar from '@/components/preguntas/ChipCalificar'
 import { ChipsSeguimiento, ListaSeguimiento, type DatosSeg, type FiltroSeg } from '@/components/preguntas/Seguimiento'
 
 export interface Conversacion {
@@ -164,6 +165,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
           <li>Leer un mensaje aquí <b className="font-medium text-neutral-800">no lo marca como leído</b> en MercadoLibre: se marca cuando respondes o tocas el sobre.</li>
           <li><b className="font-medium text-neutral-800">Por atender</b>: Responder (mensajes sin contestar), Pedir pago (ventas sin señal de pago dentro de tu plazo) y Escribirle (más de 12 h sin mensajes).</li>
           <li><b className="font-medium text-neutral-800">Atendidas</b>: las conversaciones ya respondidas, con buscador.</li>
+          <li><b className="font-medium text-neutral-800">Calificar</b> (junto al comprador, en la conversación): califica esa venta ahí mismo: concretada, no concretada o «sin problema» (compra duplicada).</li>
           <li><b className="font-medium text-neutral-800">Recordatorios</b> y <b className="font-medium text-neutral-800">Pedir calificación</b>: los mensajes de cada momento de la venta.</li>
           <li><b className="font-medium text-neutral-800">Configuración</b>: Al recibir compra (hasta 2 mensajes a cada comprador nuevo), Mi IA, Respuestas rápidas y Datos de productos (Mi IA y Datos de productos son los mismos que en Preguntas).</li>
         </>}
@@ -433,6 +435,8 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
           <Comprador nick={comprador?.nick ?? c.comprador_nick} nombre={comprador?.nombre ?? c.comprador_nombre} grande />
           <span className="font-mono">{c.pack_id}</span>
           <VerME orden={c.pack_id} />
+          {/* 23-11: calificar la venta desde aquí (estado + botón; solo quien ve Calificaciones). */}
+          {!soloLectura && <ChipCalificar pack={c.pack_id} comprador={comprador?.nombre ?? c.comprador_nombre ?? comprador?.nick ?? c.comprador_nick} />}
           {/* Informativo (sin protagonismo): si su guía ya salió en Despachos. Pudo despacharse sin registrarlo aquí. */}
           {c.cancelada
             ? <span className="text-neutral-400">· cancelada en ML</span>
