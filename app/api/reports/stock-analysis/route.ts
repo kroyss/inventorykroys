@@ -382,6 +382,26 @@ export async function GET(_: NextRequest) {
       if (stock > 0) sanos++
     }
 
+    // 23-11 (el dueño): publicaciones ACTIVAS de cada producto, por cuenta, para armar ofertas relámpago en ML
+    // (Parados / Se están cayendo / Recién llegados → «Copiar» o «Abrir en ML» con los códigos). Solo lo guardado
+    // (vínculos + Mis publicaciones), sin consultar a ML. Se pide solo para los productos de esas tres listas.
+    const conPubs = [...remate, ...declive, ...nuevos].map(p => p.id as number)
+    if (conPubs.length) {
+      const { rows: pubs } = await db.query(
+        `SELECT DISTINCT x.product_id, c.nickname AS cuenta, m.item_id
+           FROM product_ml_codes x
+           JOIN ml_catalogo m ON substring(m.item_id FROM 4) = split_part(x.ml_code, ':', 1) AND m.estado = 'active'
+           JOIN ml_conexiones c ON c.id = m.conexion_id
+          WHERE x.is_active AND x.product_id = ANY($1::int[])
+          ORDER BY 2, 3`, [conPubs])
+      const porProducto = new Map<number, { cuenta: string; item: string }[]>()
+      for (const r of pubs) {
+        const l = porProducto.get(r.product_id) ?? []
+        l.push({ cuenta: r.cuenta, item: r.item_id }); porProducto.set(r.product_id, l)
+      }
+      for (const p of [...remate, ...declive, ...nuevos]) p.publicaciones = porProducto.get(p.id) ?? []
+    }
+
     const PRIO_RANK: Record<string, number> = { URGENTE: 0, PEDIR: 1, EN_CAMINO: 2 }
     reposicion.sort((a, b) =>
       (PRIO_RANK[a.prioridad] - PRIO_RANK[b.prioridad]) ||
@@ -390,7 +410,7 @@ export async function GET(_: NextRequest) {
     )
 
     return NextResponse.json({
-      reglas, reglas_propias: propias, sanos,
+      reglas, reglas_propias: propias, sanos, pais: session.user.country,
       no_reponer: await listaNoReponer(db), puede_productos: puede(session.user, 'ver_productos'),
       reposicion,
       remate: remate.sort((a, b) => b.valor_stock - a.valor_stock || a.ventas_parado - b.ventas_parado),
