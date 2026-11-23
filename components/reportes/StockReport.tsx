@@ -418,15 +418,29 @@ function Lista({ filas, cols, accion, vacio, elegidos, elegir }: { filas: P[]; c
 }
 
 // ── Ofertas en MercadoLibre (23-11, el dueño): las ofertas relámpago de «Mi página» no están en la API de ML, así que
-// se arman en la Central de promociones. Esto ahorra buscarlas una a una: por cuenta, en grupos de 20 (el máximo de
-// una relámpago), «Abrir en ML» abre la Central ya filtrada (su buscador acepta varios códigos separados por ESPACIO;
-// con coma no, probado 23-11) y «Copiar códigos» los deja para pegar. Con casillas marcadas, solo esas; si no, la lista.
-const POR_OFERTA = 20
+// se arman en la Central de promociones. Esto ahorra buscarlas una a una: por cuenta, «Abrir» abre la Central ya
+// filtrada y el icono copia los códigos. El buscador de ML (probado 23-11): varios códigos separados por ESPACIO (con
+// coma no), acepta el número sin «MLV» y CORTA en 120 caracteres → grupos que nunca pasan de 120 (unos 11 códigos) ni
+// de 20 (lo máximo de una relámpago). Con casillas marcadas, solo esas; si no, toda la lista (respeta la búsqueda).
+const MAX_CODIGOS = 20
+const MAX_BUSCADOR = 120
+function gruposBuscador(codigos: string[]): string[][] {
+  const grupos: string[][] = []
+  let actual: string[] = [], largo = 0
+  for (const c of codigos) {
+    const extra = (actual.length ? 1 : 0) + c.length
+    if (actual.length && (largo + extra > MAX_BUSCADOR || actual.length >= MAX_CODIGOS)) { grupos.push(actual); actual = []; largo = 0 }
+    largo += (actual.length ? 1 : 0) + c.length
+    actual.push(c)
+  }
+  if (actual.length) grupos.push(actual)
+  return grupos
+}
 function OfertasML({ filas, elegidos, pais, limpiar }: { filas: P[]; elegidos: Set<number>; pais?: string; limpiar: () => void }) {
   const [copiado, setCopiado] = useState<string | null>(null)
   useEffect(() => {
     if (!copiado) return
-    const t = setTimeout(() => setCopiado(null), 2500)
+    const t = setTimeout(() => setCopiado(null), 2000)
     return () => clearTimeout(t)
   }, [copiado])
   const { cuentas, sinPub, marcados } = useMemo(() => {
@@ -437,7 +451,10 @@ function OfertasML({ filas, elegidos, pais, limpiar }: { filas: P[]; elegidos: S
     for (const p of base) {
       const pubs: { cuenta: string; item: string }[] = p.publicaciones ?? []
       if (!pubs.length) { sin++; continue }
-      for (const x of pubs) { const l = m.get(x.cuenta) ?? []; if (!l.includes(x.item)) l.push(x.item); m.set(x.cuenta, l) }
+      for (const x of pubs) {
+        const num = String(x.item).replace(/^[A-Z]{3}/, '')   // el buscador de ML lo encuentra igual sin «MLV»
+        const l = m.get(x.cuenta) ?? []; if (!l.includes(num)) l.push(num); m.set(x.cuenta, l)
+      }
     }
     return { cuentas: [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])), sinPub: sin, marcados }
   }, [filas, elegidos])
@@ -452,42 +469,48 @@ function OfertasML({ filas, elegidos, pais, limpiar }: { filas: P[]; elegidos: S
     }
     setCopiado(clave)
   }
+  const ayuda = 'Abre la Central de promociones de MercadoLibre mostrando solo esas publicaciones (con la cuenta que tengas abierta en ML): '
+    + 'eliges la oferta y le das Participar. El buscador de ML corta en 120 caracteres, por eso van en grupos de unas 11.'
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <p className="text-sm font-medium text-neutral-900">Ponerlos en oferta en MercadoLibre
-          <span className="ml-1.5 font-normal text-neutral-500">
-            {marcados ? `${marcados} elegido${marcados === 1 ? '' : 's'}` : `los ${filas.length} de la lista`}
-          </span>
-          {marcados > 0 && <button type="button" onClick={limpiar} className="ml-2 text-xs font-normal text-neutral-500 underline hover:text-neutral-800">Quitar selección</button>}
-        </p>
-        <p className="text-xs text-neutral-500">Publicaciones activas, de a {POR_OFERTA} (lo máximo de una oferta relámpago)</p>
-      </div>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
+      <span className="flex items-center gap-1.5 text-neutral-700">
+        <span className="font-medium">Ofertas en ML</span>
+        <span className="cursor-help text-neutral-400" title={ayuda} aria-label={ayuda}>ⓘ</span>
+        {marcados > 0 && <span className="text-xs text-neutral-500">· {marcados} elegido{marcados === 1 ? '' : 's'}
+          <button type="button" onClick={limpiar} className="ml-1 underline hover:text-neutral-800">quitar</button></span>}
+      </span>
       {cuentas.length === 0
-        ? <p className="mt-2 text-sm text-neutral-500">Ninguno tiene publicaciones activas vinculadas.</p>
-        : <div className="mt-2 space-y-1.5">
-            {cuentas.flatMap(([cuenta, codigos]) => {
-              const grupos = Array.from({ length: Math.ceil(codigos.length / POR_OFERTA) }, (_, i) => codigos.slice(i * POR_OFERTA, (i + 1) * POR_OFERTA))
-              return grupos.map((g, i) => {
-                const clave = `${cuenta}-${i}`
-                return (
-                  <div key={clave} className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="min-w-0 flex-1 text-neutral-700"><b className="font-semibold">{cuenta}</b>
-                      <span className="ml-1.5 text-neutral-500">{grupos.length > 1 ? `${i * POR_OFERTA + 1}–${i * POR_OFERTA + g.length} de ${codigos.length}` : `${g.length} publicaci${g.length === 1 ? 'ón' : 'ones'}`}</span></span>
-                    <button type="button" onClick={() => copiar(clave, g)} className="btn-secondary px-2.5 py-1 text-xs" title={g.join(' ')}>
-                      {copiado === clave ? '✓ Copiado' : 'Copiar códigos'}</button>
-                    <a href={portal + encodeURIComponent(g.join(' '))} target="_blank" rel="noopener noreferrer"
-                      title={`Abre la Central de promociones de ML filtrada con estas publicaciones. Entra con ${cuenta}.`}
-                      className="rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-neutral-700">Abrir en ML ↗</a>
-                  </div>
-                )
-              })
-            })}
-          </div>}
-      <p className="mt-2 text-xs text-neutral-500">
-        «Abrir en ML» muestra solo esas publicaciones en la Central de promociones (con la cuenta que tengas abierta en ML): eliges la oferta y le das Participar.
-        {sinPub > 0 && <> · {sinPub} sin publicación activa vinculada.</>}
-      </p>
+        ? <span className="text-xs text-neutral-500">Sin publicaciones activas vinculadas.</span>
+        : cuentas.map(([cuenta, codigos]) => {
+            const grupos = gruposBuscador(codigos)
+            let desde = 1
+            return (
+              <span key={cuenta} className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-semibold text-neutral-800">{cuenta}</span>
+                {grupos.map((g, i) => {
+                  const clave = `${cuenta}-${i}`
+                  const rango = grupos.length > 1 ? `${desde}–${desde + g.length - 1}` : `${g.length}`
+                  desde += g.length
+                  return (
+                    <span key={clave} className="inline-flex overflow-hidden rounded-md border border-neutral-300 bg-white text-xs">
+                      <a href={portal + encodeURIComponent(g.join(' '))} target="_blank" rel="noopener noreferrer"
+                        title={`Abrir en la Central de promociones de ML (entra con ${cuenta})`}
+                        className="px-2 py-1 font-medium text-neutral-800 hover:bg-neutral-100">
+                        Abrir {rango} <span aria-hidden>↗</span></a>
+                      <button type="button" onClick={() => copiar(clave, g)} title={`Copiar códigos: ${g.join(' ')}`}
+                        aria-label={`Copiar códigos de ${cuenta} ${rango}`}
+                        className="border-l border-neutral-300 px-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800">
+                        {copiado === clave ? <span className="text-lime-700">✓</span>
+                          : <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                              <rect x="5" y="5" width="8.5" height="8.5" rx="1.5" /><path d="M10.5 5V3.5A1.5 1.5 0 0 0 9 2H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5H5" /></svg>}
+                      </button>
+                    </span>
+                  )
+                })}
+              </span>
+            )
+          })}
+      {sinPub > 0 && <span className="text-xs text-neutral-400 sm:ml-auto">{sinPub} sin publicación activa</span>}
     </div>
   )
 }
