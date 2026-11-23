@@ -474,7 +474,7 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 - Elige una conversación. Ves los mensajes, los productos, el total de la venta y, si usas Despachos, si su guía ya
   salió.
 - **Calificar desde la conversación:** arriba, junto al comprador y el número de venta, un botón dice cómo está su
-  calificación: **☆ Calificar**, **⏳ Calificar (en espera hasta dd/mm)** o **✓ Calificada: concretada / no concretada**.
+  calificación: **☆ Calificar** (con un reloj si está en tus días de espera: la fecha sale al pasar el cursor) o **✓ Calificada: concretada / no concretada**.
   Al tocarlo eliges **Concretada**, **No concretada** o **No concretada · sin problema** (compra duplicada o anulada de
   acuerdo), el mensaje de tu plantilla sale ya escrito y lo puedes cambiar para esa venta; luego **Calificar**. Si la
   venta sigue en tus días de espera (o el sistema todavía no la ve despachada) primero pregunta **«¿El comprador ya lo
