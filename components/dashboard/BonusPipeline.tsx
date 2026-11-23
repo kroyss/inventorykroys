@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { parseBonusPhases, type BonusPhase } from '@/lib/bonus'
+import { bonoGanado, parseBonusPhases, type BonusPhase } from '@/lib/bonus'
 
 interface Bonus {
   sales_amount: number
@@ -44,7 +44,7 @@ export default function BonusPipeline({ detalle = false }: { detalle?: boolean }
   })
 
   const startDotColor = salesAmount > 0 ? fillColor : '#d1d5db'
-  const ganado   = phases.filter(p => salesAmount >= p.end).reduce((a, p) => a + p.bonus, 0)
+  const ganado   = bonoGanado(phases, salesAmount)   // 23-11: el de la última meta, no la suma
   const usd = (n: number) => Math.round(n).toLocaleString('de-DE')
 
   // pb-2.5: el aire que necesita la etiqueta del mes anterior, que se posiciona
