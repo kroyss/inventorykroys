@@ -66,7 +66,7 @@ async function main() {
           id: c.id, pack: c.pack, fecha: hasta, comprador: textoPlano(comprador).slice(0, 400),
           decision_antes: c.decision_antes, motivos_antes: c.motivos_antes, antes: c.antes,
           decision, motivos: e.motivos, ahora: e.b.respuesta, conf: e.b.confianza, verif: e.verificacion,
-          corregida: e.corregida, acuse: e.acuse, nota: e.nota ?? null, original: e.original, pedido_repetido: e.pedidoRepetido, ejemplos: e.b.ejemplos,
+          corregida: e.corregida, acuse: e.acuse, nota: e.nota ?? null, nota_pago: e.notaPago ?? null, pendiente: e.b.pendiente, original: e.original, pedido_repetido: e.pedidoRepetido, ejemplos: e.b.ejemplos,
           previas: /PREGUNTAS QUE ESTE COMPRADOR HIZO ANTES/.test(e.b.contexto),
           equipo: eq.map(x => textoPlano(String(x.texto))).join(' / ').slice(0, 400),
           llamadas: e.llamadas.length, costo: e.llamadas.reduce((s, l) => s + costoDe(l.modelo, l.uso), 0),

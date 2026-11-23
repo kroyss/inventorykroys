@@ -521,9 +521,19 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   FACTURA, CAMBIO, PAGO, DATOS, ARCHIVO, ENVÍO y PENDIENTE (lo demás). Tus notas propias no las toca.
 - **Formulario de MercadoEnvíos:** lo llena el comprador desde su cuenta; la IA no ofrece llenarlo por él (no hay
   acceso): le explica y lo guía.
+  Si dice que **el formulario no le avanza** (no se envía, no le deja poner la dirección, no pudo subir el
+  comprobante), la IA contesta con **tu guía**: la respuesta rápida de Mensajes que tenga los links de MercadoEnvíos o
+  de YouTube (ingreso, video, borrar la caché, probar desde la computadora), con los links tal cual. Si no tienes esa
+  respuesta rápida, no inventa links. Decir «dirección» en ese caso no cuenta como «recibimos sus datos».
+- **Ya hizo otra compra:** si el comprador dice que ya compró de nuevo con la cantidad correcta y pregunta qué hace con
+  esta, la IA le contesta que trabajan con la nueva y esta no tiene que pagarla, y deja en la nota «calificar esta
+  No concretada · sin problema».
+- **Factura:** si Mi IA dice que emites factura fiscal, la IA pide de una vez la razón social o nombre, el RIF o
+  cédula y la dirección fiscal.
 - **Mínimo de unidades (Mi IA):** si compró menos del mínimo que pusiste para productos baratos (ej. menos de 2 de un
   producto de menos de $3), la IA le dice que con esa compra MercadoEnvíos no activa el envío gratis y que debe volver
-  a ofertar con el mínimo. Si dice que pagó otra cantidad, queda como pendiente de PAGO en la nota.
+  a ofertar con el mínimo. Si dice que pagó otra cantidad («ya pagué 3»), le contesta lo mismo y el pago queda
+  anotado en la nota (PAGO).
 - **Buscar:** por comprador, nº de venta, producto o algo que se habló.
 
 **Pestañas:** Por atender · Atendidas · Recordatorios · Pedir calificación · **Configuración**. Dentro de

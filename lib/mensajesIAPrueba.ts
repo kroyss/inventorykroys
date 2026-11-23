@@ -7,7 +7,7 @@
 // CLIENTES (09-11, mig. 158): solo con el automático ENCENDIDO (Mi IA) y cada respuesta usa 1 crédito ('mensajes');
 // sin créditos no procesa. Los que no salen solos quedan escritos en la conversación para el equipo.
 import type { Pool } from 'pg'
-import { borradorMensaje, type OpcionesMensaje, type TemaPendiente } from '@/lib/mensajesIA'
+import { borradorMensaje, FORM_TRABADO, OTRA_COMPRA, type OpcionesMensaje, type TemaPendiente } from '@/lib/mensajesIA'
 import { verificarMensaje } from '@/lib/verificadorIA'
 import type { LlamadaIA } from '@/lib/ia'
 import { textoPlano } from '@/lib/mensajesML'
@@ -47,6 +47,8 @@ const RECLAMO = /reclam|devol|reembols|cancel|anul|garant[ií]a|defect|da[ñn]ad
 // 21-11 (medición): «No quiero nada» = quería cancelar y la IA contestó «con gusto». Ahora también lo ve una persona.
 const PAGO = /comprobante|capture|captura|referencia|ya (pagu|transfer|hice el pago|deposit)|pagu[eé]|transfer[ií]|pago m[oó]vil|zelle|binance|no (me )?(aparece|refleja)|cobr(o|aron) (de m[aá]s|doble)/i
 const DATOS = /\b\d{7,}\b|\bc\.?\s?i\.?\b|c[eé]dula|direcci[oó]n|\bcalle\b|\bav(enida|\.)|\burb(anizaci[oó]n|\.)|\bsector\b|\bedificio\b|\bapto\b|tel[eé]fono/i
+const sinCancelar = (c: string) => OTRA_COMPRA.test(c) ? c.replace(/cancel\w*|anul\w*/gi, ' ') : c
+const URL_EN_TEXTO = /https?:\/\/[^\s)>\]]+/gi
 // Lo que dice la IA.
 const MONTO = /\d[\d.,]*\s?(bs\b|bs\.|bol[ií]vares)|\bbs\.?\s?\d|aproximad/i
 // 08-11: "no hay problema" no es decir que no hay producto.
@@ -127,10 +129,13 @@ const DEJA_PENDIENTE = /\b(lo|la|los|las) (verificamos|revisamos|coordinamos|con
 export function motivosMensaje(b: { respuesta: string; confianza: string; falta_dato: string | null; pedido_especial?: string | null; reclamo?: string | null }, comprador: string, persona: string[] = [], vendedor = ''): string[] {
   const m: string[] = []
   if (b.pedido_especial) m.push(`${PEDIDO_ESPECIAL}: ${b.pedido_especial}`)
-  if (b.reclamo && !RECLAMO.test(comprador)) m.push(`Reclamo: ${b.reclamo}`)
-  if (RECLAMO.test(comprador)) m.push('Reclamo, cancelación o devolución: lo ve una persona')
+  // 23-11: sin «cancelar» si dice que ya hizo otra compra; sin «no me carga» si es el formulario que no avanza.
+  const paraReclamo = sinCancelar(FORM_TRABADO.test(comprador) ? comprador.replace(new RegExp(FORM_TRABADO.source, 'gi'), ' ') : comprador)
+  if (b.reclamo && !RECLAMO.test(paraReclamo)) m.push(`Reclamo: ${b.reclamo}`)
+  if (RECLAMO.test(paraReclamo)) m.push('Reclamo, cancelación o devolución: lo ve una persona')
   if (PAGO.test(comprador) && !/embalaje|adicional/i.test(comprador)) m.push('Habla de un pago o comprobante: lo verifica una persona')
-  if (DATOS.test(comprador)) m.push('Manda datos personales o de envío: lo ve una persona')
+  // 23-11: «en la dirección no me deja avanzar» nombra un campo, no manda datos.
+  if (DATOS.test(comprador) && !(FORM_TRABADO.test(comprador) && !/\d{7,}/.test(comprador))) m.push('Manda datos personales o de envío: lo ve una persona')
   const tema = persona.find(t => t.length >= 4 && comprador.toLowerCase().includes(t.toLowerCase().split(' ')[0]))
   if (tema) m.push(`Tema que en Mi IA marcaste para una persona (${tema})`)
   if (!b.respuesta) { if (b.confianza !== 'alta') m.push('La IA no propuso respuesta'); return m }
@@ -373,12 +378,15 @@ export function problemasForma(respuesta: string, comprador: string, contexto: s
   if (ROBOT.test(respuesta)) p.push('Forma: frase de robot')
   if (DICE_PAGADO.test(respuesta) && !/^PAGO: ya pagó/m.test(contexto)) p.push('Forma: dice que está pagado sin que el sistema lo diga')
   if (PROMETE.test(respuesta) && !/\d{4,}|https?:/.test(respuesta)) p.push('Forma: promete mandar algo que no va en el mensaje')
+  // 23-11: los links salen SOLO de las respuestas rápidas o las políticas del vendedor, copiados exactos.
+  const links = (respuesta.match(URL_EN_TEXTO) ?? []).map(u => u.replace(/[.,;:!?]+$/, ''))
+  if (links.some(u => !contexto.includes(u))) p.push('Forma: un link que no está en tus respuestas rápidas ni en Mi IA')
   // 21-11 (igual que Preguntas): días de llegada solo si están en las POLÍTICAS (Mi IA); los ejemplos viejos no valen.
   const pol = contexto.slice(contexto.indexOf('POLÍTICAS DEL VENDEDOR:'))
   if (LLEGADA.test(respuesta) && !(contexto.includes('POLÍTICAS DEL VENDEDOR:') && LLEGADA_DIAS.test(pol))) p.push('Forma: da días de llegada que no están en Mi IA')
   const c = comprador.trim()
   if (c && c.length <= 40 && CORTESIA.test(c)) {
-    if (respuesta.length > 140 || /embalaje|pago m[oó]vil|formulario|datos para pagar|medidas?\b/i.test(respuesta)) p.push('Forma: contesta de más a un saludo o un «ok»')
+    if (respuesta.length > 140 || /embalaje|pago m[oó]vil|formulario|datos para pagar|medidas?\b|factura|raz[oó]n social/i.test(respuesta)) p.push('Forma: contesta de más a un saludo o un «ok»')
     // 21-11 (afinado 2): a un «gracias» no se lamenta ni se disculpa, y no se reabre lo ya respondido (color, cambio, cantidad).
     if (/lamentablemente|disculpe|lo sentimos|lamentamos/i.test(respuesta)) p.push('Forma: se lamenta o disculpa ante un saludo o un «ok»')
     if (/(verificamos|confirmamos|revisamos)[^.]{0,40}(distribuci|cambio|color|talla|pedido|cantidad|unidades)/i.test(respuesta)) p.push('Forma: reabre algo ya respondido ante un «ok»')
@@ -396,7 +404,7 @@ export function acuseSeguro(motivos: string[], comprador: string, tono?: { salud
   if (!c) tipo = 'archivo'   // solo mandó un archivo o una foto, sin texto
   else {
     // Mensajes largos suelen traer algo más (otra pregunta, un pedido): esos los ve una persona.
-    if ((!pago && !datos) || /\?|¿/.test(c) || c.length > 160 || PIDE_DATOS.test(c) || VA_A_PAGAR.test(c)) return null
+    if ((!pago && !datos) || /\?|¿/.test(c) || c.length > 160 || PIDE_DATOS.test(c) || VA_A_PAGAR.test(c) || FORM_TRABADO.test(c)) return null
     // Una referencia, un número de operación o el pago del embalaje = comprobante (aunque solo sean números).
     tipo = MANDO_ALGO.test(c) || (/embalaje/i.test(c) && /\d{4,}/.test(c)) ? 'pago' : datos ? 'datos' : null
     if (!tipo) return null
@@ -457,7 +465,11 @@ async function procesarV2(db: Pool, r: FilaMensaje, country: string, conInventar
   else if (motivos.includes(PRECIO_OTRO)) notas.push(['pedido', `pregunta el precio de otro producto: ${textoPlano(comprador).replace(/\s+/g, ' ').slice(0, 120)}`])
   if (b.reclamo) notas.push(['reclamo', b.reclamo])
   if (e.acuse && e.nota) notas.push([e.acuse, e.nota.replace(/^[A-Z ]+ - verificar: /, '')])
+  if (e.notaPago && !(b.pendiente_tema === 'PAGO')) notas.push(['pago', e.notaPago])
   if (b.pendiente && b.pendiente_tema) notas.push([DE_TEMA[b.pendiente_tema], b.pendiente])
+  // 23-11: «ya hice otra compra»: la de esta conversación se califica «No concretada · sin problema».
+  if (OTRA_COMPRA.test(textoPlano(comprador)) && !notas.some(n => /califica/i.test(n[1])))
+    notas.push(['otro', 'hizo otra compra: calificar esta «No concretada · sin problema»'])
   else if (!notas.length && b.respuesta && DEJA_PENDIENTE.test(b.respuesta) && textoPlano(comprador).trim())
     notas.push(['otro', textoPlano(comprador).replace(/\s+/g, ' ').slice(0, 160)])
   if (notas.length) {
@@ -513,6 +525,8 @@ export interface EvaluacionV2 {
   corregida: boolean; original: string | null; pedidoRepetido: boolean; llamadas: LlamadaIA[]
   /** Nivel 2: salió el acuse fijo; el caso queda «Por confirmar» para el equipo con esta nota en la venta. */
   acuse: Acuse | null; nota?: string | null
+  /** 23-11: un pago que menciona y que la IA contestó igual (guía de MercadoEnvíos, mínimo de unidades): va a la nota. */
+  notaPago?: string | null
 }
 export async function evaluarMensajeV2(db: Pool, a: { conexionId: number; seller: number; pack: string; country: string; conInventario: boolean;
   comprador: string; persona: string[]; vendedor: string; hasta?: string; historico?: boolean; mensajeAt: string
@@ -534,6 +548,17 @@ export async function evaluarMensajeV2(db: Pool, a: { conexionId: number; seller
     // verificador comprueba que estén copiados exactos).
     if (PIDE_DATOS.test(a.comprador) && /Datos para pagar \(cópialos EXACTOS/.test(b.contexto)) m = m.filter(x => !x.startsWith('Habla de un pago'))
     // Nunca dar un pago aparte por recibido o confirmado (eso lo hace una persona viendo la cuenta).
+    // 23-11: el comprobante que no pudo subir a MercadoEnvíos (la IA le manda la guía del vendedor) y el «ya pagué 3» de una
+    // compra por debajo del mínimo (la IA le dice que vuelva a ofertar) los contesta la IA; el pago queda anotado en la venta.
+    let notaPago: string | null = null
+    const conGuia = FORM_TRABADO.test(a.comprador) && /checkout\.mercadoenvios|youtu/i.test(b.respuesta)
+    const minimo = /MÍNIMO PARA ENVÍO GRATIS/.test(b.contexto) && /ofert/i.test(b.respuesta)
+    // El «ya pagué 3» de una compra bajo el mínimo no es un pedido especial: se le dice que vuelva a ofertar.
+    if (b.respuesta && minimo) m = m.filter(x => !x.startsWith(PEDIDO_ESPECIAL))
+    if (b.respuesta && (conGuia || minimo) && m.some(x => x.startsWith('Habla de un pago'))) {
+      m = m.filter(x => !x.startsWith('Habla de un pago'))
+      notaPago = textoPlano(a.comprador).replace(/\s+/g, ' ').slice(0, 140)
+    }
     if (b.respuesta && PAGO_DADO.test(b.respuesta)) m.push('Da un pago por recibido: lo confirma una persona')
     m.push(...problemasForma(b.respuesta, textoPlano(a.comprador), b.contexto))
     if (b.respuesta && PIDE_PRECIO.test(a.comprador)) {
@@ -552,7 +577,7 @@ export async function evaluarMensajeV2(db: Pool, a: { conexionId: number; seller
       if (v?.ok) m = m.filter(x => !/^Confianza/.test(x))
       else m.push(`Verificador: ${v?.motivo ?? 'no respondió'}`)
     }
-    return { m, verificacion, repetido }
+    return { m, verificacion, repetido, notaPago }
   }
   const b = await borradorMensaje(db, a.conexionId, a.seller, a.pack, a.country, a.conInventario, a.hasta, undefined, op)
   if (a.textos) Object.assign(a, await a.textos())
@@ -562,10 +587,10 @@ export async function evaluarMensajeV2(db: Pool, a: { conexionId: number; seller
       { anterior: b.respuesta, problemas: e.m }, op).catch(() => null)
     if (k) {
       const e2 = await evaluar(k)
-      if (!e2.m.length && k.respuesta) return { b: k, motivos: [], verificacion: e2.verificacion, corregida: true, original: b.respuesta, pedidoRepetido: e2.repetido, llamadas, acuse: null }
+      if (!e2.m.length && k.respuesta) return { b: k, motivos: [], verificacion: e2.verificacion, corregida: true, original: b.respuesta, pedidoRepetido: e2.repetido, llamadas, acuse: null, notaPago: e2.notaPago }
     }
   }
   const ac = acuseSeguro(e.m, textoPlano(a.comprador), a.tono)
   if (ac) return { b: { ...b, respuesta: ac.texto }, motivos: [], verificacion: e.verificacion, corregida: false, original: b.respuesta, pedidoRepetido: e.repetido, llamadas, acuse: ac.tipo, nota: ac.nota }
-  return { b, motivos: e.m, verificacion: e.verificacion, corregida: false, original: null, pedidoRepetido: e.repetido, llamadas, acuse: null }
+  return { b, motivos: e.m, verificacion: e.verificacion, corregida: false, original: null, pedidoRepetido: e.repetido, llamadas, acuse: null, notaPago: e.notaPago }
 }
