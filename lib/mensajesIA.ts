@@ -15,6 +15,14 @@ import { fichasActivas } from '@/lib/fichasIA'
 import { COUNTRY_TZ } from '@/lib/tz'
 import { contextoFotos, fichaDeAtributos, lineasFotos, type FotoML } from '@/lib/fotosIA'
 
+// 23-11 (marcas Mal del dueño): «en la dirección no me deja avanzar», «no se termina de enviar el formulario», «no pude
+// anexarlo por MercadoEnvíos» = el formulario de MercadoEnvíos no avanza. No son datos ni un comprobante para acusar: la IA
+// contesta con la guía del vendedor (respuesta rápida con sus links).
+export const FORM_TRABADO = /no (me )?(deja|permite)\b|no (se )?(termina de )?env[ií][ae]|no (puedo|pude) (anexar|adjuntar|subir|enviar|llenar|rellenar|avanzar|completar|terminar|cargar|poner)|no avanza|(me )?(da|sale|aparece) (un )?error|no (me )?(carga|abre) (el )?(formulario|link|enlace|p[aá]gina)/i
+// «Ya hice otra compra con tres unidades, ¿qué hago con esta?»: no es un reclamo aunque diga «cancelar» (la IA contesta que
+// trabajamos con la nueva y deja la nota para calificar esta «No concretada · sin problema»).
+export const OTRA_COMPRA = /(hice|hize|ise|realic[eé]|tengo|mand[eé]|di) (una |la )?(otra|nueva|segunda) (compra|oferta|orden)|(otra|nueva) (compra|oferta|orden) (con|de|por) (\d+|las?|el|los|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)|ya (hice|ise|realic[eé]) (una|la) (compra|oferta) (por|de|con) \d+|compr[eé] (de nuevo|otra vez|nuevamente)|volv[ií] a (comprar|ofertar)/i
+
 const ESTADO_VENTA: Record<string, string> = {
   BORRADOR: 'cargada en el sistema, pago todavía sin verificar',
   PAGO_VERIFICADO: 'pago verificado, por preparar',
@@ -60,16 +68,19 @@ Cómo responder:
 - Otro pago aparte que NO es un adicional opcional (una diferencia, otro producto): ese lo verifica el equipo.
 - Monto: desglose "cantidad × precio = subtotal" con el TOTAL de la venta; si el vendedor ofrece un adicional opcional, súmalo aparte como opcional ("si desea agregar el embalaje de X, total Y").
 - Envío pagado por el comprador (cobro a destino): nunca des montos ni estimados (varían). Confirma la agencia entre las de cobro a destino de las POLÍTICAS; cuando la elija, pídele nombre completo, cédula, teléfono, dirección, ciudad y estado. Si las POLÍTICAS piden un mínimo de unidades para el envío gratis y el producto entra ahí, recomienda comprar ese mínimo: le sale más barato que el cobro a destino.
-- Si pregunta algo que depende del equipo y no está en los datos (cuándo sale el paquete, desde qué oficina, un problema con el pago o el formulario), no lo inventes: responde que lo verifican con el equipo y le avisan por este chat, con confianza "baja" y el dato en "falta_dato".
+- Si pregunta algo que depende del equipo y no está en los datos (cuándo sale el paquete, desde qué oficina, un problema con el pago), no lo inventes: responde que lo verifican con el equipo y le avisan por este chat, con confianza "baja" y el dato en "falta_dato".
 - Si el comprador solo manda un emoji o un "ok", no hace falta responder: deja la respuesta vacía con confianza "alta".
 - Si el comprador solo saluda o agradece, responde corto y amable.
-- Nada de correos, redes sociales ni links que no sean de MercadoLibre.
+- Nada de correos, redes sociales ni links que no sean de MercadoLibre, salvo los links que el vendedor ya usa en sus RESPUESTAS RÁPIDAS o POLÍTICAS (cópialos EXACTOS, letra por letra; nunca inventes uno).
 - SOLO AGRADECE (08-11): si el comprador solo agradece o confirma ("gracias", "ok", "perfecto", "excelente") y no pregunta nada, responde corto y cordial (ej. "Con gusto, quedo a su orden"); puedes recordar cuándo sale el envío, pero NO vuelvas a ofrecer el embalaje ni otros cobros que ya se le dijeron.
 - PEDIDO ESPECIAL (08-11): si en lo que escribió AHORA el comprador pide algo DISTINTO a lo que compró —otro color, talla, modelo o variante; mezclar variantes ("compré 2 rojos, quiero 1 rojo y 1 azul"); más o menos unidades; cambiar o agregar otro producto; preguntar el precio o si hay de OTRO producto distinto al que compró (21-11)— pon en "pedido_especial" un resumen corto con lo que compró y lo que quiere (ej. "Compró 2 rojos, quiere 1 rojo y 1 azul"). En ese caso el borrador NO confirma el cambio: di que lo verifican y le confirman por aquí. NO es pedido especial (deja null): preguntar de qué color o modelo le llega, confirmar que es el que compró (13-11: si lo que pide o nombra COINCIDE con la VARIANTE QUE COMPRÓ —ej. escribe "solo color blanco" y compró "Color: Luz solo Blanco"— es la misma compra repetida: confírmale que eso es lo que compró y así le llega; las fotos o la ficha pueden mostrar OTRA variante de la publicación y eso NO cambia lo que compró), preguntar si hay otros colores ANTES de decidir algo, reclamos por algo que llegó mal, ni dudas de uso.
 - RECLAMO (08-11): si pide devolución, garantía, reemplazo o reembolso, o dice que le llegó dañado, defectuoso, que no funciona, incompleto o un producto/color/modelo distinto al que compró, pon en "reclamo" un resumen corto (ej. "Le llegó azul, compró rojo; pide cambio"). El borrador NO promete devolución, reemplazo ni reembolso: di que lo revisan con el equipo y le responden por aquí. Si no es eso, null.
 
 - PENDIENTE (22-11, el dueño: «todo lo que deje pendiente debe ir a notas»): si tu respuesta deja algo para que el equipo lo haga o lo verifique ("lo revisamos con el equipo", "le confirmamos por aquí", "le avisamos"), pon en "pendiente" lo que pidió el comprador con los datos EXACTOS que dio (nombre, razón social, RIF, cédula, dirección, cantidad…) y en "pendiente_tema" el tema: FACTURA (pide factura o datos fiscales), CAMBIO (cambiar algo de la compra o del envío que no es pedido especial ni reclamo), PAGO (dice que pagó, pagó otro monto u otra cantidad, comprobantes), DATOS (manda datos de envío o personales), ENVIO (pide algo del despacho: agencia, oficina, fecha) u OTRO. Ej.: FACTURA · "a nombre de Cami Farma 4:19, C.A RIF J506862611". Si no deja nada pendiente, los dos en null. El pedido especial y el reclamo van en sus campos, no aquí.
 - FORMULARIO DE MERCADOENVÍOS (22-11): lo llena el comprador desde SU cuenta; nosotros no tenemos acceso y no podemos llenarlo por él (ni con los datos que nos pase por aquí). Si pide que se lo llenemos, explícaselo con amabilidad, guíalo con el video o el paso a paso de la conversación y ofrécele aclarar por aquí cualquier campo que no entienda. Eso SÍ contesta lo que pidió.
+- FORMULARIO QUE NO AVANZA (23-11, el dueño): si dice que el formulario de MercadoEnvíos no le deja avanzar, no se envía, da error, no le deja poner la dirección o no pudo subir el comprobante ahí, NO lo dejes para el equipo: contéstale tú con la guía del vendedor (la respuesta rápida sobre problemas con MercadoEnvíos, con sus links EXACTOS: ingreso a MercadoEnvíos, video de cómo agendar, cómo borrar la caché y probar desde una computadora), resumida para que entre en el mensaje, con confianza "alta". El comprobante se sube en el formulario de MercadoEnvíos, no por aquí. Si también pregunta otra cosa, contéstala igual.
+- OTRA COMPRA (23-11, el dueño): si dice que YA hizo otra compra (con la cantidad o el producto correcto) y pregunta qué hace con esta, contesta tú: "Perfecto, trabajamos con la nueva compra; esta no tiene que pagarla, nosotros la cerramos", con confianza "alta". No es pedido especial ni reclamo. Pon en "pendiente" "Hizo otra compra: calificar esta «No concretada · sin problema»" con tema OTRO.
+- FACTURA (23-11): si pide factura o pregunta si emiten y las POLÍTICAS dicen que sí emiten factura fiscal, contéstalo y pídele de una vez que mande por aquí la razón social o nombre, el RIF o cédula y la dirección fiscal (confianza "alta"; no digas "le confirmamos luego"). Si ya mandó esos datos, dile que los recibimos para su factura y ponlos en "pendiente" (FACTURA).
 
 Siempre termina llamando a la herramienta proponer_respuesta.`
 
@@ -149,7 +160,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
       // 22-11 (el dueño): por debajo del mínimo de Mi IA (ej. menos de 2 unidades de un producto de menos de $3) MercadoEnvíos
       // no activa el envío gratis con esa compra: tiene que volver a ofertar con el mínimo.
       if (minimoEnvio && it.usd != null && it.usd < minimoEnvio.precioMenor && it.cantidad < minimoEnvio.unidades)
-        L.push(`  MÍNIMO PARA ENVÍO GRATIS: compró ${it.cantidad} y este producto pide mínimo ${minimoEnvio.unidades} unidades (cuesta menos de $${minimoEnvio.precioMenor}). Con esta compra MercadoEnvíos NO activa el envío gratis: si pregunta por el envío o el formulario no le funciona, dile que debe volver a ofertar (comprar de nuevo) mínimo ${minimoEnvio.unidades} unidades de este producto para que se active. Si dice que pagó otra cantidad, no lo des por bueno: va en "pendiente" (PAGO).`)
+        L.push(`  MÍNIMO PARA ENVÍO GRATIS: compró ${it.cantidad} y este producto pide mínimo ${minimoEnvio.unidades} unidades (cuesta menos de $${minimoEnvio.precioMenor}). Con esta compra MercadoEnvíos NO activa el envío gratis: si pregunta por el envío o el formulario no le funciona, dile que debe volver a ofertar (comprar de nuevo) mínimo ${minimoEnvio.unidades} unidades de este producto para que se active. Si dice que pagó otra cantidad (ej. "ya pagué 3"), contéstale tú con confianza "alta": esta compra quedó por ${it.cantidad} y así MercadoEnvíos no activa el envío gratis; debe volver a ofertar (una compra nueva) mínimo ${minimoEnvio.unidades} unidades para que se active (no es pedido especial). Lo que dice que pagó va en "pendiente" (PAGO).`)
     }
     // Total de la venta en USD y Bs a tasa BCV (07-11): "¿cuánto sería en Bs?".
     if (country === 'VE' && venta.items.every(i => i.precio != null)) {
@@ -236,6 +247,15 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   // Respuestas rápidas de Mensajes (06-11): cómo escribe el vendedor post-venta. Las reglas mandan las POLÍTICAS.
   const { rows: [mr] } = await db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
   const rapidos = leerMensajesRapidos(mr?.value)
+  // 23-11 (marcas Mal del dueño): lo que escribió el comprador desde la última respuesta del vendedor (y los últimos
+  // mensajes suyos, para «ya hice otra compra» seguido de un «gracias»). Las dos reglas van como DATOS del vendedor
+  // para que el verificador no las tome por inventadas.
+  const ultimoVendedor = hilo.mensajes.map(m => m.propio).lastIndexOf(true)
+  const recienComprador = hilo.mensajes.slice(ultimoVendedor + 1).map(m => textoPlano(m.texto)).join('\n')
+  const ultimosComprador = hilo.mensajes.filter(m => !m.propio).slice(-6).map(m => textoPlano(m.texto)).join('\n')
+  const guia = FORM_TRABADO.test(recienComprador) ? rapidos.find(r => /checkout\.mercadoenvios|youtu/i.test(r.texto)) : undefined
+  if (guia) L.push(`\nEL FORMULARIO DE MERCADOENVÍOS NO LE AVANZA: contesta con esta guía del vendedor, resumida, con los links EXACTOS (el comprobante también se sube ahí, no por aquí):\n${guia.texto}`)
+  if (OTRA_COMPRA.test(ultimosComprador)) L.push('\nREGLA DEL VENDEDOR (otra compra): si el comprador ya hizo otra compra con la cantidad o el producto correcto, trabajamos con la nueva; esta no tiene que pagarla y la cerramos nosotros (se califica «No concretada · sin problema»).')
   if (rapidos.length) L.push(`\nRESPUESTAS RÁPIDAS DEL VENDEDOR PARA MENSAJES (su forma de escribir; si alguna aplica a lo que pregunta, úsala casi tal cual; si un dato choca con las POLÍTICAS, mandan las POLÍTICAS; lo que está entre llaves como {nombre}, {producto} o {precio} NUNCA va tal cual: cámbialo por el dato real de esta venta o sácalo):\n${rapidos.slice(0, 15).map(r => `- [${r.titulo}]: ${r.texto}`).join('\n')}`)
   if (ejemplos.sugerencias.length) {
     L.push('\nRESPUESTAS ANTERIORES DEL VENDEDOR A MENSAJES PARECIDOS (otras ventas):')
