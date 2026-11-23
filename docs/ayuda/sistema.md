@@ -1455,6 +1455,13 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   quién y cuándo, con **Devolver** (vuelve a Reponer y se reactiva); reactivarlo en Productos también lo devuelve.
   **Se están cayendo**: venden la mitad o menos que antes teniendo stock. **Parados**: vendieron menos de lo que
   dicen tus reglas teniendo stock (candidatos a remate). En ambos, **Desactivar** si el stock está en 0.
+  **Ponerlos en oferta en MercadoLibre** (en Se están cayendo, Parados y Recién llegados): junta las publicaciones
+  **activas** de esos productos, por cuenta y de a **20** (lo máximo de una oferta relámpago). **Abrir en ML** abre la
+  Central de promociones de MercadoLibre mostrando solo esas publicaciones (con la cuenta que tengas abierta en ML): ahí
+  eliges la oferta (por ejemplo una Oferta relámpago) y le das **Participar**. **Copiar códigos** los copia separados por
+  espacio, que es como los acepta el buscador de ML. Con las casillas eliges solo algunos; sin marcar, va toda la lista
+  (respeta la búsqueda). Las **Ofertas relámpago de «Mi página»** no se ven en Productos → Promociones: MercadoLibre no
+  las da por su API, se crean y se llenan en su Central de promociones.
   **⚙ Reglas** (cambiarlas pide el permiso «Configurar inventario»): cuánto tarda en llegarte la mercancía, desde cuándo
   es urgente, para cuántos meses comprar, cuántos meses de ventas mirar, venta mínima al mes para reponer, qué es
   «parado» (unidades y meses), cuánto dura «recién llegado» y cuántos meses comparar para «se está cayendo». Botones
@@ -1580,8 +1587,9 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   fotos, datos de envío y costos. La lista va por último movimiento.
 - **Inventario:** **Bajo** = lo que tienes alcanza para menos de lo que tarda en llegar la mercancía (reglas de
   Reponer); un mínimo escrito a mano manda. Mín y máx en gris = recomendados que se mueven con las ventas. Cada venta
-  resta y cada compra recibida suma. **Ajuste de stock** guarda el número real contado. **Reponer** = qué comprar;
-  **Stock en ML** = tu stock contra tus publicaciones.
+  resta y cada compra recibida suma. **Ajuste de stock** guarda el número real contado. **Reponer** = qué comprar
+  (en Parados y Se están cayendo, **Abrir en ML** lleva esas publicaciones a la Central de promociones para ponerlas en
+  oferta); **Stock en ML** = tu stock contra tus publicaciones.
 - **Facturas:** las facturas fiscales de las ventas; **Retención pendiente** espera el comprobante del cliente; **Hoja
   de prueba** cuadra el papel; Configuración: número siguiente y corrimiento.
 - **Productos:** costo, precio y rentabilidad de cada producto (tócalo para la ficha). **Importar desde ML** crea

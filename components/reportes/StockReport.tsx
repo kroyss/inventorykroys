@@ -63,6 +63,15 @@ export default function StockReport({ data, sub, setSub, onReload, onRefrescar }
   const [verReglas, setVerReglas] = useState(false)
   const [ocupado, setOcupado] = useState<number | null>(null)
   const confirmar = useConfirm()
+  // 23-11: casillas de Parados / Se están cayendo / Recién llegados para armar ofertas en ML (se limpian al cambiar de vista).
+  // (Se guardan junto a la vista: al cambiar de vista, la selección de la otra no cuenta.)
+  const [seleccion, setSeleccion] = useState<{ sub: StockSub; ids: Set<number> }>({ sub, ids: new Set() })
+  const elegidos = useMemo(() => seleccion.sub === sub ? seleccion.ids : new Set<number>(), [seleccion, sub])
+  const setElegidos = (ids: Set<number>) => setSeleccion({ sub, ids })
+  const elegir = (ids: number[], on: boolean) => {
+    const n = new Set(elegidos); for (const id of ids) { if (on) n.add(id); else n.delete(id) }
+    setElegidos(n)
+  }
   const router = useRouter()
   const cerrarReglas = useCallback(() => setVerReglas(false), [])
 
@@ -186,8 +195,12 @@ export default function StockReport({ data, sub, setSub, onReload, onRefrescar }
       {sub === 'reposicion' && listaNo.length > 0 && (
         <NoVuelves lista={listaNo} puede={!!data.puede_productos} onDevolver={devolver} />
       )}
+      {(sub === 'declive' || sub === 'remate' || sub === 'nuevos') && (
+        <OfertasML filas={filtra(sub === 'declive' ? declive : sub === 'remate' ? remate : nuevos)} elegidos={elegidos}
+          pais={data.pais} limpiar={() => setElegidos(new Set())} />
+      )}
       {sub === 'declive' && (
-        <Lista filas={filtra(declive)} vacio="Ningún producto se está cayendo." cols={[
+        <Lista filas={filtra(declive)} elegidos={elegidos} elegir={elegir} vacio="Ningún producto se está cayendo." cols={[
           { t: 'Tienes', v: p => `${p.stock_actual} u` },
           { t: `Antes → ahora (${r.cayendo} m)`, v: p => `${p.ventas_4m_prior} → ${p.ventas_4m_recent} u`,
             title: p => `Días con stock: ${p.dias_stock_prior} → ${p.dias_stock_recent}. Stock promedio: ${p.stock_prom_prior} → ${p.stock_prom_recent} u.` },
@@ -195,7 +208,7 @@ export default function StockReport({ data, sub, setSub, onReload, onRefrescar }
         ]} accion={p => <Desactivar p={p} ocupado={ocupado} onClick={desactivar} />} />
       )}
       {sub === 'remate' && (
-        <Lista filas={filtra(remate)} vacio="No tienes productos parados." cols={[
+        <Lista filas={filtra(remate)} elegidos={elegidos} elegir={elegir} vacio="No tienes productos parados." cols={[
           { t: 'Tienes', v: p => `${p.stock_actual} u` },
           { t: `Vendió (${r.paradoMeses} m)`, v: p => `${p.ventas_parado} u` },
           { t: 'Plata parada', v: p => `$${money(p.valor_stock || 0)}`, fuerte: true },
@@ -203,7 +216,7 @@ export default function StockReport({ data, sub, setSub, onReload, onRefrescar }
         ]} accion={p => <Desactivar p={p} ocupado={ocupado} onClick={desactivar} />} />
       )}
       {sub === 'nuevos' && (
-        <Lista filas={filtra(nuevos)} vacio="No hay recién llegados con pocas ventas." cols={[
+        <Lista filas={filtra(nuevos)} elegidos={elegidos} elegir={elegir} vacio="No hay recién llegados con pocas ventas." cols={[
           { t: 'Tienes', v: p => `${p.stock_actual} u` },
           { t: 'Vendió', v: p => `${p.ventas_parado} u` },
           { t: 'En inventario', v: p => m(p.meses_disponible), fuerte: true },
@@ -353,34 +366,128 @@ function Nombre({ p }: { p: P }) {
 
 // ── Lista simple (Cayendo / Parados / Nuevos): tabla en escritorio, tarjetas en el celular ─────────────────────
 type Col = { t: string; v: (p: P) => React.ReactNode; fuerte?: boolean; title?: (p: P) => string }
-function Lista({ filas, cols, accion, vacio }: { filas: P[]; cols: Col[]; accion?: (p: P) => React.ReactNode; vacio: string }) {
+function Lista({ filas, cols, accion, vacio, elegidos, elegir }: { filas: P[]; cols: Col[]; accion?: (p: P) => React.ReactNode; vacio: string
+  elegidos?: Set<number>; elegir?: (ids: number[], on: boolean) => void }) {
   if (!filas.length) return <Vacio t={vacio} />
+  const conCasillas = !!(elegidos && elegir)
+  const todos = conCasillas && filas.every(p => elegidos!.has(p.id))
+  const algunos = conCasillas && !todos && filas.some(p => elegidos!.has(p.id))
+  const casilla = (p: P) => conCasillas && (
+    <input type="checkbox" checked={elegidos!.has(p.id)} onChange={e => elegir!([p.id], e.target.checked)}
+      onClick={e => e.stopPropagation()} aria-label={`Elegir ${p.name}`} className="mt-1 shrink-0" />
+  )
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+      {conCasillas && (
+        <label className="flex items-center gap-2 border-b border-neutral-100 bg-neutral-50 px-4 py-2 text-xs text-neutral-600 md:hidden">
+          <input type="checkbox" checked={todos} ref={el => { if (el) el.indeterminate = algunos }}
+            onChange={() => elegir!(filas.map(p => p.id), !todos)} />
+          Elegir todos <span className="ml-auto text-neutral-400">{filas.length} productos</span>
+        </label>
+      )}
       <table className="hidden w-full text-sm md:table">
         <thead className="bg-neutral-50 text-left text-xs text-neutral-500">
-          <tr><th className="px-4 py-2 font-medium">Producto</th>{cols.map(c => <th key={c.t} className="px-3 py-2 text-right font-medium">{c.t}</th>)}{accion && <th className="w-28 px-4 py-2" />}</tr>
+          <tr>{conCasillas && <th className="w-10 px-4 py-2"><input type="checkbox" checked={todos} aria-label="Elegir todos"
+            ref={el => { if (el) el.indeterminate = algunos }} onChange={() => elegir!(filas.map(p => p.id), !todos)} /></th>}
+            <th className={`${conCasillas ? 'pr-4' : 'px-4'} py-2 font-medium`}>Producto</th>{cols.map(c => <th key={c.t} className="px-3 py-2 text-right font-medium">{c.t}</th>)}{accion && <th className="w-28 px-4 py-2" />}</tr>
         </thead>
         <tbody>
           {filas.map(p => (
-            <tr key={p.id} className="border-t border-neutral-100 hover:bg-neutral-50">
-              <td className="max-w-xs px-4 py-2.5"><Nombre p={p} /></td>
+            <tr key={p.id} onClick={conCasillas ? () => elegir!([p.id], !elegidos!.has(p.id)) : undefined}
+              className={`border-t border-neutral-100 ${conCasillas ? 'cursor-pointer' : ''} ${conCasillas && elegidos!.has(p.id) ? 'bg-lime-50/60' : 'hover:bg-neutral-50'}`}>
+              {conCasillas && <td className="px-4 py-2.5">{casilla(p)}</td>}
+              <td className={`max-w-xs ${conCasillas ? 'pr-4' : 'px-4'} py-2.5`}><Nombre p={p} /></td>
               {cols.map(c => <td key={c.t} title={c.title?.(p)} className={`px-3 py-2.5 text-right tabular-nums ${c.fuerte ? 'font-semibold text-neutral-900' : 'text-neutral-600'}`}>{c.v(p)}</td>)}
-              {accion && <td className="px-4 py-2.5 text-right">{accion(p)}</td>}
+              {accion && <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>{accion(p)}</td>}
             </tr>
           ))}
         </tbody>
       </table>
       <div className="divide-y divide-neutral-100 md:hidden">
         {filas.map(p => (
-          <div key={p.id} className="space-y-1.5 px-4 py-3">
-            <div className="flex items-start justify-between gap-2"><Nombre p={p} />{accion?.(p)}</div>
+          <div key={p.id} className={`space-y-1.5 px-4 py-3 ${conCasillas && elegidos!.has(p.id) ? 'bg-lime-50/60' : ''}`}>
+            <div className="flex items-start justify-between gap-2"><div className="flex min-w-0 items-start gap-3">{casilla(p)}<Nombre p={p} /></div>{accion?.(p)}</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
               {cols.map(c => <span key={c.t}>{c.t}: <b className={c.fuerte ? 'text-neutral-900' : 'font-medium text-neutral-700'}>{c.v(p)}</b></span>)}
             </div>
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ── Ofertas en MercadoLibre (23-11, el dueño): las ofertas relámpago de «Mi página» no están en la API de ML, así que
+// se arman en la Central de promociones. Esto ahorra buscarlas una a una: por cuenta, en grupos de 20 (el máximo de
+// una relámpago), «Abrir en ML» abre la Central ya filtrada (su buscador acepta varios códigos separados por ESPACIO;
+// con coma no, probado 23-11) y «Copiar códigos» los deja para pegar. Con casillas marcadas, solo esas; si no, la lista.
+const POR_OFERTA = 20
+function OfertasML({ filas, elegidos, pais, limpiar }: { filas: P[]; elegidos: Set<number>; pais?: string; limpiar: () => void }) {
+  const [copiado, setCopiado] = useState<string | null>(null)
+  useEffect(() => {
+    if (!copiado) return
+    const t = setTimeout(() => setCopiado(null), 2500)
+    return () => clearTimeout(t)
+  }, [copiado])
+  const { cuentas, sinPub, marcados } = useMemo(() => {
+    const marcados = filas.filter(p => elegidos.has(p.id)).length
+    const base = marcados ? filas.filter(p => elegidos.has(p.id)) : filas
+    const m = new Map<string, string[]>()
+    let sin = 0
+    for (const p of base) {
+      const pubs: { cuenta: string; item: string }[] = p.publicaciones ?? []
+      if (!pubs.length) { sin++; continue }
+      for (const x of pubs) { const l = m.get(x.cuenta) ?? []; if (!l.includes(x.item)) l.push(x.item); m.set(x.cuenta, l) }
+    }
+    return { cuentas: [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])), sinPub: sin, marcados }
+  }, [filas, elegidos])
+  if (!filas.length) return null
+  const portal = `https://vendedores.mercadolibre.com.${pais === 'CO' ? 'co' : 've'}/publicaciones/listado/promos?page=1&tab=promotions&search=`
+  const copiar = async (clave: string, codigos: string[]) => {
+    const texto = codigos.join(' ')
+    try { await navigator.clipboard.writeText(texto) }
+    catch {
+      const t = document.createElement('textarea'); t.value = texto; document.body.appendChild(t); t.select()
+      try { document.execCommand('copy') } finally { t.remove() }
+    }
+    setCopiado(clave)
+  }
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="text-sm font-medium text-neutral-900">Ponerlos en oferta en MercadoLibre
+          <span className="ml-1.5 font-normal text-neutral-500">
+            {marcados ? `${marcados} elegido${marcados === 1 ? '' : 's'}` : `los ${filas.length} de la lista`}
+          </span>
+          {marcados > 0 && <button type="button" onClick={limpiar} className="ml-2 text-xs font-normal text-neutral-500 underline hover:text-neutral-800">Quitar selección</button>}
+        </p>
+        <p className="text-xs text-neutral-500">Publicaciones activas, de a {POR_OFERTA} (lo máximo de una oferta relámpago)</p>
+      </div>
+      {cuentas.length === 0
+        ? <p className="mt-2 text-sm text-neutral-500">Ninguno tiene publicaciones activas vinculadas.</p>
+        : <div className="mt-2 space-y-1.5">
+            {cuentas.flatMap(([cuenta, codigos]) => {
+              const grupos = Array.from({ length: Math.ceil(codigos.length / POR_OFERTA) }, (_, i) => codigos.slice(i * POR_OFERTA, (i + 1) * POR_OFERTA))
+              return grupos.map((g, i) => {
+                const clave = `${cuenta}-${i}`
+                return (
+                  <div key={clave} className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="min-w-0 flex-1 text-neutral-700"><b className="font-semibold">{cuenta}</b>
+                      <span className="ml-1.5 text-neutral-500">{grupos.length > 1 ? `${i * POR_OFERTA + 1}–${i * POR_OFERTA + g.length} de ${codigos.length}` : `${g.length} publicaci${g.length === 1 ? 'ón' : 'ones'}`}</span></span>
+                    <button type="button" onClick={() => copiar(clave, g)} className="btn-secondary px-2.5 py-1 text-xs" title={g.join(' ')}>
+                      {copiado === clave ? '✓ Copiado' : 'Copiar códigos'}</button>
+                    <a href={portal + encodeURIComponent(g.join(' '))} target="_blank" rel="noopener noreferrer"
+                      title={`Abre la Central de promociones de ML filtrada con estas publicaciones. Entra con ${cuenta}.`}
+                      className="rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-neutral-700">Abrir en ML ↗</a>
+                  </div>
+                )
+              })
+            })}
+          </div>}
+      <p className="mt-2 text-xs text-neutral-500">
+        «Abrir en ML» muestra solo esas publicaciones en la Central de promociones (con la cuenta que tengas abierta en ML): eliges la oferta y le das Participar.
+        {sinPub > 0 && <> · {sinPub} sin publicación activa vinculada.</>}
+      </p>
     </div>
   )
 }
