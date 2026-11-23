@@ -5,7 +5,6 @@ import { TELEGRAM_SOPORTE } from '@/lib/cuenta'
 import type { Marca } from '@/lib/marca'
 import { eventoPixel, iniciarPixel } from '@/lib/metaPixel'
 import { LineaLegal } from '@/components/legal/PaginaLegal'
-import { CASO_FINAL } from '@/lib/despegue'
 
 // Prueba gratis de 15 días (26-10, app/registro/page.tsx → POST /api/registro). Mismo formato que la entrada:
 // panel negro de marca a la izquierda y el formulario a la derecha. Al crear la cuenta entra sola y va al inicio,
@@ -27,9 +26,6 @@ const PASOS = [
   'Conecta tu cuenta de MercadoLibre: tus 15 días corren desde que te registras.',
   'Al terminar, escríbenos para seguir sin perder nada.',
 ]
-// 23-11 (el dueño: llegan muchos y casi nadie se registra): un caso real y una persona detrás, arriba del formulario.
-const CASO = `Caso real: nuestra cuenta arrancó de cero y llegó a MercadoLíder en ${CASO_FINAL.dias} días usándolo.`
-const AYUDA = 'Te ayudamos a conectar tu cuenta por WhatsApp.'
 
 export default function RegistroForm({ marca }: { marca: Marca }) {
   const [error, setError]       = useState('')
@@ -113,7 +109,6 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
           <p className="inline-flex w-fit rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">15 días gratis</p>
           <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight">{TITULO}</h1>
           <p className="text-neutral-400 mt-3 text-sm leading-relaxed">Sin tarjeta ni pago por adelantado. {marca.lema}</p>
-          <p className="mt-4 border-l-2 border-lime-400 pl-3 text-sm leading-relaxed text-neutral-300">{CASO}</p>
           <ul className="mt-8 space-y-4">
             {INCLUYE.map(p => (
               <li key={p.t} className="flex gap-3">
@@ -153,7 +148,6 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
           {EN_CELULAR.map(t => <li key={t} className="flex items-center gap-1"><span className="text-lime-400" aria-hidden="true">✓</span>{t}</li>)}
         </ul>
         <p className="relative mt-2 text-xs text-neutral-400">Sin tarjeta. Los 15 días corren desde que te registras.</p>
-        <p className="relative mt-3 border-l-2 border-lime-400 pl-2.5 text-xs leading-relaxed text-neutral-300">{CASO}</p>
       </header>
 
       {/* Formulario */}
@@ -171,10 +165,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
             </div>
           ) : <>
           <h2 className="text-2xl font-semibold text-neutral-900 tracking-tight">Crea tu cuenta</h2>
-          <p className="text-sm text-neutral-500 mt-1">MercadoLibre Venezuela · prueba de 15 días.</p>
-          <p className="mt-2 mb-6 flex items-center gap-2 text-sm text-neutral-700">
-            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-lime-100 text-[11px] text-lime-700" aria-hidden="true">✓</span>{AYUDA}
-          </p>
+          <p className="text-sm text-neutral-500 mt-1 mb-6">MercadoLibre Venezuela · prueba de 15 días.</p>
 
           <form onSubmit={enviar} onFocusCapture={e => tocoCampo((e.target as unknown as HTMLInputElement).name ?? "")} className="space-y-3.5">
             <div>

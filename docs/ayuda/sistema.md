@@ -114,7 +114,7 @@ está: **verde** todo al día, **amarillo** algo viejo. Abre un panel con cada c
   La página lista lo que trae la prueba (la IA responde sola tus preguntas, Mensajes, Pagos MercadoEnvíos, Despachos,
   Stock, Radar) y menciona **Inventario** como paso opcional que se activa después. Abajo del formulario están los
   **Términos** y la **Política de privacidad** (app.elcomerciantedigital.com/terminos y /privacidad): la prueba es sin
-  tarjeta y sin cobros automáticos. Te ayudamos a conectar tu cuenta de MercadoLibre por WhatsApp.
+  tarjeta y sin cobros automáticos.
 - **Prueba gratis de 15 días:** incluye Automatizaciones y Pagos ME (sin Inventario). Los días **corren desde que te
   registras**: conecta tu cuenta de MercadoLibre cuanto antes para aprovecharlos. Cada cuenta de MercadoLibre puede usar
   una sola prueba. Al terminar la prueba, para seguir se elige el plan y se paga en **Mi plan** (ver
