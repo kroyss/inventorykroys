@@ -432,7 +432,7 @@ export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3, opc
                             AND h.fecha > r.fecha + INTERVAL '3 minutes' AND h.fecha < r.fecha + INTERVAL '60 minutes'
                             AND h.texto !~* $3
                             AND NOT EXISTS (SELECT 1 FROM ml_mensajes_ia j WHERE j.pack_id = h.pack_id
-                                              AND j.enviada_at BETWEEN h.fecha - INTERVAL '3 minutes' AND h.fecha + INTERVAL '3 minutes'))))))))
+                                              AND j.enviada_at BETWEEN h.fecha - INTERVAL '3 minutes' AND h.fecha + INTERVAL '3 minutes')))))))
        ORDER BY r.fecha LIMIT 1) r ON TRUE
      WHERE NOT b.propio AND b.pack_id <> $2 AND (b.texto % $1 OR x.n >= LEAST(2, cardinality(qw.w)))
        AND r.texto !~* $3 AND ($4::timestamptz IS NULL OR b.fecha < $4)
