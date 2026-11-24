@@ -1366,7 +1366,10 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   Vende de más y se arregla con Aplicar en ML); si alguno tiene stock, no se toca sola. El botón **«Vincular por color →»** (en la
   columna Quedará, con permiso de vincular; antes «Dividir por variantes») abre un **panel a la derecha** en dos pasos:
   1) cada color con su foto y «Hoy en ML», el producto sugerido por el nombre (✓), los productos vinculados como botones y
-  «otro producto…» para buscar → **Vincular** (se vincula cada color y se quita el vínculo entero); 2) con permiso de
+  «otro producto…» para buscar → **Vincular** (se vincula cada color y se quita el vínculo entero). Un color que no tiene
+  producto en tu inventario (por ahora) → **«sin vínculo»**: queda sin producto (no se borra ni se esconde; sigue en
+  Vincular con ML → Por vincular y, si tiene unidades en ML, en el numerito «Sin vincular») y puedes seguir con los demás;
+  2) con permiso de
   cambiar stock, cada color con «Tienes N · poner N» y una casilla → **Guardar en MercadoLibre** o **Listo, después**.
   El mismo panel se abre desde Automatizaciones → Stock.
   **Quedan pocas** (el disponible es igual o menor a la reserva): el sistema no reparte solo. Si ML ofrece más de lo que
@@ -1694,7 +1697,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   días; se revisa sola cada hora y con ↻ Actualizar (arriba) como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
   «⚠ desde N u. sin envío gratis · pack»: comprando varias pierde el envío gratis (el pack se arma en Stock vs inventario).
   «Repartir»: el producto está en varias publicaciones; abre un panel a la derecha con cada una y lo que repartiste de tu inventario.
-  «Vincular por color»: publicación vinculada entera con colores; abre un panel a la derecha para elegir el producto de cada color y luego su stock.
+  «Vincular por color»: publicación vinculada entera con colores; abre un panel a la derecha para elegir el producto de cada color (o «sin vínculo» si no lo tienes) y luego su stock.
 - **Pagos ME:** **Traer pagos y guías** (la PC trae de MercadoEnvíos pagos, guías y ventas nuevas, 1 a 3 min; también
   sola durante el día). Sin inventario se verifica cada pago aquí (uno a uno o con Comprobar con el banco); con
   inventario se verifica en Ventas → Por confirmar y aquí queda la conexión y el historial. Las guías pagadas pasan

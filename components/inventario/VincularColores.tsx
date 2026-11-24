@@ -10,6 +10,8 @@ import { createPortal } from 'react-dom'
 //            (vincula cada variante y quita el vínculo entero).
 //   Paso 2 · Stock (solo con el permiso de cambiar stock): cada color con lo que tienes y lo que hay en ML → POST /api/stock-ml.
 //            Opcional: «Listo, después».
+//   24-11 (el dueño, bolsa Negra sin producto): «Sin vínculo» en un color → queda SIN producto (no se borra ni se esconde:
+//            sigue en Vincular con ML → Por vincular) y deja seguir con los demás. En el paso 2 no se toca.
 
 interface Variante { id: string; nombre: string | null; disponible: number; foto: string | null }
 interface Prod { id: number; code: string; name: string; stock?: number }
@@ -17,6 +19,8 @@ interface Datos { item_id: string; titulo: string; estado: string | null; cuenta
   /** Colores que ya tienen su producto (variante → product_id). */
   actuales: Record<string, number> }
 
+/** Color marcado «Sin vínculo» (los productos tienen id > 0). */
+const SIN = 0
 const SIN_PESO = new Set(['color', 'talla', 'modelo', 'tamano', 'tamaño', 'diseno', 'diseño', 'tipo', 'de', 'y', 'con', 'x', 'para'])
 const palabras = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/)
   .filter(w => w.length > 1 && !SIN_PESO.has(w))
@@ -80,16 +84,19 @@ export default function VincularColores({ item, foco = null, imagen = null, conS
   const stockDe = (id: number | null | undefined) => (id == null ? null : todos?.find(y => y.id === id)?.stock ?? null)
   const variantes = d?.variantes ?? []
   const faltan = variantes.filter(v => elegido[v.id] == null).length
+  const conProducto = variantes.filter(v => elegido[v.id] !== SIN)
+  const sinVinculo = variantes.length - conProducto.length
   const q = texto.trim().toLowerCase()
   const encontrados = q.length >= 2 ? (todos ?? []).filter(x => `${x.code} ${x.name}`.toLowerCase().includes(q)).slice(0, 8) : []
 
   const vincular = async () => {
     if (!d?.cuenta) { setError('No encontré la cuenta de esta publicación'); return }
+    if (!conProducto.length) { setError('Elige el producto de al menos un color'); return }
     setGuardando(true); setError(null)
     try {
       const r = await fetch('/api/vincular-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         accion: 'dividir', item: d.item_id.replace(/^[A-Z]{3}/, ''), cuenta: d.cuenta,
-        asignaciones: variantes.map(v => ({ variante: v.id, product_id: elegido[v.id] })) }) })
+        asignaciones: conProducto.map(v => ({ variante: v.id, product_id: elegido[v.id] })) }) })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { setError(j.error ?? 'No se pudo vincular'); return }
       onHecho()
@@ -98,7 +105,7 @@ export default function VincularColores({ item, foco = null, imagen = null, conS
   }
 
   const valor = (v: Variante) => { const t = valores[v.id]; return t === undefined || t === '' ? v.disponible : parseInt(t, 10) || 0 }
-  const cambios = variantes.filter(v => valor(v) !== v.disponible).map(v => ({ item_id: d!.item_id, variante_id: v.id, cantidad: valor(v) }))
+  const cambios = conProducto.filter(v => valor(v) !== v.disponible).map(v => ({ item_id: d!.item_id, variante_id: v.id, cantidad: valor(v) }))
   // Lo que se pone de cada producto, sumando sus colores (un producto puede quedar en varios colores).
   const pasa = (v: Variante) => {
     const id = elegido[v.id]; const st = stockDe(id)
@@ -179,7 +186,10 @@ export default function VincularColores({ item, foco = null, imagen = null, conS
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                        {p
+                        {elegido[v.id] === SIN
+                          ? <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 font-medium text-neutral-700 ring-1 ring-inset ring-neutral-300"
+                              title="Queda sin producto: sigue en Vincular con ML → Por vincular para cuando lo sepas">Sin vínculo</span>
+                          : p
                           ? <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-lime-100 px-2.5 py-1 font-medium text-lime-900" title={p.name}>✓ {p.code} · {p.name}</span>
                           : <span className="font-medium text-amber-700">Elige el producto:</span>}
                         {d.vinculados.filter(x => x.id !== elegido[v.id]).map(x => (
@@ -188,6 +198,11 @@ export default function VincularColores({ item, foco = null, imagen = null, conS
                         ))}
                         <button type="button" onClick={() => { setBuscando(v.id); setTexto('') }}
                           className="rounded-full px-2 py-1 text-neutral-500 underline-offset-2 hover:text-neutral-800 hover:underline">otro producto…</button>
+                        {elegido[v.id] !== SIN && d.actuales?.[v.id] == null && (
+                          <button type="button" onClick={() => setElegido(e => ({ ...e, [v.id]: SIN }))}
+                            title="No tiene producto en tu inventario (por ahora): queda sin vincular y puedes seguir con los demás colores"
+                            className="rounded-full px-2 py-1 text-neutral-500 underline-offset-2 hover:text-neutral-800 hover:underline">sin vínculo</button>
+                        )}
                       </div>
                     )}
                   </li>
@@ -198,10 +213,10 @@ export default function VincularColores({ item, foco = null, imagen = null, conS
 
           {d && paso === 2 && <>
             <p className="rounded-xl bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-900 ring-1 ring-inset ring-emerald-200">
-              ✓ Listo, cada color quedó con su producto. Ahora, si quieres, pon el stock de cada color en MercadoLibre.
+              ✓ Listo, cada color quedó con su producto{sinVinculo > 0 ? <> ({sinVinculo} sin vínculo: siguen en Vincular con ML → Por vincular)</> : null}. Ahora, si quieres, pon el stock de cada color en MercadoLibre.
             </p>
             <ul className="divide-y divide-neutral-100 rounded-xl ring-1 ring-neutral-200">
-              {variantes.map(v => {
+              {conProducto.map(v => {
                 const st = stockDe(elegido[v.id])
                 const res = resultados[v.id]
                 return (
