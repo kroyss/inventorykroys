@@ -316,6 +316,14 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
      WHERE split_part(m.ml_code, ':', 1) = $1 AND p.is_active AND m.is_active AND ${sinEnteraVieja('m')}   -- también los productos por variante (stock sumado)
      ORDER BY (m.ml_code LIKE '%:%')
      LIMIT 1`, [codigo])
+  // 24-11 Kit (mig 198): el stock es el de kits que se pueden armar (el mínimo entre sus productos).
+  if (prod) {
+    const { rows: [k] } = await db.query(
+      `SELECT MIN(FLOOR(GREATEST(COALESCE(i.quantity, 0), 0)::numeric / GREATEST(COALESCE(m.unidades, 1), 1)))::int AS kits
+       FROM product_ml_codes m JOIN products p ON p.id = m.product_id AND p.is_active LEFT JOIN inventory i ON i.product_id = p.id
+       WHERE m.is_active AND m.kit AND m.ml_code = $1`, [codigo])
+    if (k?.kits != null) prod.stock = k.kits
+  }
   const { rows: [tasa] } = await db.query(
     `SELECT official_rate::float AS r FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`)
   // Envío gratis por transportista: solo empresas con Promociones (las demás, como antes).

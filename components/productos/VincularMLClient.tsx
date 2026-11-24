@@ -23,6 +23,7 @@ interface Fila {
   entera_vieja?: { id: number; code: string; name: string }[]   // 17-11: vínculo viejo por la publicación entera (nadie lo usa)
   conflicto?: ConflictoPesos | null                       // …de distinto peso y el envío gratis cambia según cuál
   no_usa?: { por: string | null; creada_at: string } | null   // marcada "No se usa" (26-10)
+  kit?: { unidades: Record<number, number> } | null           // 24-11: trae TODOS sus productos (u. de cada uno)
 }
 interface Datos { filas: Fila[]; productos: Producto[]; hoy: { todos: number; mios: number }; esDueno: boolean }
 type Filtro = 'fotos' | 'nuevas' | 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'toda' | 'no_usa' | 'todas' | 'sin_pub'
@@ -156,7 +157,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     <ConStock.Provider value={conStock}>
     <div className="space-y-4">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      {!enPanel && <EncabezadoInfo info={<><li>Une cada publicación (o cada color/modelo) con su producto, con un clic.</li><li>Así cada venta de MercadoLibre descuenta el producto correcto y Stock vs inventario puede comparar.</li><li>Las que faltan salen en el numerito del botón Vincular de <b className="font-medium text-neutral-800">Mis publicaciones</b> y en su fila («Sin vincular»).</li></>} title="Vincular con MercadoLibre"
+      {!enPanel && <EncabezadoInfo info={<><li>Une cada publicación (o cada color/modelo) con su producto, con un clic.</li><li>Así cada venta de MercadoLibre descuenta el producto correcto y Stock vs inventario puede comparar.</li><li>Las que faltan salen en el numerito del botón Vincular de <b className="font-medium text-neutral-800">Mis publicaciones</b> y en su fila («Sin vincular»).</li><li><b className="font-medium text-neutral-800">Es un kit…</b>: la publicación trae varios productos distintos juntos (ej. kit de 4 colores). Cada venta descuenta todos y ML muestra los kits que alcanzan con lo que hay de cada uno.</li></>} title="Vincular con MercadoLibre"
         subtitle="Une cada publicación (o cada color/modelo) con su producto. Así las ventas de ML descuentan el producto correcto."
         actions={datos.esDueno ? <Link href="/productos/importar-ml" className={`${sinProductos ? 'btn-primary' : 'btn-secondary'} text-sm`} title="Crear productos nuevos a partir de publicaciones">Crear productos desde ML</Link> : undefined} />}
 
@@ -279,7 +280,7 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQui
   const confirm = useConfirm()
   const celular = useCelular()
   const conStock = useContext(ConStock)
-  const [modo, setModo] = useState<'nada' | 'elegir' | 'duda'>('nada')
+  const [modo, setModo] = useState<'nada' | 'elegir' | 'duda' | 'kit'>('nada')
   const [texto, setTexto] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const elegido = productos.find(p => `${p.code} · ${p.name}` === texto)
@@ -312,7 +313,9 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQui
 
         {f.estado === 'vinculada' && f.producto ? (
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">✓ {f.producto.code} · {f.producto.name}</span>
+            {f.kit && <span className="rounded-full bg-violet-100 px-2 py-0.5 font-medium text-violet-800"
+              title="Cada venta trae todos estos productos; ML muestra los kits que se pueden armar">📦 Kit</span>}
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">✓ {f.producto.code} · {f.producto.name}{f.kit && (f.kit.unidades[f.producto.id] ?? 1) > 1 ? ` ×${f.kit.unidades[f.producto.id]}` : ''}</span>
             {f.producto.toda && <span className="text-neutral-400" title="Vinculada por la publicación entera, no por esta variante">(toda la publicación)</span>}
             {/* 27-10: el vínculo viejo de la publicación entera no se podía corregir. Vincular la variante le gana (solo a esa). */}
             {f.producto.toda && productos.length > 0 && (
@@ -337,7 +340,7 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQui
             {/* Más productos con el mismo código (21-10): antes quedaban escondidos detrás del primero. */}
             {f.otros?.map(o => (
               <span key={o.id} className="inline-flex items-center gap-2">
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">✓ {o.code} · {o.name}</span>
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">{f.kit ? '+' : '✓'} {o.code} · {o.name}{f.kit && (f.kit.unidades[o.id] ?? 1) > 1 ? ` ×${f.kit.unidades[o.id]}` : ''}</span>
                 {esDueno && (
                   <button disabled={ocupado} className="text-neutral-500 underline hover:text-red-600" onClick={async () => {
                     if (!await confirm({ title: 'Deshacer el vínculo', message: `Se separa "${f.variante ?? f.titulo}" de ${o.name}.`, confirmText: 'Deshacer' })) return
@@ -349,7 +352,23 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQui
                 )}
               </span>
             ))}
-            <AvisoPesos c={f.conflicto} />
+            {!f.kit && <AvisoPesos c={f.conflicto} />}
+            {/* 24-11 Kit: varios productos distintos en una publicación, que vienen TODOS en cada venta (no uno a elegir). */}
+            {esDueno && !f.producto.toda && (
+              <button onClick={() => setModo(modo === 'kit' ? 'nada' : 'kit')} className="text-violet-700 underline hover:text-violet-900"
+                title="La publicación trae varios productos distintos juntos (ej. kit de 4 colores): cada venta descuenta todos">
+                {f.kit ? 'Editar kit' : 'Es un kit…'}</button>
+            )}
+            {esDueno && f.kit && (
+              <button disabled={ocupado} className="text-neutral-500 underline hover:text-neutral-800" onClick={async () => {
+                if (!await confirm({ title: 'Ya no es kit', confirmText: 'Quitar kit', cancelText: 'Cancelar',
+                  message: 'Los productos siguen vinculados, pero como publicación compartida: el comprador elige UNO y ML muestra la suma.' })) return
+                setOcupado(true)
+                const ok = await pedir({ accion: 'quitar_kit', codigo: f.codigo })
+                setOcupado(false)
+                if (ok) onCambio({ kit: null })
+              }}>Ya no es kit</button>
+            )}
           </div>
         ) : (
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
@@ -369,6 +388,8 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
               </>
             )}
             {productos.length > 0 && <button onClick={() => setModo(modo === 'elegir' ? 'nada' : 'elegir')} className="btn-secondary w-full text-xs sm:w-auto">{f.estado === 'parecida' ? 'Es otro…' : 'Elegir producto…'}</button>}
+            {esDueno && productos.length > 1 && <button onClick={() => setModo(modo === 'kit' ? 'nada' : 'kit')} className="btn-secondary w-full text-xs sm:w-auto"
+              title="La publicación trae varios productos distintos juntos (ej. kit de 4 colores): cada venta descuenta todos">Es un kit…</button>}
             {/* 13-11: producto que todavía no existe en el inventario → se crea desde la publicación (Crear productos desde ML). */}
             {esDueno && f.reciente && <Link href={`/productos/importar-ml?buscar=${encodeURIComponent(f.item_id)}`} className="btn-secondary w-full text-center text-xs sm:w-auto"
               title="Crea el producto a partir de esta publicación (queda vinculado)">Crear producto nuevo</Link>}
@@ -433,6 +454,21 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
           <button onClick={() => { setModo('nada'); setTexto('') }} className="btn-ghost text-xs">Cancelar</button>
         </div>
       )}
+      {modo === 'kit' && (
+        <EditorKit f={f} productos={productos} ocupado={ocupado} onCancelar={() => setModo('nada')} onGuardar={async comps => {
+          setOcupado(true)
+          const ok = await pedir({ accion: 'kit', codigo: f.codigo, cuenta: f.cuenta, componentes: comps.map(c => ({ product_id: c.p.id, unidades: c.u })) })
+          setOcupado(false)
+          if (!ok) return
+          const [a, ...resto] = comps
+          onCambio({ estado: 'vinculada', producto: { id: a.p.id, code: a.p.code, name: a.p.name, toda: false },
+            otros: resto.map(c => ({ id: c.p.id, code: c.p.code, name: c.p.name })), conflicto: null,
+            kit: { unidades: Object.fromEntries(comps.map(c => [c.p.id, c.u])) },
+            ...(f.estado === 'vinculada' ? {} : { vinculado_por: 'tú', vinculado_at: new Date().toISOString(), propio: true, duda: null }) },
+            f.estado === 'vinculada' ? 0 : 1)
+          setModo('nada')
+        }} />
+      )}
       {modo === 'duda' && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input value={texto} onChange={e => setTexto(e.target.value)} autoFocus maxLength={300} placeholder="¿Qué duda tienes? (ej.: no encuentro el color wengue)"
@@ -447,6 +483,69 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
         </div>
       )}
     </li>
+  )
+}
+
+/** 24-11 Kit (mig 198): los productos que trae la publicación, cada uno con cuántas unidades. Arranca con lo vinculado. */
+function EditorKit({ f, productos, ocupado, onCancelar, onGuardar }: {
+  f: Fila; productos: Producto[]; ocupado: boolean
+  onCancelar: () => void; onGuardar: (c: { p: { id: number; code: string; name: string }; u: number }[]) => void
+}) {
+  const inicial = f.estado === 'vinculada' && f.producto && !f.producto.toda ? [f.producto, ...(f.otros ?? [])] : []
+  const [comps, setComps] = useState(inicial.map(p => ({ p: { id: p.id, code: p.code, name: p.name }, u: f.kit?.unidades[p.id] ?? 1 })))
+  const [q, setQ] = useState('')
+  const res = useMemo(() => buscarProductos(productos, q).filter(p => !comps.some(c => c.p.id === p.id)).slice(0, 8), [productos, q, comps])
+  const valido = comps.length >= 2 && comps.every(c => Number.isInteger(c.u) && c.u >= 1 && c.u <= 100)
+  return (
+    <div className="mt-2 space-y-2 rounded-lg border border-violet-200 bg-violet-50/60 p-3">
+      <p className="text-xs text-violet-900">
+        <b>Kit</b>: cada venta de esta publicación trae <b>todos</b> estos productos. MercadoLibre mostrará los kits que se pueden
+        armar con lo que hay de cada uno, y al registrar la venta se descuenta cada producto.
+      </p>
+      {comps.length > 0 && (
+        <ul className="divide-y divide-violet-100 rounded-md border border-violet-200 bg-white">
+          {comps.map((c, i) => (
+            <li key={c.p.id} className="flex items-center gap-2 px-2 py-1.5 text-sm">
+              <span className="min-w-0 flex-1 truncate"><span className="font-mono text-xs text-neutral-400">{c.p.code}</span> {c.p.name}</span>
+              <label className="flex shrink-0 items-center gap-1 text-xs text-neutral-500" title="Cuántas unidades de este producto trae cada kit">
+                trae
+                <input type="number" min={1} max={100} value={c.u} onChange={e => {
+                  const u = Math.round(Number(e.target.value))
+                  setComps(comps.map((x, j) => (j === i ? { ...x, u } : x)))
+                }} className="w-14 rounded border border-neutral-300 px-1 py-0.5 text-right tabular-nums" />
+                u.
+              </label>
+              <button type="button" onClick={() => setComps(comps.filter((_, j) => j !== i))} aria-label={`Quitar ${c.p.code}`}
+                className="shrink-0 px-1 text-lg leading-none text-neutral-400 hover:text-red-600">×</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="relative">
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Agregar producto al kit (nombre o código)…"
+          className="w-full rounded border border-neutral-300 bg-white px-2 py-2 text-base sm:py-1 sm:text-sm" />
+        {res.length > 0 && (
+          <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-neutral-200 bg-white shadow-lg">
+            {res.map(p => (
+              <li key={p.id}>
+                <button type="button" onClick={() => { setComps([...comps, { p: { id: p.id, code: p.code, name: p.name }, u: 1 }]); setQ('') }}
+                  className="flex w-full items-center gap-2 px-2 py-2 text-left text-sm hover:bg-violet-50 sm:py-1.5">
+                  <span className="font-mono text-xs text-neutral-400">{p.code}</span>
+                  <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                  <span className="shrink-0 text-xs text-neutral-400">stock {p.stock}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" disabled={!valido || ocupado} onClick={() => onGuardar(comps)} className="btn-primary text-xs disabled:opacity-50">
+          {ocupado ? 'Guardando…' : 'Guardar kit'}</button>
+        <button type="button" onClick={onCancelar} className="btn-ghost text-xs">Cancelar</button>
+        {comps.length < 2 && <span className="text-xs text-neutral-500">Un kit lleva al menos 2 productos distintos (4 del mismo = «trae 4 u.» en Stock en ML).</span>}
+      </div>
+    </div>
   )
 }
 

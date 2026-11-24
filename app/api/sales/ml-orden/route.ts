@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     if (!v) return NextResponse.json({ error: 'No se encontró en tus cuentas de MercadoLibre' }, { status: 404 })
     // Productos del sistema por su código ML (se guarda sin el prefijo: MLV768007052 → 768007052).
     // Un mismo código puede estar en varios productos (combos o publicaciones repetidas): entonces
-    // no se elige ninguno solo; van todos en `opciones` y la persona decide.
+    // no se elige ninguno solo; van todos en `opciones` y la persona decide. Si es un KIT (24-11), van todos en `kit`.
     // Producto por variante (Importar desde ML, 2026-10-12): "768007052:180012345"; si la variante no
     // tiene producto propio se usa el de la publicación, como siempre; y si tampoco, se ofrecen los de las
     // otras variantes de esa publicación para elegir.
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const publicaciones = v.items.map(i => sinPrefijo(i.itemId))
     const { rows } = await db.query(
       `SELECT DISTINCT m.ml_code, split_part(m.ml_code, ':', 1) AS publicacion, p.id AS product_id, p.code, p.name,
-              COALESCE(m.unidades, 1)::int AS unidades
+              COALESCE(m.unidades, 1)::int AS unidades, m.kit
        FROM product_ml_codes m JOIN products p ON p.id = m.product_id
        WHERE m.is_active AND p.is_active AND split_part(m.ml_code, ':', 1) = ANY($1::text[])
        ORDER BY m.ml_code, p.code`, [publicaciones])
@@ -45,7 +45,13 @@ export async function GET(req: NextRequest) {
       // multiplicada y se puede cambiar. Nunca se adivina por el título. Si los vínculos no coinciden, 1.
       const us = [...new Set((exactas.length ? exactas : dePublicacion).map(r => r.unidades as number))]
       const unidades = segura && us.length === 1 ? us[0] : 1
-      return { ...i, producto: segura && opciones.length === 1 ? opciones[0] : null, opciones, unidades }
+      // 24-11 Kit (mig 198): la publicación trae TODOS sus productos; cada uno entra con lo comprado × lo que trae.
+      const base = exactas.length ? exactas : dePublicacion
+      const kit = segura && base.length >= 2 && base.every(r => r.kit)
+        ? base.map(r => ({ id: r.product_id as number, code: r.code as string, name: r.name as string, unidades: r.unidades as number }))
+        : null
+      if (kit) return { ...i, producto: null, opciones: [], unidades: 1, kit }
+      return { ...i, producto: segura && opciones.length === 1 ? opciones[0] : null, opciones, unidades, kit: null }
     })
     return NextResponse.json({ cuenta: v.cuenta, comprador: v.comprador, fecha: v.fecha, items })
   } catch (err) {

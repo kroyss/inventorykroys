@@ -1081,7 +1081,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 
 ## 15. Inventario (solo con el módulo Inventario)
 
-*Cómo lo pregunta la gente:* productos, catálogo, inventario, ventas, compras, entró mercancía, vincular publicaciones, combos, packs, promociones, reportes, tasa, ajustes.
+*Cómo lo pregunta la gente:* productos, catálogo, inventario, ventas, compras, entró mercancía, vincular publicaciones, combos, packs, kits, promociones, reportes, tasa, ajustes.
 
 **La ⓘ junto al título** (Ventas, Compras, Inventario, Facturas, Productos, Publicaciones, Reportes, Finanzas, y también
 en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócala para abrirla o cerrarla. Lo que dice cada
@@ -1229,6 +1229,14 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   **Más de 10 publicaciones** (Arreglar o Pausar/Activar en lote) van por la **cola de MercadoLibre** (60 por minuto):
   arriba se ve el avance y sigue aunque cierres la pantalla. Cada publicación toma lo que calcula el sistema en el momento
   en que le toca (si entra una venta mientras tanto, ya la cuenta).
+- **Kit (varios productos distintos en una publicación):** p. ej. «Kit 4 tintas» = 1 negra + 1 cian + 1 magenta + 1
+  amarilla. En Vincular con ML (solo el dueño), en la publicación toca **Es un kit…**: agrega cada producto y cuántas trae
+  de cada uno («trae N u.») y **Guardar kit** (mínimo 2 productos distintos; 4 del mismo es un combo: «trae 4 u.» en
+  Stock). Sale **📦 Kit** con sus productos; **Editar kit** / **Ya no es kit** (queda como compartida). Con kit: ML
+  muestra los kits que alcanzan con **todos** (el mínimo: con 10 negras y 3 cian, 3 kits) y lo que cada producto guardó de
+  más vuelve a sus otras publicaciones; al registrar la venta entran **todos** sus productos (lo comprado × lo que trae
+  de cada uno) y se descuenta cada uno; el envío se calcula con el peso del kit completo. Si algún producto del kit está
+  desactivado o en «Quedan pocas», no se toca sola.
 - **Vínculo viejo (publicación entera + variantes):** si una publicación con variantes sigue vinculada ENTERA a un
   producto y además cada variante tiene el suyo, en Vincular con ML sale una franja ámbar **«Vínculo viejo»** con
   **Quitar vínculo viejo** (también en la pestaña «Por publicación entera»). Mientras tanto ese vínculo no cuenta para
@@ -1351,6 +1359,8 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   **Compartida con COD-…**: la misma publicación vinculada a varios productos (modelos que elige el comprador, p. ej. un
   convertidor con varias versiones). ML muestra la **suma** de lo que aporta cada producto («aporta N»). Si alguno está en
   «Quedan pocas» o no se sincroniza, esa publicación no se toca sola.
+  **📦 Kit con COD-…**: la publicación trae TODOS esos productos (se marca en Vincular con ML → Es un kit…). ML muestra los
+  kits que se arman con lo que hay de cada uno (el mínimo); en ámbar «incompleto» si algún producto está desactivado.
   **Vinculada entera con variantes** (vínculos viejos: el inventario va por variante): el sistema no sabe qué variante es
   cada producto, así que **solo baja**: si todos sus productos están en 0, «Quedará: 0 en todas las variantes» (cuenta en
   Vende de más y se arregla con Aplicar en ML); si alguno tiene stock, no se toca sola. El botón **«Vincular por color →»** (en la
@@ -1666,7 +1676,8 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   en promo pierden TODAS sus promociones (se sacan antes del precio) y quedan en «Por restaurar» para volver a meterlas
   desde Promociones. El producto abre su ficha (pestaña nueva) y el precio en ML la publicación encima, sin salir.
 - **Vincular:** une cada publicación (o color/modelo) con su producto, para que cada venta descuente el correcto y Stock
-  vs inventario pueda comparar. Lo que falta sale en el botón Vincular de Mis publicaciones y en cada fila.
+  vs inventario pueda comparar. Lo que falta sale en el botón Vincular de Mis publicaciones y en cada fila. «Es un kit…»:
+  varios productos distintos juntos (cada venta descuenta todos; ML muestra los kits que alcanzan con todos).
 - **Reportes:** el detalle con Excel: por fechas (Ventas, Compras) y cómo estás hoy (Inventario, En tránsito, Conteos).
   Ventas → Por producto = el top y cuánto subió o bajó. La ganancia, solo con permiso de costos. El resumen está en el
   Inicio; qué comprar, en Inventario → Reponer.

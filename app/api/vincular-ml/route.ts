@@ -6,6 +6,7 @@ import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
 import { desvincular, eliminarVarianteML, filasVincular, marcarNoUsa, productosParaVincular, vincular } from '@/lib/vincularML'
 import { ErrorML } from '@/lib/ml'
+import { pasarPesos } from '@/lib/pesosML'
 import { buscarNuevas } from '@/lib/catalogoML'
 import type { Pool } from 'pg'
 
@@ -29,6 +30,7 @@ async function enteraVieja(db: Pool, pub: string) {
 //   POST { accion: 'vincular', codigo, cuenta, product_id } · { accion: 'desvincular', codigo, product_id }
 //        { accion: 'duda', codigo, cuenta, titulo, variante, nota } · { accion: 'ignorar', id }
 //        { accion: 'no_usa', codigo, valor } (cualquiera que vincula) · { accion: 'eliminar_variante', codigo } (el dueño; borra en ML)
+//        { accion: 'kit', codigo, cuenta, componentes: [{ product_id, unidades }] } · { accion: 'quitar_kit', codigo } (24-11, el dueño)
 async function sesion() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return { error: unauthorized() } as const
@@ -98,6 +100,11 @@ const Body = z.discriminatedUnion('accion', [
              titulo: z.string().max(300).optional(), variante: z.string().max(200).nullable().optional() }),
   z.object({ accion: z.literal('eliminar_variante'), codigo: Codigo, con_stock: z.boolean().optional() }),
   z.object({ accion: z.literal('buscar_nuevas') }),
+  // 24-11 Kit (mig 198): la publicación (o variante) trae TODOS estos productos, cada uno × sus unidades. Solo el dueño.
+  z.object({ accion: z.literal('kit'), codigo: Codigo, cuenta: z.string().min(1).max(50),
+             componentes: z.array(z.object({ product_id: z.number().int().positive(), unidades: z.number().int().min(1).max(100) }))
+               .min(2, 'Un kit lleva al menos 2 productos distintos').max(12) }),
+  z.object({ accion: z.literal('quitar_kit'), codigo: Codigo }),
   z.object({ accion: z.literal('dividir'), item: z.string().regex(/^\d{5,15}$/), cuenta: z.string().min(1).max(50),
              asignaciones: z.array(z.object({ variante: z.string().regex(/^\d{1,15}$/), product_id: z.number().int().positive() })).min(1).max(100) }),
 ])
@@ -132,6 +139,31 @@ export async function POST(req: NextRequest) {
       await s.db.query(
         `UPDATE product_ml_codes SET is_active = FALSE, desvinculado_por = $2, desvinculado_at = NOW() WHERE ml_code = $1 AND is_active`,
         [b.item, userId])
+      return NextResponse.json({ ok: true })
+    }
+    if (b.accion === 'kit' || b.accion === 'quitar_kit') {
+      if (!puede(s.session.user, 'ver_productos')) return forbidden()
+      if (b.accion === 'quitar_kit') {
+        await s.db.query(`UPDATE product_ml_codes SET kit = FALSE, updated_at = NOW() WHERE ml_code = $1 AND is_active`, [b.codigo])
+        return NextResponse.json({ ok: true })
+      }
+      const ids = b.componentes.map(c => c.product_id)
+      if (new Set(ids).size !== ids.length) return NextResponse.json({ error: 'Hay un producto repetido: usa «u.» para poner cuántas trae' }, { status: 400 })
+      const { rows } = await s.db.query(`SELECT id FROM products WHERE id = ANY($1::int[]) AND is_active`, [ids])
+      if (rows.length !== ids.length) return NextResponse.json({ error: 'Algún producto no existe o está desactivado' }, { status: 400 })
+      // Sin transacción, como «dividir» (vincular() pide pesos y traga sus errores): primero se vincula lo que falta, después
+      // se quitan los que ya no van y al final se marca kit (hasta ahí sigue como compartida).
+      const { rows: ya } = await s.db.query(`SELECT product_id FROM product_ml_codes WHERE ml_code = $1 AND is_active`, [b.codigo])
+      const tenia = new Set(ya.map(r => r.product_id as number))
+      for (const c of b.componentes) if (!tenia.has(c.product_id)) await vincular(s.db, c.product_id, b.cuenta, b.codigo, userId)
+      await s.db.query(
+        `UPDATE product_ml_codes SET is_active = FALSE, kit = FALSE, desvinculado_por = $3, desvinculado_at = NOW()
+         WHERE ml_code = $1 AND is_active AND NOT (product_id = ANY($2::int[]))`, [b.codigo, ids, userId])
+      await s.db.query(
+        `UPDATE product_ml_codes m SET kit = TRUE, unidades = x.u, combo_revisado = TRUE, updated_at = NOW()
+         FROM unnest($2::int[], $3::int[]) AS x(pid, u) WHERE m.ml_code = $1 AND m.is_active AND m.product_id = x.pid`,
+        [b.codigo, ids, b.componentes.map(c => c.unidades)])
+      await pasarPesos(s.db).catch(() => {})
       return NextResponse.json({ ok: true })
     }
     if (b.accion === 'vincular') {

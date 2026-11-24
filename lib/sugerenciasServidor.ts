@@ -119,10 +119,12 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
   // está vinculada a un producto (sin variante), también el inventario en unidades de la publicación («trae N u.»).
   const { rows: stocks } = await db.query(
     `SELECT p.id::text, p.item_stock_ml, p.item_variantes, p.item_titulo,
-            (SELECT FLOOR(COALESCE(i.quantity, 0)::numeric / GREATEST(COALESCE(m.unidades, 1), 1))::int
+            -- 24-11 Kit (mig 198): los kits que se pueden armar (el mínimo entre sus productos).
+            (SELECT (CASE WHEN bool_and(m.kit) THEN MIN(FLOOR(COALESCE(i.quantity, 0)::numeric / GREATEST(COALESCE(m.unidades, 1), 1)))
+                          ELSE (array_agg(FLOOR(COALESCE(i.quantity, 0)::numeric / GREATEST(COALESCE(m.unidades, 1), 1))))[1] END)::int
              FROM product_ml_codes m JOIN products pd ON pd.id = m.product_id AND pd.is_active
              LEFT JOIN inventory i ON i.product_id = pd.id
-             WHERE m.is_active AND m.ml_code = regexp_replace(p.item_id, '^[A-Z]{3}', '') AND ${sinEnteraVieja('m')} LIMIT 1) AS real
+             WHERE m.is_active AND m.ml_code = regexp_replace(p.item_id, '^[A-Z]{3}', '') AND ${sinEnteraVieja('m')}) AS real
      FROM ml_preguntas p WHERE p.id::text = ANY($1::text[])`, [preguntas.map(p => p.id)])
   const stockDe = new Map(stocks.map(r => [r.id as string, {
     stock: r.item_stock_ml === null ? null : r.real === null ? Number(r.item_stock_ml) : Math.min(Number(r.item_stock_ml), Number(r.real)),

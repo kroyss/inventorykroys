@@ -51,6 +51,10 @@ export interface PubStockML {
   /** 17-11 Compartida: la misma publicación (o variante) vinculada a varios productos activos (modelos que el comprador
    *  elige). ML recibe la SUMA de lo que aporta cada uno; `aporte` = lo de este producto. */
   compartida: { con: string[]; aporte: number | null } | null
+  /** 24-11 Kit (mig 198): la publicación trae TODOS sus productos (cada uno × su «trae N u.»). ML recibe lo que se puede
+   *  armar: el MÍNIMO entre sus productos. `con` = los otros productos del kit; `peso` = el del kit completo (null = falta
+   *  alguno); `incompleto` = algún producto del kit está desactivado (no se toca sola). */
+  kit: { con: { code: string; unidades: number }[]; peso: number | null; incompleto: boolean } | null
   /** 17-11: vinculada ENTERA y tiene variantes → sus variantes (para «Dividir por variantes» y para ponerlas en 0). */
   variantes_ml: { id: string; nombre: string | null; disponible: number; foto: string | null }[] | null
   /** 18-11 Envío gratis POR CANTIDAD (VE): al precio de hoy (con la promo si tiene), qué cantidades que el comprador puede
@@ -187,6 +191,8 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       `SELECT p.id AS product_id, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock, p.weight_kg::float AS peso,
               m.id AS codigo_id, m.ml_code, m.ml_account AS cuenta, COALESCE(m.unidades, 1)::int AS unidades,
               COALESCE(m.sin_sincronizar, FALSE) AS sin_sincronizar, COALESCE(m.combo_revisado, FALSE) AS combo_revisado,
+              m.kit, CASE WHEN m.kit THEN (SELECT COUNT(DISTINCT k.product_id) FROM product_ml_codes k
+                                           WHERE k.is_active AND k.kit AND k.ml_code = m.ml_code) END::int AS kit_n,
               c.item_id, c.titulo, c.estado, c.disponible::int AS disponible, c.precio::float AS precio, c.variantes,
               c.actualizado_at, m.pausa_mano_at, um.full_name AS pausa_mano_por, m.pausa_mano_motivo,
               -- El CASE corta primero: la búsqueda en movimientos solo corre para los marcados «Se acabó» (antes 2,6 s).
@@ -210,6 +216,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
   ])
 
   const porProducto = new Map<number, FilaStockML & { codigos: string[] }>()
+  const kitN = new Map<PubStockML, number>()   // cuántos productos tiene el kit (también los desactivados)
   for (const r of rows) {
     let f = porProducto.get(r.product_id)
     if (!f) {
@@ -241,10 +248,12 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       actualizado_at: r.actualizado_at,
       pausa_mano: r.pausa_mano_at && r.estado === 'paused' ? { at: r.pausa_mano_at, por: r.pausa_mano_por, motivo: r.pausa_mano_motivo } : null,
       compartida: null,
+      kit: null,
       envio_cantidad: null,
       variantes_ml: !varId && variantes.length
         ? variantes.map(x => ({ id: String(x.id), nombre: x.nombre, disponible: Number(x.disponible) || 0, foto: x.foto ?? null })) : null,
     })
+    if (r.kit) kitN.set(f.pubs[f.pubs.length - 1], r.kit_n ?? 0)
   }
 
   const filas: FilaStockML[] = []
@@ -276,16 +285,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       const orden = [...sincronizables].sort((a, b) => Number(b.estado === 'active') - Number(a.estado === 'active')
         || b.ventas60 - a.ventas60 || a.cuenta.localeCompare(b.cuenta))
       for (const p of orden) p.objetivo = 0
-      let quedan = f.publicable
-      for (let dio = true; dio;) {
-        dio = false
-        for (const p of orden) {
-          if (p.unidades > quedan) continue
-          p.objetivo = (p.objetivo ?? 0) + 1
-          quedan -= p.unidades
-          dio = true
-        }
-      }
+      repartir(orden, f.publicable)
       for (const p of orden) {
         if (p.estado === 'paused' && (p.objetivo ?? 0) > 0 && !p.pausa_mano) {
           if (p.envio === 'destino') p.bloqueada_envio = true
@@ -316,6 +316,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     const { codigos: _, ...fila } = f
     filas.push(fila)
   }
+  kits(filas, kitN, tablas, pais)
   compartidas(filas)
   enteras(filas)
   if (pais === 'VE') porCantidad(filas, tablas, enPromo)
@@ -326,14 +327,16 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
 // llevar (lo que mostrará ML: lo sugerido o lo de hoy, máx. 20), al precio que paga hoy (con la promo si tiene).
 function porCantidad(filas: FilaStockML[], tablas: TablasEnvio, enPromo: Map<string, number>) {
   for (const f of filas) {
-    if (f.peso == null || !(f.peso > 0)) continue
     for (const p of f.pubs) {
+      // El kit pesa lo de todos sus productos; lo demás, el producto × lo que trae.
+      const kg = p.kit ? p.kit.peso : f.peso != null && f.peso > 0 ? f.peso * p.unidades : null
+      if (kg == null || !(kg > 0)) continue
       if (p.precio == null || !(p.precio > 0) || p.sin_sincronizar) continue
       const promo = enPromo.get(p.item_id)
       const precio = promo != null && promo < p.precio ? promo : p.precio
       const hasta = Math.max(p.objetivo ?? 0, p.ml_disponible ?? 0)
       if (hasta < 2) continue
-      const e = envioPorCantidad(f.peso * p.unidades, precio, tablas, hasta)
+      const e = envioPorCantidad(kg, precio, tablas, hasta)
       if (e) p.envio_cantidad = { ...e, precio, promo: precio !== p.precio }
     }
   }
@@ -359,12 +362,73 @@ function enteras(filas: FilaStockML[]) {
   }
 }
 
+/** Por turnos: cada vuelta, a cada una (en el orden dado) 1 publicación entera si todavía alcanza. Devuelve lo que sobra. */
+function repartir(orden: PubStockML[], quedan: number) {
+  for (let dio = true; dio;) {
+    dio = false
+    for (const p of orden) {
+      if (p.unidades > quedan) continue
+      p.objetivo = (p.objetivo ?? 0) + 1
+      quedan -= p.unidades
+      dio = true
+    }
+  }
+  return quedan
+}
+
+// 24-11 Kits (mig 198, el dueño: «Kit 4 Tintas Epson 544»): cada producto del kit reservó en su reparto lo suyo para la
+// publicación; se arman solo los kits que alcanzan con TODOS (el mínimo). Lo que un producto guardó de más para kits que
+// no se arman vuelve a sus otras publicaciones. Si alguno está en reserva, desactivado o sin dato, no se toca sola.
+function kits(filas: FilaStockML[], kitN: Map<PubStockML, number>, tablas: TablasEnvio, pais: string) {
+  const grupos = new Map<string, { f: FilaStockML; p: PubStockML }[]>()
+  for (const f of filas) for (const p of f.pubs) {
+    if (!kitN.has(p)) continue
+    const k = `${p.item_id}:${p.variante_id ?? ''}`
+    grupos.set(k, [...(grupos.get(k) ?? []), { f, p }])
+  }
+  const tocadas = new Set<FilaStockML>()
+  for (const g of grupos.values()) {
+    const completo = g.length >= 2 && g.every(({ p }) => g.length >= (kitN.get(p) ?? 0))
+    const pesos = g.map(({ f, p }) => (f.peso != null && f.peso > 0 ? f.peso * p.unidades : null))
+    const peso = completo && pesos.every(x => x != null) ? pesos.reduce((s, x) => s + x!, 0) : null
+    const manual = !completo || g.some(({ f, p }) => p.objetivo == null || f.en_reserva || p.sin_sincronizar || p.pausa_mano)
+    const minimo = manual ? null : Math.min(...g.map(({ p }) => p.objetivo ?? 0))
+    for (const { f, p } of g) {
+      tocadas.add(f)
+      p.kit = { con: g.filter(x => x.f !== f).map(x => ({ code: x.f.code, unidades: x.p.unidades })), peso, incompleto: !completo }
+      if (pais === 'VE' && p.precio != null && p.precio > 0) p.envio = envioPorTransportista(peso, p.precio, tablas).estado
+      if (minimo == null) {
+        if (!p.sin_sincronizar && !p.pausa_mano) { p.objetivo = null; p.reactivar = false; p.bloqueada_envio = false }
+        continue
+      }
+      const sobra = ((p.objetivo ?? 0) - minimo) * p.unidades
+      p.objetivo = minimo
+      if (sobra > 0) {
+        const otras = f.pubs.filter(x => !kitN.has(x) && x.objetivo != null && !x.sin_sincronizar && !x.entera_con_variantes && !x.pausa_mano)
+          .sort((a, b) => Number(b.estado === 'active') - Number(a.estado === 'active') || b.ventas60 - a.ventas60 || a.cuenta.localeCompare(b.cuenta))
+        repartir(otras, sobra)
+      }
+    }
+  }
+  for (const f of tocadas) {
+    if (f.en_reserva) continue
+    for (const p of f.pubs) {
+      if (p.objetivo == null || p.sin_sincronizar || p.entera_con_variantes || p.pausa_mano) continue
+      const pausada = p.estado === 'paused' && p.objetivo > 0
+      p.bloqueada_envio = pausada && p.envio === 'destino'
+      p.reactivar = pausada && p.envio !== 'destino'
+    }
+    f.diferencia = f.pubs.some(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar)) || (f.en_reserva && f.excede)
+  }
+}
+
 // 17-11 (el dueño): una publicación vinculada a varios productos activos (p. ej. un convertidor con 4 modelos) recibía
 // el número de un solo producto («gana el último que igualaste»). Ahora recibe la SUMA de lo que aporta cada uno.
 // Si alguno está en reserva o no se sincroniza, la publicación no se toca sola (queda como está en ML).
 function compartidas(filas: FilaStockML[]) {
   const grupos = new Map<string, { f: FilaStockML; p: PubStockML }[]>()
   for (const f of filas) for (const p of f.pubs) {
+    if (p.kit) continue   // 24-11: el kit no es compartida (trae todos, no uno a elegir)
     const k = `${p.item_id}:${p.variante_id ?? ''}`
     const g = grupos.get(k) ?? []
     if (!g.some(x => x.f.product_id === f.product_id)) g.push({ f, p })
