@@ -118,12 +118,6 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   }, [vista, pagina, q, primera])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
-  // 24-11 «Pendiente de la IA» → «Listo»: sale de Por atender sin tener que escribir.
-  const listoIA = async (pack: string) => {
-    setLista(l => l && l.filter(x => x.pack_id !== pack))
-    await fetch('/api/mensajes/pendiente-ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pack_id: pack }) }).catch(() => {})
-    cargar()
-  }
 
   // Seguimiento (11-11; 12-11 pasó a Por atender, pedido del dueño): chips Sin respuesta (la lista de siempre) · Sin guía ·
   // Sin mensaje. Sin chip activo solo trae los contadores.
@@ -272,11 +266,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
                 {(c.pendiente_ia || c.notas) && (
                   <p className="flex items-center gap-1.5 text-xs">
                     {c.pendiente_ia && <ChipTexto etiqueta="IA" texto={c.pendiente_ia} chip="bg-violet-100 text-violet-900"
-                      ayuda="Pendiente de la IA: respondió sola y dejó esto para el equipo. Sale de aquí cuando alguien escribe en la conversación o tocas Listo" />}
-                    {c.pendiente_ia && <span role="button" tabIndex={0} aria-label="Listo" title="Listo: ya se revisó lo que dejó la IA (quita el aviso)"
-                      onClick={e => { e.stopPropagation(); listoIA(c.pack_id) }}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); listoIA(c.pack_id) } }}
-                      className="-ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:bg-emerald-50 hover:text-emerald-700">✓</span>}
+                      ayuda="Pendiente de la IA: respondió sola y dejó esto para el equipo. Sale de aquí cuando alguien escribe en la conversación o tocas el ícono IA (junto al sobre) adentro" />}
                     {c.notas && <ChipTexto etiqueta="Nota" texto={c.notas} chip="bg-amber-100 text-amber-900" ayuda="Nota de la venta en MercadoLibre" />}
                   </p>
                 )}
@@ -334,6 +324,8 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
     envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string; conflicto?: ConflictoPesos | null } | null; situacion?: Situacion; disponible?: number | null; variacion?: number | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [recordatorio, setRecordatorio] = useState<{ enviados: number; detenido: string | null } | null>(null)
+  // 24-11: ícono IA junto al sobre (null = la IA no intervino; pendiente = texto de lo que dejó sin revisar).
+  const [ia, setIa] = useState<{ pendiente: string | null } | null>(null)
   const [texto, setTexto] = useState('')
   // De dónde salió el texto (se guarda al enviar, migración 062).
   const [origen, setOrigen] = useState<{ fuente: 'ia' | 'parecida' | 'rapida' | 'propia'; base: string }>({ fuente: 'propia', base: '' })
@@ -407,6 +399,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
     if (d.comprador) setComprador(d.comprador)
     if (Array.isArray(d.preguntas)) setPrevias(d.preguntas)
     setRecordatorio(d.recordatorio ?? null)
+    setIa(d.ia ?? null)
     setTasa(typeof d.tasa_bcv === 'number' ? d.tasa_bcv : null)
     if (marcar) onCambio()
   }, [c.pack_id, onCambio])
@@ -464,16 +457,33 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
             : c.con_despachos && (c.despachada_at
               ? <span className="text-neutral-500" title="Su guía salió impresa en Despachos">· despachada {new Date(c.despachada_at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</span>
               : <span className="text-neutral-400" title="No hay guía impresa en Despachos para esta venta (pudo despacharse sin registrarla aquí)">· sin despachar en sistema</span>)}
+          {/* 24-11 (el dueño): IA junto al sobre. Morado = la IA respondió sola y dejó algo sin revisar (clic = revisado);
+              gris = la IA intervino en esta conversación. */}
+          {ia && (ia.pendiente !== null && !soloLectura ? (
+            <button type="button" onClick={async () => {
+                setIa({ pendiente: null })
+                await fetch('/api/mensajes/pendiente-ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pack_id: c.pack_id }) }).catch(() => {})
+                onCambio()
+              }}
+              title={`La IA respondió sola y dejó esto para revisar:
+${ia.pendiente}
+
+Clic = ya lo revisé (sale de Por atender)`} aria-label="Marcar como revisado lo que dejó la IA"
+              className="ml-auto inline-flex h-6 items-center justify-center rounded-full bg-violet-600 px-1.5 text-[10px] font-bold text-white hover:bg-violet-700 transition-colors">IA</button>
+          ) : (
+            <span title="La IA intervino en esta conversación" aria-label="La IA intervino"
+              className="ml-auto inline-flex h-6 items-center justify-center rounded-full bg-neutral-100 px-1.5 text-[10px] font-bold text-neutral-400">IA</span>
+          ))}
           {/* Como ML: sobre cerrado y en color = sin leer (clic la marca leída); abierto y gris = leída. */}
           {c.sin_leer > 0 ? (
             <button onClick={() => leer(true)} title="Marcar como leída" aria-label="Marcar como leída"
-              className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-full text-sky-600 hover:bg-sky-50 hover:text-sky-700 transition-colors">
+              className={`${ia ? '' : 'ml-auto '}inline-flex h-8 w-8 items-center justify-center rounded-full text-sky-600 hover:bg-sky-50 hover:text-sky-700 transition-colors`}>
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
                 <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5v-11Zm2.3-.2 6.1 4.6a1 1 0 0 0 1.2 0l6.1-4.6A.5.5 0 0 0 18.5 6h-13a.5.5 0 0 0-.2.3Z" />
               </svg>
             </button>
           ) : (
-            <span title="Leída" aria-label="Leída" className="ml-auto inline-flex h-8 w-8 items-center justify-center text-neutral-300">
+            <span title="Leída" aria-label="Leída" className={`${ia ? '' : 'ml-auto '}inline-flex h-8 w-8 items-center justify-center text-neutral-300`}>
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true">
                 <path d="M3.5 10 12 4l8.5 6v8.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V10Z" />
                 <path d="m3.5 10 8.5 6 8.5-6" />

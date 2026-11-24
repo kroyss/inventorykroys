@@ -4,7 +4,7 @@ import { OrigenRespuesta, registrarOrigen } from '@/lib/respuestasOrigen'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { CuentaDesconectada, ErrorML } from '@/lib/ml'
-import { itemsDeVenta, leerHilo, responderHilo, subirAdjunto } from '@/lib/mensajesML'
+import { itemsDeVenta, leerHilo, responderHilo, sqlPendienteIA, subirAdjunto } from '@/lib/mensajesML'
 import { preguntasDeComprador } from '@/lib/preguntasComprador'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { tieneModulo } from '@/lib/modulos'
@@ -49,7 +49,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
       const { rows: [r] } = await s.db.query(`SELECT enviados, detenido FROM ml_recordatorios WHERE pack_id = $1::bigint`, [pack])
       if (r && (r.enviados > 0 || r.detenido)) recordatorio = r
     }
+    // 24-11 (el dueño): ícono IA junto al sobre — morado = la IA dejó algo pendiente sin revisar; gris = la IA intervino.
+    const { rows: [ia] } = await s.db.query(
+      `SELECT ${sqlPendienteIA('c')} AS pendiente, c.pendiente_ia AS que,
+              EXISTS (SELECT 1 FROM ml_mensajes_ia j WHERE j.pack_id = c.pack_id AND j.enviada_at IS NOT NULL) AS intervino
+         FROM ml_conversaciones c WHERE c.pack_id = $1::bigint`, [pack]).catch(() => ({ rows: [] as { pendiente: boolean; que: string | null; intervino: boolean }[] }))
     return NextResponse.json({ cuenta: c.nickname, ...h, mensajes, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas, recordatorio,
+      ia: ia && (ia.pendiente || ia.intervino) ? { pendiente: ia.pendiente ? (ia.que ?? '') : null } : null,
       tasa_bcv: s.session.user.country === 'VE' ? await tasaBCVHoy(s.db) : null })   // variables de las respuestas rápidas
   } catch (err) {
     return apiError(err)
