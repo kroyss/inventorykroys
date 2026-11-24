@@ -34,7 +34,9 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
     if (!r.ok) setError(j.error ?? 'No se pudo cambiar'); else cargar()
   }
   const [error, setError] = useState<string | null>(null)
-  const [filtro, setFiltro] = useState<'todas' | 'sola' | 'revisar' | 'sin_marcar'>('todas')
+  // 24-11 (el dueño): solo se marcan las que saldrían solas (es lo que decide si se enciende); las que quedan para el equipo
+  // van en su propio filtro, sin Bien/Mal, para que no hagan ruido.
+  const [filtro, setFiltro] = useState<'sola' | 'sin_marcar' | 'equipo'>('sola')
   // 22-11 (el dueño: «son demasiadas, muestra 5 y si doy clic sale la lista ahí mismo»): 5 a la vista; el resto se abre en el mismo recuadro, con su propia barra.
   const [todasContra, setTodasContra] = useState(false)
   const cargar = () => fetch('/api/mensajes/ia-prueba').then(async r => {
@@ -51,7 +53,9 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
   if (error) return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
   if (!d) return <p className="text-sm text-neutral-500">Cargando…</p>
   const r = d.resumen
-  const casos = d.casos.filter(c => filtro === 'todas' ? true : filtro === 'sin_marcar' ? c.estado === 'listo' && !c.marca : c.decision === filtro)
+  const esSola = (c: Caso) => c.decision === 'sola'
+  const deFiltro = (f: typeof filtro) => d.casos.filter(c => f === 'equipo' ? !esSola(c) : f === 'sin_marcar' ? esSola(c) && c.estado === 'listo' && !c.marca : esSola(c))
+  const casos = deFiltro(filtro)
   return (
     <div className="space-y-4">
       <div className={`rounded-xl border p-4 text-sm flex flex-wrap items-center justify-between gap-3 ${d.auto ? 'border-green-200 bg-green-50 text-green-900' : 'border-sky-200 bg-sky-50 text-sky-900'}`}>
@@ -59,7 +63,7 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
           <p className="font-medium">{d.auto ? `Mensajes automáticos: encendido · ${nombreModo(!!d.todo)}` : 'Mensajes automáticos: apagado (solo prueba, no manda nada)'}</p>
           <p className="text-xs">{d.auto
             ? 'Las respuestas que la IA da por seguras se mandan solas unos 2 minutos después del último mensaje del comprador. Las demás quedan escritas en la conversación para que las revise una persona. Reclamos, pagos, datos personales y montos siempre van a una persona.'
-            : 'A cada mensaje nuevo de un comprador la IA le deja escrita la respuesta en la conversación (la encuentras al abrirla) y anota si habría salido sola. Marca Bien o Mal para saber si se puede encender.'}</p>
+            : 'A cada mensaje nuevo de un comprador la IA le deja escrita la respuesta en la conversación (la encuentras al abrirla) y anota si habría salido sola. Marca Bien o Mal las que saldrían solas: Bien si podía salir sola así, Mal si estaba mal o el caso necesitaba a una persona. Eso dice si se puede encender.'}</p>
         </div>
         {d.puedeConfigurar && onMiIA && <button type="button" onClick={onMiIA}
           className="shrink-0 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-800 hover:bg-neutral-50">Cambiar en Mi IA</button>}
@@ -102,9 +106,10 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        {([['todas', 'Todas'], ['sola', 'Saldrían solas'], ['revisar', 'A revisión'], ['sin_marcar', 'Sin marcar']] as const).map(([k, t]) => (
+        {([['sola', 'Saldrían solas'], ['sin_marcar', 'Solas sin marcar'], ['equipo', 'Para el equipo']] as const).map(([k, t]) => (
           <button key={k} type="button" onClick={() => setFiltro(k)}
-            className={`px-3 py-1.5 rounded-full text-sm border ${filtro === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-300 text-neutral-700'}`}>{t}</button>
+            title={k === 'equipo' ? 'Las que la IA dejó para una persona: no se marcan (no salen solas)' : undefined}
+            className={`px-3 py-1.5 rounded-full text-sm border ${filtro === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-300 text-neutral-700'}`}>{t} · {deFiltro(k).length}</button>
         ))}
       </div>
       {!casos.length && <p className="text-sm text-neutral-500">Todavía no hay mensajes en esta vista. Se llenan solos a medida que escriben los compradores.</p>}
@@ -126,13 +131,13 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${c.decision === 'sola' ? 'bg-green-50 text-green-800' : c.decision === 'nada' ? 'bg-neutral-100 text-neutral-600' : 'bg-amber-50 text-amber-800'}`}>
                   {c.decision === 'sola' ? (c.enviada_at ? (c.sin_seguro ? `✓ Enviada en Modo Total · en Modo Seguro la habría frenado: ${(c.motivos ?? []).join(' · ')}` : '✓ Enviada sola') : c.envio_error ? `No se pudo enviar: ${c.envio_error}` : 'Saldría sola') : c.decision === 'nada' ? 'No respondería' : `A revisión: ${(c.motivos ?? []).join(' · ')}${c.escape_at ? ' · se mandó la frase de escape' : ''}`}</span>
-                <div className="flex gap-1">
+                {esSola(c) && <div className="flex gap-1">
                   {(['bien', 'mal'] as const).map(m => (
                     <button key={m} type="button" onClick={() => marcar(c, m)}
                       className={`px-3 py-1 rounded-full text-xs border ${c.marca === m ? (m === 'bien' ? 'bg-green-700 text-white border-green-700' : 'bg-red-600 text-white border-red-600') : 'bg-white border-neutral-300 text-neutral-700'}`}>
                       {m === 'bien' ? 'Bien' : 'Mal'}</button>
                   ))}
-                </div>
+                </div>}
               </div>
               {c.enviada_at && c.respuesta && <CorregirIA tipo="mensajes" texto={c.comprador || ''} ia={c.respuesta} />}
             </>}
