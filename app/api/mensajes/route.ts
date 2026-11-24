@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
          SELECT COALESCE((SELECT thumbnail FROM ml_catalogo k WHERE k.item_id = o.item),
                          (SELECT item_imagen FROM ml_preguntas q WHERE q.item_id = o.item AND q.item_imagen IS NOT NULL LIMIT 1)) AS imagen
        ) img ON TRUE
-       ORDER BY (c.sin_leer > 0 OR pendiente_activo) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC`, [tieneModulo(s.session.user, 'despachos'), ...params])
+       ORDER BY (c.sin_leer > 0 OR ${sqlPendienteIA('c')}) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC`, [tieneModulo(s.session.user, 'despachos'), ...params])
     const hayMas = !paginado && tope === limite + 1 && rows.length > limite
     if (hayMas) rows.pop()
     let total: number | null = null
