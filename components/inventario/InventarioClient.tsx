@@ -11,6 +11,7 @@ import { matchTokens } from '@/lib/search'
 import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import { EncabezadoInfo } from '@/components/ui/Info'
+import { avisarLlegada } from '@/lib/avisoLlegada'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -277,6 +278,7 @@ export default function InventarioClient({ initialItems, acceso, country, etique
         }),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); setMsg({ type: 'error', text: d.error ?? 'Error' }); return }
+      avisarLlegada()   // 24-11: una entrada o ajuste hacia arriba puede dejar con stock algo pausado o en 0 en ML
       const listRes = await fetch('/api/inventory')
       const updated: InventoryItem[] = await listRes.json()
       setItems(updated)

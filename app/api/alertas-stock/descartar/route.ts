@@ -6,13 +6,18 @@ import { sesionStock } from '@/lib/preguntasSesion'
 // POST /api/alertas-stock/descartar { item_id, variante_id, quitar } (2026-10-12, migración 087)
 //   quitar: true  → "No hay, quitar": deja de avisar (va a "En el olvido") hasta que se reponga y vuelva a caer.
 //   quitar: false → "Volver a avisar".
-const Body = z.object({ item_id: z.string().regex(/^[A-Z]{3}\d+$/), variante_id: z.string().regex(/^\d+$/), quitar: z.boolean() })
+//   ahora_no: true → «Llegó mercancía · Ahora no» (24-11, mig 197): sale de ese grupo hasta la próxima entrada de mercancía.
+const Body = z.object({ item_id: z.string().regex(/^[A-Z]{3}\d+$/), variante_id: z.string().regex(/^\d+$/), quitar: z.boolean(), ahora_no: z.boolean().optional() })
 
 export async function POST(req: NextRequest) {
   const s = await sesionStock()
   if ('error' in s) return s.error
   try {
-    const { item_id, variante_id, quitar } = Body.parse(await req.json())
+    const { item_id, variante_id, quitar, ahora_no } = Body.parse(await req.json())
+    if (ahora_no) {
+      await s.db.query(`UPDATE ml_stock_alertas SET llegada_vista_at = NOW() WHERE item_id = $1 AND variante_id = $2::bigint`, [item_id, variante_id])
+      return NextResponse.json({ ok: true })
+    }
     await s.db.query(
       `UPDATE ml_stock_alertas SET descartada_at = CASE WHEN $3 THEN NOW() END WHERE item_id = $1 AND variante_id = $2::bigint`,
       [item_id, variante_id, quitar])

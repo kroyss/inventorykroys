@@ -15,6 +15,7 @@ import VerComoBarra from '@/components/layout/VerComoBarra'
 import ActividadReal from '@/components/layout/ActividadReal'
 import BurbujaAyuda from '@/components/layout/BurbujaAyuda'
 import AvisoColaML from '@/components/layout/AvisoColaML'
+import AvisoLlegada from '@/components/layout/AvisoLlegada'
 import { Suspense } from 'react'
 import { esDuenoPlataforma } from '@/lib/empresa'
 
@@ -58,6 +59,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <ActividadReal />
       {/* Lo que se está mandando a MercadoLibre en segundo plano (lib/colaML.ts). */}
       <AvisoColaML />
+      {/* 24-11: «Entró mercancía» después de recibir: lo pausado o en 0 en ML que ya tiene inventario. */}
+      <AvisoLlegada />
       {/* Ayuda con IA + Soporte (lib/ayuda.ts, lib/soporte.ts). Suspense: lee ?soporte= de la URL. */}
       <Suspense><BurbujaAyuda /></Suspense>
       <CommandPalette role={role} permisos={session.user.permisos} country={country} modulos={modulos} />
