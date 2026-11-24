@@ -37,7 +37,9 @@ export interface FilaImportar {
   estado: EstadoImportar
   producto: { id: number; code: string; name: string; toda: boolean } | null   // vinculada (toda = por la publicación) o parecida
   /** Otros productos vinculados al MISMO código (21-10): antes solo se veía el primero y un vínculo de más quedaba escondido. */
-  otros?: { id: number; code: string; name: string }[]
+  otros?: { id: number; code: string; name: string; unidades?: number }[]
+  /** 24-11 Kit (mig 198): la publicación trae todos sus productos; `unidades` = cuántas de cada uno (producto + otros). */
+  kit?: { unidades: Record<number, number> } | null
   /** 17-11: vínculo VIEJO por la publicación entera cuando todas sus variantes ya tienen su producto (no lo usa nadie y
    *  antes confundía Preguntas, pesos y Stock en ML; ver lib/vinculoEntero.ts). */
   entera_vieja?: { id: number; code: string; name: string }[]
@@ -107,12 +109,14 @@ export async function filasImportar(db: Pool, { parecidas = true } = {}): Promis
 
   // Vinculadas: por el código exacto o por el de toda la publicación.
   const { rows: cods } = await db.query(
-    `SELECT m.ml_code, p.id, p.code, p.name
+    `SELECT m.ml_code, p.id, p.code, p.name, m.kit, COALESCE(m.unidades, 1)::int AS unidades
      FROM product_ml_codes m JOIN products p ON p.id = m.product_id
      WHERE m.is_active AND p.is_active AND split_part(m.ml_code, ':', 1) = ANY($1::text[])
      ORDER BY m.ml_code, p.code`, [[...new Set(filas.map(f => f.codigo.split(':')[0]))]])
   const todosDe = new Map<string, { id: number; code: string; name: string }[]>()
+  const kitDe = new Map<string, Record<number, number>>()
   for (const r of cods) {
+    if (r.kit) kitDe.set(r.ml_code, { ...(kitDe.get(r.ml_code) ?? {}), [r.id]: r.unidades })
     const l = todosDe.get(r.ml_code) ?? []
     if (!l.some(x => x.id === r.id)) l.push({ id: r.id, code: r.code, name: r.name })
     todosDe.set(r.ml_code, l)
@@ -126,6 +130,8 @@ export async function filasImportar(db: Pool, { parecidas = true } = {}): Promis
       f.estado = 'vinculada'; f.producto = { ...p, toda: !exacto }
       const otros = (todosDe.get(exacto ? f.codigo : f.codigo.split(':')[0]) ?? []).slice(1)
       if (otros.length) f.otros = otros
+      const kit = kitDe.get(exacto ? f.codigo : f.codigo.split(':')[0])
+      if (kit) f.kit = { unidades: kit }
     }
   }
 

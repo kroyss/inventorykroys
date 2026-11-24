@@ -142,7 +142,8 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     const codigos = venta.items.map(i => i.id.replace(/^[A-Z]{3}/, ''))
     const { rows: stock } = await db.query(
       `SELECT split_part(m.ml_code, ':', 1) AS ml_code,
-              COALESCE((array_agg(COALESCE(i.quantity, 0)) FILTER (WHERE m.ml_code NOT LIKE '%:%'))[1],
+              COALESCE(MIN(FLOOR(GREATEST(COALESCE(i.quantity, 0), 0)::numeric / GREATEST(COALESCE(m.unidades, 1), 1))) FILTER (WHERE m.kit AND m.ml_code NOT LIKE '%:%'),   -- 24-11 kit: los que se arman
+                       (array_agg(COALESCE(i.quantity, 0)) FILTER (WHERE m.ml_code NOT LIKE '%:%'))[1],
                        SUM(COALESCE(i.quantity, 0)) FILTER (WHERE m.ml_code LIKE '%:%'))::int AS stock
        FROM product_ml_codes m JOIN products p ON p.id = m.product_id LEFT JOIN inventory i ON i.product_id = p.id
        WHERE split_part(m.ml_code, ':', 1) = ANY($1::text[]) AND p.is_active AND m.is_active AND ${sinEnteraVieja('m')}

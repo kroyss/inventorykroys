@@ -80,9 +80,12 @@ export const SQL_SIN_PESO = `(substring(m.item_id FROM 4) IN (
 // llegaron unas variantes y otras no»): filtro «Para activar» = publicación activa o pausada vinculada a algún producto con
 // inventario (alcanza para 1 venta, combos incluidos) y que: está pausada, está en 0, tiene una variante vinculada en 0 cuyo
 // producto sí tiene, o su producto recibió mercancía en los últimos días (recién llegada, aunque ya esté activa).
+// 24-11 Kit (mig 198): solo si alcanza con TODOS sus productos.
 const CON_INVENTARIO = `(SELECT x.ml_code FROM product_ml_codes x JOIN products px ON px.id = x.product_id AND px.is_active
      JOIN inventory i ON i.product_id = x.product_id
-    WHERE x.is_active AND x.ml_code IS NOT NULL AND i.quantity >= GREATEST(COALESCE(x.unidades, 1), 1))`
+    WHERE x.is_active AND x.ml_code IS NOT NULL AND i.quantity >= GREATEST(COALESCE(x.unidades, 1), 1)
+      AND (NOT x.kit OR NOT EXISTS (SELECT 1 FROM product_ml_codes k LEFT JOIN inventory ik ON ik.product_id = k.product_id
+             WHERE k.is_active AND k.kit AND k.ml_code = x.ml_code AND COALESCE(ik.quantity, 0) < GREATEST(COALESCE(k.unidades, 1), 1))))`
 export const SQL_PARA_ACTIVAR = `(m.estado IN ('active', 'paused')
   AND substring(m.item_id FROM 4) IN (SELECT split_part(c.ml_code, ':', 1) FROM ${CON_INVENTARIO} c)
   AND (m.estado = 'paused' OR m.disponible <= 0
@@ -91,7 +94,8 @@ export const SQL_PARA_ACTIVAR = `(m.estado IN ('active', 'paused')
                WHERE COALESCE((v->>'disponible')::int, 0) <= 0
                  AND substring(m.item_id FROM 4) || ':' || (v->>'id') IN ${CON_INVENTARIO})))`
 /** Lo que hay en el inventario para esta publicación: suma de sus productos vinculados (combos: ÷ unidades). */
-export const SQL_INVENTARIO_PUB = `(SELECT SUM(FLOOR(GREATEST(i.quantity, 0) / GREATEST(COALESCE(x.unidades, 1), 1)))::int
+export const SQL_INVENTARIO_PUB = `(SELECT (CASE WHEN bool_and(x.kit) THEN MIN(FLOOR(GREATEST(i.quantity, 0) / GREATEST(COALESCE(x.unidades, 1), 1)))
+                                                ELSE SUM(FLOOR(GREATEST(i.quantity, 0) / GREATEST(COALESCE(x.unidades, 1), 1))) END)::int
    FROM product_ml_codes x JOIN products px ON px.id = x.product_id AND px.is_active JOIN inventory i ON i.product_id = x.product_id
   WHERE x.is_active AND split_part(x.ml_code, ':', 1) = substring(m.item_id FROM 4))`
 /** Cuántos productos distintos tiene vinculados (variantes): para decir «en N variantes». */

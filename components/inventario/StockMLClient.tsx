@@ -814,6 +814,12 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
           {p.compartida && <span className="ml-1 rounded-full bg-violet-50 px-1.5 py-px text-[11px] text-violet-800 ring-1 ring-inset ring-violet-200"
             title={`La misma publicación está vinculada a otros productos: ML muestra la suma de todos.${p.compartida.aporte != null ? ` Este aporta ${p.compartida.aporte}.` : ''}`}>
             Compartida con {p.compartida.con.join(', ')}{p.compartida.aporte != null ? ` · aporta ${p.compartida.aporte}` : ''}</span>}
+          {/* 24-11 Kit (mig 198): trae todos sus productos; ML muestra los kits que se arman (el mínimo entre ellos). */}
+          {p.kit && <span className={`ml-1 rounded-full px-1.5 py-px text-[11px] ring-1 ring-inset ${p.kit.incompleto ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-violet-50 text-violet-800 ring-violet-200'}`}
+            title={p.kit.incompleto
+              ? 'Kit con algún producto desactivado: no se iguala solo. Corrígelo en Vincular con ML'
+              : `Kit: cada venta trae ${p.unidades > 1 ? `${p.unidades} de este` : 'este'} y también ${p.kit.con.map(c => `${c.unidades > 1 ? `${c.unidades} × ` : ''}${c.code}`).join(', ')}. ML muestra los kits que alcanzan con todos.`}>
+            📦 Kit con {p.kit.con.map(c => c.code).join(', ') || '—'}{p.kit.incompleto ? ' · incompleto' : ''}</span>}
         </div>
         <div className="truncate text-neutral-800" title={p.titulo ?? ''}>{p.titulo ?? <span className="text-neutral-400">No está activa ni pausada en ML (cerrada o finalizada); si la acabas de crear, toca ↻ Actualizar arriba</span>}</div>
       </div>

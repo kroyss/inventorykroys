@@ -120,7 +120,7 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
   const sinPrefijo = (c: string) => c.replace(/^[A-Z]{3}/, '')
   const publicaciones = [...new Set(rows.flatMap(r => (r.items as string[] | null ?? []).filter(i => !i.includes(':')).map(sinPrefijo)))]
   const { rows: map } = publicaciones.length ? await db.query(
-    `SELECT m.ml_code, COUNT(DISTINCT p.id)::int AS n
+    `SELECT m.ml_code, CASE WHEN bool_and(m.kit) THEN 1 ELSE COUNT(DISTINCT p.id) END::int AS n   -- 24-11: el kit es uno (trae todos)
      FROM product_ml_codes m JOIN products p ON p.id = m.product_id
      WHERE m.is_active AND p.is_active AND split_part(m.ml_code, ':', 1) = ANY($1::text[]) GROUP BY 1`, [publicaciones]) : { rows: [] }
   const productosDe = new Map(map.map(m => [m.ml_code as string, m.n as number]))
@@ -141,16 +141,19 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
   const fotoDe = new Map(fotos.map(f => [f.item_id as string, f.thumbnail as string]))
   // Stock de lo vinculado (solo cuenta con inventario; sin él no hay filas y nunca sale "sin stock").
   const { rows: stocks } = publicaciones.length ? await db.query(
-    `SELECT m.ml_code, COALESCE(i.quantity, 0)::float AS stock
+    `SELECT m.ml_code, COALESCE(i.quantity, 0)::float AS stock, GREATEST(COALESCE(m.unidades, 1), 1)::int AS unidades, m.kit
      FROM product_ml_codes m JOIN products p ON p.id = m.product_id LEFT JOIN inventory i ON i.product_id = p.id
      WHERE m.is_active AND p.is_active AND split_part(m.ml_code, ':', 1) = ANY($1::text[])`, [publicaciones]) : { rows: [] }
-  const stockDe = new Map<string, number[]>()
-  for (const r of stocks) stockDe.set(r.ml_code, [...(stockDe.get(r.ml_code) ?? []), r.stock])
-  // Sin stock = todos los productos posibles de la línea (la variante exacta, si no la publicación) tienen menos de lo pedido.
+  const stockDe = new Map<string, { stock: number; unidades: number; kit: boolean }[]>()
+  for (const r of stocks) stockDe.set(r.ml_code, [...(stockDe.get(r.ml_code) ?? []), { stock: r.stock, unidades: r.unidades, kit: !!r.kit }])
+  // Sin stock = todos los productos posibles de la línea (la variante exacta, si no la publicación) tienen menos de lo pedido
+  // (combos: × lo que trae). 24-11 Kit: basta que falte UNO de sus productos.
   const faltaStock = (l: LineaML, variante: string | null) => {
     if (!l.codigo) return false
     const posibles = (variante && stockDe.get(sinPrefijo(variante))) || stockDe.get(sinPrefijo(l.codigo))
-    return !!posibles?.length && posibles.every(st => st < l.cantidad)
+    if (!posibles?.length) return false
+    const falta = (x: { stock: number; unidades: number }) => x.stock < l.cantidad * x.unidades
+    return posibles.every(x => x.kit) ? posibles.some(falta) : posibles.every(falta)
   }
   const cuantos = (codigo: string, variante: string | null) => {
     const pub = sinPrefijo(codigo)

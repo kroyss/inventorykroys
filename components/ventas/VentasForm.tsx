@@ -41,6 +41,7 @@ interface MlVenta {
     producto: { id: number; code: string; name: string } | null   // solo si el código ML está en UN producto
     opciones?: { id: number; code: string; name: string }[]        // todos los productos con ese código
     unidades?: number                                                // pack/combo: «trae N u.» (Stock en ML, 26-10)
+    kit?: { id: number; code: string; name: string; unidades: number }[] | null   // 24-11: trae TODOS estos productos
   }[]
 }
 
@@ -198,6 +199,18 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   const agregarDeMl = (lista: MlVenta['items'], elegido?: number) => {
     const nuevos: FormItem[] = []
     for (const i of lista) {
+      // 24-11 Kit: entran todos sus productos (lo comprado × lo que trae de cada uno); los ya agregados no se repiten.
+      if (i.kit?.length && elegido == null) {
+        for (const c of i.kit) {
+          const p = products.find(x => x.product_id === c.id)
+          if (!p || items.some(x => x.product_id === p.product_id)) continue
+          const q = i.cantidad * Math.max(1, c.unidades)
+          const ya = nuevos.find(x => x.product_id === p.product_id)
+          if (ya) ya.quantity += q
+          else nuevos.push({ product_id: p.product_id, product_name: p.name, product_code: p.code, quantity: q, unit_price: defaultPrice(p) })
+        }
+        continue
+      }
       const id = elegido ?? i.producto?.id
       const p = id != null && products.find(x => x.product_id === id)
       if (!p || items.some(x => x.product_id === p.product_id) || nuevos.some(x => x.product_id === p.product_id)) continue
@@ -211,7 +224,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   useEffect(() => {
     if (!numeroInicial || autoAgregado.current || !mlVenta || orderNumber.trim() !== numeroInicial) return
     autoAgregado.current = true
-    agregarDeMl(mlVenta.items.filter(i => i.producto))
+    agregarDeMl(mlVenta.items.filter(i => i.producto || i.kit?.length))
   })
 
   // "Esta publicación siempre es este producto" (2026-10-12): queda vinculada para las próximas ventas.
@@ -455,7 +468,8 @@ Revísala en el detalle que se abre ahora.`)
 
           {/* Lo que compró en MercadoLibre */}
           {mlVenta && mlVenta.items.length > 0 && (() => {
-            const faltan = mlVenta.items.filter(i => i.producto && !items.some(x => x.product_id === i.producto!.id))
+            const faltaKit = (i: MlVenta['items'][number]) => !!i.kit?.some(c => !items.some(x => x.product_id === c.id))
+            const faltan = mlVenta.items.filter(i => (i.producto && !items.some(x => x.product_id === i.producto!.id)) || faltaKit(i))
             return (
               <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs space-y-1">
                 <div className="flex items-center justify-between gap-2">
@@ -489,7 +503,11 @@ Revísala en el detalle que se abre ahora.`)
                             📦 trae {i.unidades} u. → {i.cantidad * i.unidades!} del producto
                           </span>
                         )}
-                        {i.producto ? (ya
+                        {i.kit?.length ? (faltaKit(i)
+                          ? <button type="button" onClick={() => agregarDeMl([i])} className="shrink-0 underline underline-offset-2 text-sky-700"
+                              title={i.kit.map(c => `${c.code} ×${i.cantidad * c.unidades}`).join(' + ')}>+ Kit ({i.kit.length} productos)</button>
+                          : <span className="shrink-0 text-emerald-700">✓ Kit</span>)
+                        : i.producto ? (ya
                           ? <span className="shrink-0 text-emerald-700">✓ {i.producto.code}</span>
                           : <button type="button" onClick={() => agregarDeMl([i])} className="shrink-0 underline underline-offset-2 text-sky-700">+ {i.producto.code}</button>)
                           : varios ? (elegido
@@ -497,7 +515,10 @@ Revísala en el detalle que se abre ahora.`)
                             : <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Elige el producto</span>)
                           : <span className="shrink-0 text-neutral-400" title="Ningún producto tiene este código ML: búscalo abajo">sin vincular</span>}
                       </div>
-                      {!i.producto && !varios && (() => {
+                      {i.kit?.length ? (
+                        <p className="pl-3 text-[11px] text-violet-800">📦 Kit: trae {i.kit.map(c => `${c.code}${c.unidades > 1 ? ` ×${c.unidades}` : ''}`).join(' + ')} · se descuenta cada uno</p>
+                      ) : null}
+                      {!i.producto && !varios && !i.kit?.length && (() => {
                         // Productos de la venta que no salen de otra publicación: candidatos a "es este".
                         const usados = new Set(mlVenta.items.flatMap(x => (x.opciones ?? []).map(o => o.id)))
                         const libres = items.filter(it => !usados.has(it.product_id))
