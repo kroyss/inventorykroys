@@ -31,6 +31,8 @@ interface Fila {
   n_pubs?: number | null
   /** 18-11: qué cantidades quedan sin envío gratis (hasta lo que mostrará ML, máx. 20). Solo con el inventario al día. */
   envio_cantidad?: { pierde: number[]; hasta: number; promo: boolean } | null
+  /** 24-11 «Llegó mercancía»: en 0 o pausada y su producto recibió mercancía después (con Inventario). */
+  llegada?: boolean; llego_at?: string | null; llego_ref?: string | null
 }
 export interface Datos {
   filas: Fila[]; contadores: { agotadas: number; bajas: number; pausadas: number }; umbral: number
@@ -52,10 +54,10 @@ const hace = (s: string | null) => {
 }
 
 /** Automatizaciones → Stock: publicaciones (y variantes) de MercadoLibre vendidas en 30 días, agotadas o por agotarse. */
-export default function AlertasStockClient({ inicial = null, conInventario = false }: { inicial?: Datos | null; conInventario?: boolean }) {   // 12-11: Agotadas ya vino en el HTML
-  const [vista, setVista] = useState<Vista>('agotadas')
+export default function AlertasStockClient({ inicial = null, conInventario = false, vistaInicial = 'agotadas' }: { inicial?: Datos | null; conInventario?: boolean; vistaInicial?: Vista }) {   // 12-11: Agotadas ya vino en el HTML
+  const [vista, setVista] = useState<Vista>(vistaInicial)
   const [datos, setDatos] = useState<Datos | null>(inicial)
-  const [datosDe, setDatosDe] = useState<Vista | null>(inicial ? 'agotadas' : null)   // de qué pestaña son los datos cargados
+  const [datosDe, setDatosDe] = useState<Vista | null>(inicial ? vistaInicial : null)   // de qué pestaña son los datos cargados
   const [buscar, setBuscar] = useState('')
   const [umbral, setUmbral] = useState(inicial ? String(inicial.umbral) : '')
   const [guardandoUmbral, setGuardandoUmbral] = useState(false)
@@ -82,6 +84,16 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
       if (r.ok) setDatos(d => d && { ...d,
         filas: d.filas.map(x => clave(x) === clave(f) ? { ...x, caliente: !quitar, descartada_at: quitar ? new Date().toISOString() : null } : x),
         contadores: { ...d.contadores, [vista]: Math.max(0, d.contadores[vista] + (quitar ? -1 : 1)) } })
+    } finally { setQuitando(null); setVez(n => n + 1) }
+  }
+  // 24-11 «Llegó mercancía · Ahora no»: sale del grupo hasta la próxima entrada de mercancía de ese producto.
+  const ahoraNo = async (f: Fila) => {
+    setQuitando(clave(f))
+    try {
+      const r = await fetch('/api/alertas-stock/descartar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: f.item_id, variante_id: f.variante_id, quitar: false, ahora_no: true }) })
+      if (r.ok) setDatos(d => d && { ...d, filas: d.filas.filter(x => clave(x) !== clave(f)),
+        contadores: { ...d.contadores, [vista]: Math.max(0, d.contadores[vista] - 1) } })
     } finally { setQuitando(null); setVez(n => n + 1) }
   }
 
@@ -197,8 +209,10 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
 
   const q = buscar.trim().toLowerCase()
   const filas = (datos?.filas ?? []).filter(f => !q || `${f.titulo} ${f.variante ?? ''} ${f.item_id} ${f.cuenta}`.toLowerCase().includes(q))
-  const calientes = filas.filter(f => f.caliente)
-  const olvido = filas.filter(f => !f.caliente)
+  // 24-11: «Llegó mercancía» va primero, aparte (aunque se hubiera quitado con «No hay» o «Quitar»).
+  const llegadas = vista === 'bajas' ? [] : filas.filter(f => f.llegada)
+  const calientes = filas.filter(f => f.caliente && !llegadas.includes(f))
+  const olvido = filas.filter(f => !f.caliente && !llegadas.includes(f))
 
 
   // "Color: Azul 2 Rayas · Talla: M" → "Azul 2 Rayas · M" (como lo muestra la ficha).
@@ -268,7 +282,10 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
             ▶ Reactivar
           </button>}
         </>}
-        {(f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
+        {f.llegada && vista !== 'bajas' && <button type="button" onClick={() => ahoraNo(f)} disabled={quitando === clave(f)}
+          title="Sale de «Llegó mercancía» hasta que vuelva a entrar mercancía de este producto"
+          className="inline-flex items-center whitespace-nowrap rounded-full border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:border-neutral-500 disabled:opacity-40">Ahora no</button>}
+        {!(f.llegada && vista !== 'bajas') && (f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
           title={vista === 'pausadas' ? (f.caliente ? 'Ya la revisaste: sale de la lista (vuelve si la reactivas y la pausas de nuevo)' : 'Vuelve a la lista')
             : f.caliente ? 'No hay para reponer: deja de avisar hasta que lo repongas y vuelva a agotarse' : 'Vuelve a contar en el aviso'}
           className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 ${
@@ -338,12 +355,17 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
             <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.item_id)}`} className="font-medium text-sky-700 underline hover:text-sky-900">pack</Link>
           </p>
         ) : null}
+        {f.llegada && vista !== 'bajas' && (
+          <p className="text-[11px] font-medium text-emerald-700 whitespace-nowrap" title={f.llego_ref ? `Entrada: ${f.llego_ref}` : undefined}>
+            Llegó mercancía {hace(f.llego_at ?? null)}{f.llego_ref ? ` · ${f.llego_ref.length > 14 ? f.llego_ref.slice(0, 13) + '…' : f.llego_ref}` : ''}
+          </p>
+        )}
         <p className="text-[11px] text-neutral-400 whitespace-nowrap">
           {hace(vista === 'pausadas' ? f.pausada_desde ?? f.agotada_desde ?? null : vista === 'agotadas' ? f.agotada_desde : f.bajo_desde)}
         </p>
       </div>
       {/* Corte de línea solo en celular (con algo abajo que mostrar). */}
-      {(datos?.puedeStock || f.caliente || (f.descartada_at && reciente(f))) && <div className="order-4 basis-full h-0 sm:hidden" />}
+      {(datos?.puedeStock || f.caliente || f.llegada || (f.descartada_at && reciente(f))) && <div className="order-4 basis-full h-0 sm:hidden" />}
     </li>
   )
 
@@ -441,8 +463,20 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
         </p>
       )}
 
+      {/* 24-11 «Llegó mercancía»: en 0 o pausadas cuyo producto recibió mercancía; arriba de todo. */}
+      {datos && datosDe === vista && llegadas.length > 0 && (
+        <section className="rounded-xl border border-emerald-200 bg-white shadow-sm">
+          <p className="rounded-t-xl border-b border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-900">
+            <b>Llegó mercancía · {llegadas.length}</b>{' '}
+            {vista === 'pausadas' ? 'pausada' : 'en 0'}{llegadas.length === 1 ? '' : 's'} en MercadoLibre que ya tiene{llegadas.length === 1 ? '' : 'n'} inventario
+            para volver a la venta. {vista === 'pausadas' ? 'Reactívalas' : 'Ponles stock'} o toca «Ahora no».
+          </p>
+          <ul className="divide-y divide-neutral-100">{llegadas.map(fila)}</ul>
+        </section>
+      )}
+
       {/* Al cambiar de pestaña no se muestra la lista anterior mientras llega la nueva. */}
-      {!datos || datosDe !== vista ? <Cargando /> : calientes.length === 0 ? (
+      {!datos || datosDe !== vista ? <Cargando /> : calientes.length === 0 ? llegadas.length > 0 ? null : (
         <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 p-6 text-center">
           {vista === 'pausadas' ? 'No hay publicaciones pausadas a mano pendientes. 👌'
             : vista === 'agotadas' ? 'Nada nuevo agotado en los últimos 7 días. Todo al día. 👌' : 'Nada nuevo por agotarse en los últimos 7 días.'}
