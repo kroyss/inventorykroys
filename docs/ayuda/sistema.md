@@ -523,7 +523,7 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   que va a la nota), la conversación **sigue en Por atender** aunque MercadoLibre la marque leída, con la etiqueta
   morada **«IA»** (junto a la etiqueta **«Nota»** si la venta tiene nota). En la lista van solo las etiquetas: pasando
   el cursor por encima se lee el texto completo, y adentro de la conversación está todo. Sale sola cuando
-  alguien del equipo escribe en esa conversación, o con **✓ Listo** (a la derecha de la etiqueta) si se resolvió sin
+  alguien del equipo escribe en esa conversación, o con el **✓** (a la derecha de la etiqueta) si se resolvió sin
   escribir. Cuenta en el numerito de Mensajes. Las notas viejas o escritas por el equipo no la hacen aparecer; sin IA automática en Mensajes no aparece nunca.
 - **Formulario de MercadoEnvíos:** lo llena el comprador desde su cuenta; la IA no ofrece llenarlo por él (no hay
   acceso): le explica y lo guía.

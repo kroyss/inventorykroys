@@ -273,10 +273,10 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
                   <p className="flex items-center gap-1.5 text-xs">
                     {c.pendiente_ia && <ChipTexto etiqueta="IA" texto={c.pendiente_ia} chip="bg-violet-100 text-violet-900"
                       ayuda="Pendiente de la IA: respondió sola y dejó esto para el equipo. Sale de aquí cuando alguien escribe en la conversación o tocas Listo" />}
-                    {c.pendiente_ia && <span role="button" tabIndex={0} title="Ya se resolvió (sin escribir): sale de Por atender"
+                    {c.pendiente_ia && <span role="button" tabIndex={0} aria-label="Listo" title="Listo: ya se revisó lo que dejó la IA (quita el aviso)"
                       onClick={e => { e.stopPropagation(); listoIA(c.pack_id) }}
                       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); listoIA(c.pack_id) } }}
-                      className="shrink-0 rounded px-1 text-neutral-500 underline-offset-2 hover:text-neutral-900 hover:underline">✓ Listo</span>}
+                      className="-ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:bg-emerald-50 hover:text-emerald-700">✓</span>}
                     {c.notas && <ChipTexto etiqueta="Nota" texto={c.notas} chip="bg-amber-100 text-amber-900" ayuda="Nota de la venta en MercadoLibre" />}
                   </p>
                 )}
