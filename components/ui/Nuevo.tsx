@@ -23,6 +23,8 @@ export const NUEVOS = {
   precio_vs_ml: '2026-12-22',
   // 23-11: Calificar desde Mensajes y el tipo «No concretada, sin problema».
   calificar_mensajes: '2026-12-23',
+  // 24-11: Productos → Catálogo PDF para todos los que llevan Inventario.
+  catalogo_pdf: '2026-12-24',
 } as const
 export type ClaveNuevo = keyof typeof NUEVOS
 

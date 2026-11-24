@@ -10,6 +10,7 @@ import { coPublishedPrice } from '@/lib/coPricing'
 import { matchTokens } from '@/lib/search'
 import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
 import { liveBaseVE, liveFinalVE, livePublishedVE, recDiscountVE, mlNetFor, storedPricesVE, type VeRate } from '@/lib/pricingVE'
+import { Nuevo } from '@/components/ui/Nuevo'
 import Link from '@/components/ui/Link'
 import MlBreakdown from './MlBreakdown'
 import VinculosML from './VinculosML'
@@ -616,7 +617,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           </Link>
         )}
         {costosML && <button onClick={() => setVerCostos(true)} className="btn-secondary text-sm whitespace-nowrap" title="Comisión de MercadoLibre, envío y colores de la rentabilidad">Costos ML</button>}
-        {catalogo && <Link href="/productos/catalogo" className="btn-secondary text-sm whitespace-nowrap" title="Catálogo con logo, fotos y precios para mandar por WhatsApp">Catálogo PDF</Link>}
+        {catalogo && <Link href="/productos/catalogo" className="btn-secondary text-sm whitespace-nowrap" title="Catálogo con logo, fotos y precios para mandar por WhatsApp">Catálogo PDF<Nuevo clave="catalogo_pdf" /></Link>}
         <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Producto</button>
       </>} />
 

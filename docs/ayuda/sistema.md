@@ -1323,7 +1323,7 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
   ficha, la columna Rentabilidad, los simuladores y Promociones.
   - El **«Envío»** del costo de la ficha es lo que te costó traer el producto (flete o importación) y se suma al costo;
     es opcional y Compras no lo pide. El envío que cobra ML va aparte, en «Lo que te queda».
-- **Catálogo PDF** (Productos → botón Catálogo PDF; en prueba, solo algunas empresas): elige productos (buscar,
+- **Catálogo PDF** (Productos → botón Catálogo PDF; viene con el Inventario): elige productos (buscar,
   «Solo con stock», «Solo con foto»), sube tu **logo**, pon el nombre, una línea debajo y un texto al final
   (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar
   como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos

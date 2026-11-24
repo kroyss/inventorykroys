@@ -1,5 +1,6 @@
 'use client'
 import { useMemo, useRef, useState } from 'react'
+import { useVistoNuevo } from '@/components/ui/Nuevo'
 
 // Catálogo PDF (08-11): arma una hoja A4 con logo, nombre, fotos y precios (o sin precios) de los productos elegidos.
 // «Guardar PDF» abre la impresión del navegador (Guardar como PDF): sale liviano y se manda por WhatsApp.
@@ -26,6 +27,7 @@ function achicar(file: File): Promise<string> {
 }
 
 export default function CatalogoClient({ productos, ajustes, pais, verBase }: { productos: ProductoCatalogo[]; ajustes: AjustesCatalogo | null; pais: 'VE' | 'CO'; verBase: boolean }) {
+  useVistoNuevo('catalogo_pdf')
   const [a, setA] = useState<AjustesCatalogo>({ ...POR_DEFECTO, ...(pais === 'CO' ? { precio: 'venta' } : {}), ...ajustes })
   const [q, setQ] = useState('')
   const [conStock, setConStock] = useState(true)
