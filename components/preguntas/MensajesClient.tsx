@@ -28,6 +28,23 @@ import PedirCalificacion from '@/components/preguntas/PedirCalificacion'
 import ChipCalificar from '@/components/preguntas/ChipCalificar'
 import { ChipsSeguimiento, ListaSeguimiento, type DatosSeg, type FiltroSeg } from '@/components/preguntas/Seguimiento'
 
+/** Etiqueta + texto en una línea; cursor encima = todo el texto; tocarla lo despliega ahí (sin abrir la conversación). */
+function EtiquetaTexto({ etiqueta, texto, clase, chip, ayuda, extra }: { etiqueta: string; texto: string; clase: string; chip: string; ayuda: string; extra?: React.ReactNode }) {
+  const [abierta, setAbierta] = useState(false)
+  const alternar = (e: React.SyntheticEvent) => { e.stopPropagation(); setAbierta(v => !v) }
+  return (
+    <p className={`flex items-start gap-1.5 text-xs ${clase}`}>
+      <span role="button" tabIndex={0} aria-expanded={abierta} title={`${ayuda}\n\n${texto}`} onClick={alternar}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(e) } }}
+        className="flex min-w-0 flex-1 cursor-pointer items-start gap-1.5">
+        <span className={`shrink-0 rounded px-1.5 py-0.5 font-semibold ${chip}`}>{etiqueta}</span>
+        <span className={`min-w-0 flex-1 py-0.5 ${abierta ? 'whitespace-pre-wrap [overflow-wrap:anywhere]' : 'truncate'}`}>{texto}</span>
+      </span>
+      {extra}
+    </p>
+  )
+}
+
 export interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
   ultimo_at: string | null; productos: string | null; cuenta: string; despachada_at: string | null; cancelada: boolean | null; con_despachos: boolean; notas: string | null; imagen?: string | null
@@ -261,21 +278,17 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
                     <span className="font-medium text-neutral-500">Se habló: </span><Resaltar texto={recorte(sinEtiquetas(c.coincide), q)} q={q} />
                   </p>
                 )}
+                {/* 24-11 (el dueño): IA y Nota juntas; al pasar el cursor se ve todo y al tocarlas se despliegan aquí mismo,
+                    sin abrir la conversación. */}
                 {c.pendiente_ia && (
-                  <p className="flex items-center gap-1.5 text-xs text-violet-900">
-                    <span className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 font-semibold" title="La IA respondió sola y dejó esto para el equipo: sale de aquí cuando alguien escribe en la conversación o tocas Listo">Pendiente de la IA</span>
-                    <span className="min-w-0 flex-1 truncate">{c.pendiente_ia}</span>
-                    <span role="button" tabIndex={0} title="Ya se resolvió (sin escribir): sale de Por atender"
+                  <EtiquetaTexto etiqueta="IA" texto={c.pendiente_ia} clase="text-violet-900" chip="bg-violet-100"
+                    ayuda="Pendiente de la IA: respondió sola y dejó esto para el equipo. Sale de aquí cuando alguien escribe en la conversación o tocas Listo"
+                    extra={<span role="button" tabIndex={0} title="Ya se resolvió (sin escribir): sale de Por atender"
                       onClick={e => { e.stopPropagation(); listoIA(c.pack_id) }}
                       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); listoIA(c.pack_id) } }}
-                      className="shrink-0 rounded px-1 text-neutral-500 underline-offset-2 hover:text-neutral-900 hover:underline">✓ Listo</span>
-                  </p>
+                      className="shrink-0 rounded px-1 text-neutral-500 underline-offset-2 hover:text-neutral-900 hover:underline">✓ Listo</span>} />
                 )}
-                {c.notas && !c.pendiente_ia && (
-                  <p className="text-xs text-amber-800 truncate">
-                    <span className="font-semibold bg-amber-100 rounded px-1.5 py-0.5 mr-1.5">Nota</span>{c.notas}
-                  </p>
-                )}
+                {c.notas && <EtiquetaTexto etiqueta="Nota" texto={c.notas} clase="text-amber-800" chip="bg-amber-100" ayuda="Nota de la venta en MercadoLibre" />}
                 </div>
               </button>
             ))}
