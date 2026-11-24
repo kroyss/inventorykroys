@@ -5,7 +5,7 @@ import { whereFiltro } from '@/lib/publicacionesLista'
 import { actualizarCatalogo } from '@/lib/catalogoML'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
-import { avisosStock, itemsEnPromo, SQL_SIN_PESO, SQL_SIN_VINCULAR, type AvisoStock } from '@/lib/avisosPublicaciones'
+import { avisosStock, itemsEnPromo, SQL_SIN_PESO, SQL_SIN_VINCULAR, SQL_PARA_ACTIVAR, SQL_INVENTARIO_PUB, SQL_PRODUCTOS_PUB, SQL_LLEGO_PUB, type AvisoStock } from '@/lib/avisosPublicaciones'
 import { SQL_POCA_VENTA } from '@/lib/visitasML'
 
 const POR_PAGINA = 40
@@ -14,7 +14,8 @@ const POR_PAGINA = 40
 // Fase 4 (18-11): cada fila trae sus avisos (stock, vincular, peso, promo; lib/avisosPublicaciones.ts) y arriba el
 // conteo de cada uno para los filtros. Cada aviso solo si el usuario ve esa pantalla. &fresco=1 recalcula el stock.
 // 20-11 (mig. 192): «visitas» = muchas visitas y pocas ventas en 30 días (lib/visitasML.ts); lo ve todo el que entra aquí.
-const AVISOS = ['stock', 'vincular', 'peso', 'promo', 'visitas'] as const
+// 24-11: «activar» = con inventario y pausada, en 0 o recién llegada (lib/avisosPublicaciones.ts; el aviso «Entró mercancía» lleva aquí).
+const AVISOS = ['activar', 'stock', 'vincular', 'peso', 'promo', 'visitas'] as const
 type Aviso = typeof AVISOS[number]
 
 export async function GET(req: NextRequest) {
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
   const pagina = Math.max(1, Number(p.get('pagina')) || 1)
   const u = s.session.user
   const ve: Record<Aviso, boolean> = {
+    activar: tieneModulo(u, 'inventario') && puede(u, 'ver_inventario'),
     stock: tieneModulo(u, 'inventario') && puede(u, 'ver_inventario'),
     vincular: puede(u, 'vincular_ml') || (puede(u, 'ver_productos') && puede(u, 'importar_ml')),
     peso: u.country === 'VE' && tieneModulo(u, 'inventario') && puede(u, 'ver_productos'),
@@ -45,12 +47,15 @@ export async function GET(req: NextRequest) {
     if (ve.vincular) cond.vincular = SQL_SIN_VINCULAR
     if (ve.peso) cond.peso = SQL_SIN_PESO
     cond.visitas = SQL_POCA_VENTA
+    if (ve.activar) cond.activar = SQL_PARA_ACTIVAR
     const extra = avisoPedido ? ` AND ${cond[avisoPedido]}` : ''
     // 18-11 (caída de la lista en prod): Postgres exige que cada parámetro enviado aparezca en la consulta. Los arrays de
     // stock/promo se mandan siempre que se ven, así que la lista también los nombra (como columnas), haya filtro o no.
     const cols = `${ve.vincular ? SQL_SIN_VINCULAR : 'FALSE'} AS sin_vincular, ${ve.peso ? SQL_SIN_PESO : 'FALSE'} AS sin_peso`
       + `, COALESCE(${SQL_POCA_VENTA}, FALSE) AS poca_venta`
       + (cond.stock ? `, ${cond.stock} AS _st` : '') + (cond.promo ? `, ${cond.promo} AS _pr` : '')
+      // Con «Para activar», cada fila dice cuánto hay en el inventario y si llegó mercancía (solo ahí: cuesta).
+      + (avisoPedido === 'activar' ? `, ${SQL_INVENTARIO_PUB} AS inventario, ${SQL_PRODUCTOS_PUB} AS n_productos, ${SQL_LLEGO_PUB} AS llego_at` : '')
     const conteos = AVISOS.filter(a => cond[a]).map(a => `, COUNT(*) FILTER (WHERE ${cond[a]})::int AS ${a}`).join('')
     // Con un aviso pedido, la lista se filtra; los conteos de los filtros siguen siendo de toda la búsqueda.
     const [{ rows }, { rows: [t] }, { rows: cuentas }] = await Promise.all([
@@ -58,7 +63,7 @@ export async function GET(req: NextRequest) {
         `SELECT m.item_id, m.titulo, m.precio::float AS precio, m.moneda, m.disponible, m.estado, m.thumbnail, m.permalink, m.sku,
                 k.nickname AS cuenta, COALESCE(jsonb_array_length(m.variantes), 0) AS variantes, m.visitas_30d, m.ventas_30d,
                 (SELECT MAX(c.creado_at) FROM ml_publicacion_cambios c WHERE c.item_id = m.item_id AND c.ok) AS editada_at, ${cols}
-         ${w.sql}${extra} ORDER BY m.sin_movimiento, m.estado, m.titulo LIMIT ${POR_PAGINA} OFFSET ${(pagina - 1) * POR_PAGINA}`, args),
+         ${w.sql}${extra} ORDER BY ${avisoPedido === 'activar' ? `(m.estado = 'paused' OR m.disponible <= 0) DESC, ` : ''}m.sin_movimiento, m.estado, m.titulo LIMIT ${POR_PAGINA} OFFSET ${(pagina - 1) * POR_PAGINA}`, args),
       s.db.query(`SELECT COUNT(*)::int AS todas, COUNT(*) FILTER (WHERE TRUE${extra})::int AS n${conteos} ${w.sql}`, args),
       s.db.query(`SELECT id, nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`),
     ])

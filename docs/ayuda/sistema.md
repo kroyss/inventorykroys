@@ -588,15 +588,13 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
   subir el stock en ML, **sugerido X** (al tocarlo lo escribe como stock nuevo). Debajo, **hace 17 h / hace 2 días / hace 40 min**:
   desde cuándo está agotada, por agotarse o pausada.
 - **No hay para reponer:** deja de avisar de ese producto hasta que lo repongas y vuelva a agotarse.
-- **Llegó mercancía (con Inventario):** arriba de Agotadas y de Pausadas, en verde, las publicaciones en 0 o pausadas en
-  MercadoLibre cuyo producto **recibió mercancía** después de agotarse o pausarse (compra o importación recibida, entrada
-  o ajuste hacia arriba en el inventario, en los últimos 14 días; no cuenta lo que vuelve de una venta corregida o
-  anulada). Salen **aunque las hubieras quitado** con «No hay» o «Quitar». Cada una dice «Llegó mercancía hace … · OC-…»
-  y se activa como siempre (Poner X / Repartir / ▶ Reactivar); al ponerle stock o reactivarla sale sola. **Ahora no** la
-  saca hasta la próxima entrada de ese producto. Cuentan en el número de la pestaña y del menú.
-- **Aviso «Entró mercancía»:** al recibir o finalizar una compra o importación, o al cargar una entrada en el inventario,
-  si algo pausado o en 0 en ML ya tiene inventario sale un aviso abajo a la izquierda con **Activarlas →** (abre Stock en
-  la pestaña donde están). Si no hay nada que activar, no sale nada.
+- **Llegó mercancía (con Inventario):** arriba de Agotadas y de Pausadas, un **desplegable cerrado** («▸ Llegó mercancía ·
+  N») con las publicaciones en 0 o pausadas cuyo producto recibió mercancía después de agotarse o pausarse (compra o
+  importación recibida, entrada o ajuste hacia arriba, en 14 días; no lo que vuelve de una venta corregida o anulada),
+  aunque las hubieras quitado con «No hay» o «Quitar». **No suma** al número de la pestaña ni del menú: la lista del día
+  sigue siendo lo que se agota. Al abrirlo, cada una dice «Llegó mercancía hace … · OC-…», se activa como siempre o con
+  **Ahora no** sale hasta la próxima entrada. **Ver en Mis publicaciones →** abre el filtro «Para activar» (cada variante
+  y cada cuenta como está en ML).
 - **Revisar ya:** con **↻ Actualizar** (arriba, junto a Novedades), línea Publicaciones y stock (se puede cada 10 minutos). Además se revisa sola cada hora.
 - Si la empresa lleva Inventario, cada fila muestra cuánto tienes en inventario y un botón «usar» para ponerlo
   como stock nuevo, y arriba el botón **Comparar con inventario →**: aquí ves **lo que dice MercadoLibre**; compararlo
@@ -622,6 +620,14 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
     activa. Pausada desde aquí queda «pausada a mano» (el stock automático no la reactiva). Para varias: elígelas y
     abajo **Pausar** o **Activar** (van por la cola, con el avance abajo a la derecha y en Historial de tareas; las que ya estaban así no se tocan; solo se activan las
     que tienen stock en ML).
+  - **Para activar** (filtro, con Inventario): las publicaciones que tienen con qué venderse y no lo están — vinculadas
+    a un producto con inventario y **pausadas**, **en 0**, con **alguna variante en 0** cuyo producto sí tiene (llegaron unas
+    variantes y otras no), o **recién llegadas** (su producto recibió mercancía en los últimos 14 días). Primero las
+    pausadas o en 0. Cada fila dice **«Inventario N»** (con variantes, la suma y cuántas son) y **«llegó hace…»**: pones el
+    stock con «N disp. ✎» y la activas con **Pausada · Activar** (o eliges varias y **Activar** abajo; ML solo activa las
+    que tienen stock). Al **recibir o finalizar una compra o importación**, o cargar una entrada en el inventario, si algo
+    pausado o en 0 ya tiene inventario sale el aviso **«Entró mercancía · Ver y activar →»** (abajo a la izquierda), que abre
+    esta lista con el filtro puesto.
   - **Stock distinto** (ámbar) o **Vende de más** (rojo): el stock de ML no coincide con tu inventario (la misma cuenta
     de Stock vs inventario). Dice la diferencia (ML X · inventario Y, o cuántas variantes no cuadran; el detalle al
     pasar el cursor). Solo avisa: al tocarla abre **Stock vs inventario** con ese producto, donde se analiza y arregla.

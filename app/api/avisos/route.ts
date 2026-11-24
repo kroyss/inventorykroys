@@ -32,7 +32,7 @@ export async function GET() {
         `SELECT (SELECT COUNT(*) FROM ml_preguntas WHERE estado = 'UNANSWERED')::int AS p,
                 (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0 AND ${SQL_MENSAJE_VIGENTE})::int AS m`)
       out.preguntas = r.p; out.mensajes = r.m
-      if (tieneModulo(u, 'alertas_stock')) { const c = await contarAlertas(db, tieneModulo(u, 'inventario')); out.alertas = c.agotadas + c.llegadas }  // agotadas (= pestaña Agotadas) + «Llegó mercancía» (24-11)
+      if (tieneModulo(u, 'alertas_stock')) { out.alertas = (await contarAlertas(db)).agotadas }  // solo agotadas (= pestaña Agotadas); «Llegó mercancía» no suma (24-11, el dueño)
       {
         const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
         // Solo las que se pueden calificar ya: las que siguen en días de espera no cuentan (salen solas).

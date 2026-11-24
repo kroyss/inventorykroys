@@ -19,8 +19,10 @@ interface Fila {
   visitas_30d: number | null; ventas_30d: number | null; poca_venta: boolean
   stock: null | { nivel: 'vende' | 'stock'; code: string; disponible: number
                   pubs: { item_id: string; variante_id: string | null; variante: string | null; ml: number | null; queda: number; reactivar: boolean }[] }
+  // 24-11, solo con el filtro «Para activar»: lo que hay en el inventario, en cuántos productos (variantes) y si llegó mercancía.
+  inventario?: number | null; n_productos?: number | null; llego_at?: string | null
 }
-type Aviso = 'stock' | 'vincular' | 'peso' | 'promo' | 'visitas'
+type Aviso = 'activar' | 'stock' | 'vincular' | 'peso' | 'promo' | 'visitas'
 interface Respuesta {
   filas: Fila[]; total: number; todas: number; porPagina: number; cuentas: { id: number; nickname: string }[]
   avisos: Partial<Record<Aviso, number>>; puedeIgualar: boolean
@@ -34,13 +36,13 @@ interface Texto { id: number; tipo: 'encabezado' | 'condiciones' | 'pie'; nombre
 
 /** Publicaciones (Fase 6): buscar una publicación de las cuentas conectadas y abrir su editor. Desde 08-11 también
  *  elegir varias (o todas las de la búsqueda) y cambiarles el encabezado / pie de la descripción o el precio en lote. */
-export default function PublicacionesClient() {
+export default function PublicacionesClient({ avisoInicial = '' }: { avisoInicial?: '' | Aviso }) {
   const [q, setQ] = useState('')
   const [buscar, setBuscar] = useState('')
   const [cuenta, setCuenta] = useState('')
   const [estado, setEstado] = useState('')
   const [pagina, setPagina] = useState(1)
-  const [aviso, setAviso] = useState<'' | Aviso>('')
+  const [aviso, setAviso] = useState<'' | Aviso>(avisoInicial)   // 24-11: ?aviso=activar (aviso «Entró mercancía»)
   const fresco = useRef(false)
   const [r, setR] = useState<Respuesta | null>(null)
   const { data: sesion } = useSession()
@@ -210,9 +212,14 @@ export default function PublicacionesClient() {
 }
 
 const AVISOS_UI: { k: Aviso; t: string }[] = [
+  { k: 'activar', t: 'Para activar' },
   { k: 'stock', t: 'Stock distinto' }, { k: 'vincular', t: 'Sin vincular' }, { k: 'peso', t: 'Sin peso' }, { k: 'promo', t: 'En promo' },
   { k: 'visitas', t: 'Muchas visitas, pocas ventas' },
 ]
+const haceDias = (s: string) => {
+  const d = Math.floor((Date.now() - new Date(s).getTime()) / 86_400_000)
+  return d <= 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`
+}
 const ETQ = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-4 whitespace-nowrap'
 
 /** Fase 4 (18-11, el dueño: «al estilo ML»): etiquetas cortas SOLO cuando algo pide atención; cada una lleva a lo que
@@ -271,6 +278,14 @@ function AvisosFila({ f, vincular, envios, onCambio }: {
           className={`${ETQ} ${st.nivel === 'vende' ? 'border-red-200 bg-red-50 text-red-700 hover:border-red-300' : 'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300'}`}>
           {st.nivel === 'vende' ? 'Vende de más' : 'Stock distinto'}{detalle && <span className="num">· {detalle}</span>}<span aria-hidden>→</span>
         </Link>
+      )}
+      {/* 24-11 «Para activar»: cuánto hay en el inventario (y si llegó mercancía) para ponerle stock con «N disp. ✎» y activarla. */}
+      {f.inventario != null && (
+        <span title={f.n_productos && f.n_productos > 1 ? `Suma de ${f.n_productos} productos vinculados (variantes). Pon el stock de cada variante con «disp. ✎».` : 'Lo que hay en tu inventario para esta publicación'}
+          className={`${ETQ} border-emerald-200 bg-emerald-50 text-emerald-800`}>
+          <span className="num">Inventario {f.inventario}</span>{f.n_productos && f.n_productos > 1 ? <span>· {f.n_productos} variantes</span> : null}
+          {f.llego_at && <span>· llegó {haceDias(f.llego_at)}</span>}
+        </span>
       )}
       {f.sin_vincular && (vincular
         ? <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.item_id)}`} className={`${ETQ} border-sky-200 bg-sky-50 text-sky-800 hover:border-sky-300`}>Sin vincular · Vincular →</Link>

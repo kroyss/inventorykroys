@@ -49,7 +49,8 @@ export async function GET(req: NextRequest) {
   try {
     const umbral = await umbralStock(s.db)
     const conInventario = tieneModulo(s.session.user, 'inventario')
-    // 24-11: «Llegó mercancía» (con Inventario): en 0 o pausadas cuyo producto recibió mercancía; van arriba de todo.
+    // 24-11: «Llegó mercancía» (con Inventario): en 0 o pausadas cuyo producto recibió mercancía; van en un desplegable
+    // cerrado arriba y NO suman a los contadores (el dueño: «que no le quite importancia a la lista del día a día»).
     const llegada = conInventario && vista !== 'bajas' ? sqlLlegada(vista === 'pausadas' ? 'pausadas' : 'agotadas') : 'FALSE'
     const base = vista === 'pausadas' ? PAUSADA
       : vista === 'bajas' ? `${FRESCA} AND a.disponible > 0 AND a.disponible < $1` : `${FRESCA} AND a.disponible <= 0`
@@ -64,9 +65,9 @@ export async function GET(req: NextRequest) {
          FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
          WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${llegada} DESC, ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
       s.db.query(
-        `SELECT COUNT(*) FILTER (WHERE (${FRESCA} AND a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')}) OR ${conInventario ? sqlLlegada('agotadas') : 'FALSE'})::int AS agotadas,
+        `SELECT COUNT(*) FILTER (WHERE (${FRESCA} AND a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')}))::int AS agotadas,
                 COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible > 0 AND a.disponible < $1 AND ${sqlCaliente('a.bajo_desde')})::int AS bajas,
-                COUNT(*) FILTER (WHERE (${PAUSADA} AND ${PAUSADA_EN_LISTA}) OR ${conInventario ? sqlLlegada('pausadas') : 'FALSE'})::int AS pausadas
+                COUNT(*) FILTER (WHERE (${PAUSADA} AND ${PAUSADA_EN_LISTA}))::int AS pausadas
          FROM ml_stock_alertas a`, [umbral]),
       s.db.query(`SELECT MIN(stock_alertas_at) AS desde, MAX(stock_alertas_at) AS hasta, COUNT(*)::int AS cuentas
                   FROM ml_conexiones WHERE estado = 'activa'`),
