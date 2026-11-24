@@ -22,6 +22,41 @@ export const DIAS_CALIENTE = 7
 export const sqlCaliente = (desde: 'a.agotada_desde' | 'a.bajo_desde') =>
   `(${desde} > NOW() - INTERVAL '${DIAS_CALIENTE} days' AND (a.descartada_at IS NULL OR a.descartada_at < ${desde}))`
 
+// 24-11 (el dueño: «cuando llega stock, lo que tenía como "no hay" o pausado debe salir de nuevo en Stock para activarlo»):
+// «Llegó mercancía» = la publicación (o variante) está en 0 o pausada en ML, su producto tiene inventario y recibió una
+// entrada (movimiento positivo: compra, importación, ajuste) DESPUÉS de que se agotó o se pausó, en los últimos
+// DIAS_LLEGADA días. Vale aunque se haya quitado con «No hay» / «Quitar»; «Ahora no» la saca hasta la próxima entrada
+// (llegada_vista_at, mig 197). Se va sola al ponerle stock o reactivarla (la fila deja de estar en 0 / pausada).
+export const DIAS_LLEGADA = 14
+const VINCULO_PROPIO = `EXISTS (SELECT 1 FROM product_ml_codes v WHERE v.is_active
+            AND v.ml_code = substring(a.item_id FROM 4) || ':' || a.variante_id)`
+const CODIGO_DE_FILA = `CASE WHEN a.variante_id <> 0 AND ${VINCULO_PROPIO}
+     THEN substring(a.item_id FROM 4) || ':' || a.variante_id ELSE substring(a.item_id FROM 4) END`
+const ENTERA_SIN_PROPIO = `(a.variante_id <> 0 AND NOT ${VINCULO_PROPIO} AND EXISTS (SELECT 1 FROM product_ml_codes w
+    WHERE w.is_active AND w.ml_code = substring(a.item_id FROM 4)))`
+const ENTRADAS = `FROM product_ml_codes m JOIN products p ON p.id = m.product_id AND p.is_active
+   JOIN inventory_movements mv ON mv.product_id = m.product_id AND mv.quantity > 0 AND mv.created_at > NOW() - INTERVAL '${DIAS_LLEGADA} days'
+     AND COALESCE(mv.reference, '') NOT LIKE 'Venta%'   -- lo que vuelve de una venta corregida, reabierta o anulada no es mercancía nueva
+   WHERE m.is_active AND m.ml_code = ${CODIGO_DE_FILA}`
+// Filtro rápido (se arma UNA vez como hash): publicaciones con algún producto que recibió mercancía en DIAS_LLEGADA días.
+const PUBS_CON_ENTRADA = `SELECT split_part(m.ml_code, ':', 1) FROM inventory_movements mv
+    JOIN product_ml_codes m ON m.product_id = mv.product_id AND m.is_active
+   WHERE mv.quantity > 0 AND mv.created_at > NOW() - INTERVAL '${DIAS_LLEGADA} days' AND COALESCE(mv.reference, '') NOT LIKE 'Venta%'`
+/** Cuándo entró la última mercancía del producto de la fila (null si no hubo en DIAS_LLEGADA días). */
+export const SQL_LLEGO_AT = `(SELECT MAX(mv.created_at) ${ENTRADAS})`
+/** Referencia de esa entrada (ej. «OC-0123», «IMP-0042», «CONTEO-2026-11»). */
+export const SQL_LLEGO_REF = `(SELECT mv.reference ${ENTRADAS} ORDER BY mv.created_at DESC LIMIT 1)`
+const HAY_INVENTARIO = `(SELECT SUM(FLOOR(GREATEST(i.quantity, 0) / GREATEST(COALESCE(m.unidades, 1), 1))) FROM product_ml_codes m
+    JOIN products p ON p.id = m.product_id AND p.is_active JOIN inventory i ON i.product_id = p.id
+   WHERE m.is_active AND m.ml_code = ${CODIGO_DE_FILA}) > 0`
+/** Condición SQL sobre `a`: «Llegó mercancía». `tipo`: 'agotadas' (en 0, no pausada a mano) o 'pausadas' (pausada a mano). */
+export const sqlLlegada = (tipo: 'agotadas' | 'pausadas') => `(a.actualizado_at > NOW() - INTERVAL '1 day'
+  AND ${tipo === 'pausadas' ? `a.estado = 'pausada' AND a.sub_status IS NULL` : `a.estado <> 'pausada' AND a.disponible <= 0`}
+  AND substring(a.item_id FROM 4) IN (${PUBS_CON_ENTRADA})
+  AND NOT ${ENTERA_SIN_PROPIO} AND ${HAY_INVENTARIO}
+  AND ${SQL_LLEGO_AT} > GREATEST(COALESCE(a.llegada_vista_at, '-infinity'::timestamptz),
+        COALESCE(${tipo === 'pausadas' ? 'a.pausada_desde' : 'a.agotada_desde'}, '-infinity'::timestamptz)))`
+
 /** Condición SQL sobre ml_stock_alertas `a`: se vendió en los últimos DIAS_VENDIDAS días.
  *  Con IN (subconsulta) Postgres arma UNA vez la lista de lo vendido y la consulta como hash; con
  *  EXISTS … = ANY(o.items) recorría todas las ventas por cada fila (3 s por conteo, ~12 ms así). */
@@ -168,11 +203,24 @@ export async function revisarStockPendiente(db: Pool) {
 }
 
 /** Cuántas alertas EN CALIENTE hay (agotadas + por agotarse, vendidas en 30 días), para el numerito del menú. */
-export async function contarAlertas(db: Pool) {
+export async function contarAlertas(db: Pool, conInventario = false) {
   const umbral = await umbralStock(db)
   const { rows: [r] } = await db.query(
     `SELECT COUNT(*) FILTER (WHERE a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')})::int AS agotadas,
             COUNT(*) FILTER (WHERE a.disponible > 0 AND a.disponible < $1 AND ${sqlCaliente('a.bajo_desde')})::int AS bajas
      FROM ml_stock_alertas a WHERE a.actualizado_at > NOW() - INTERVAL '1 day' AND a.estado <> 'pausada' AND ${SQL_VENDIDA}`, [umbral])
-  return { agotadas: r.agotadas as number, bajas: r.bajas as number }
+  // 24-11: con Inventario, también «Llegó mercancía» (en 0 o pausadas que ya tienen con qué volver a la venta).
+  const llegadas = conInventario ? (await contarLlegadas(db)).total : 0
+  return { agotadas: r.agotadas as number, bajas: r.bajas as number, llegadas }
+}
+
+/** Cuántas publicaciones están en «Llegó mercancía» (las dos pestañas). Solo empresas con Inventario.
+ *  `desde`: solo las de entradas a partir de ese momento (el aviso al recibir). */
+export async function contarLlegadas(db: Pool, desde?: Date) {
+  const { rows: [r] } = await db.query(
+    // OFFSET 0: primero lo barato (publicaciones con entradas recientes) y recién ahí lo demás (0,18 s → 0,03 s en SolucionesMC).
+    `SELECT COUNT(*) FILTER (WHERE ${sqlLlegada('agotadas')})::int AS agotadas, COUNT(*) FILTER (WHERE ${sqlLlegada('pausadas')})::int AS pausadas
+       FROM (SELECT * FROM ml_stock_alertas a WHERE substring(a.item_id FROM 4) IN (${PUBS_CON_ENTRADA}) OFFSET 0) a
+      WHERE $1::timestamptz IS NULL OR ${SQL_LLEGO_AT} >= $1`, [desde ?? null])
+  return { agotadas: r.agotadas as number, pausadas: r.pausadas as number, total: (r.agotadas + r.pausadas) as number }
 }

@@ -13,6 +13,7 @@ import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { matchTokens, matchFuzzy, dateTokens } from '@/lib/search'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import type { AccesoCompras } from '@/lib/permisos'
+import { avisarLlegada } from '@/lib/avisoLlegada'
 
 const PAGE_SIZE = 15
 
@@ -424,6 +425,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
       await reload() // sincroniza la UI con el estado real (pudo cambiar en otra sesión)
       return
     }
+    if (action === 'finalize') avisarLlegada()   // 24-11: ¿algo pausado o en 0 en ML ya tiene con qué volver a la venta?
     await reload()
   }
 
@@ -566,6 +568,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
     }
     setSaving(false)
     setShowReceive(false)
+    avisarLlegada()   // 24-11: «Entró mercancía» si algo pausado o en 0 en ML ya tiene inventario
     await reload()
   }
 

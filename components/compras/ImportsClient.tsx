@@ -14,6 +14,7 @@ import { matchFuzzy, dateTokens } from '@/lib/search'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { Combobox } from '@/components/ui/Combobox'
 import type { AccesoCompras } from '@/lib/permisos'
+import { avisarLlegada } from '@/lib/avisoLlegada'
 
 const PAGE_SIZE = 15
 
@@ -452,6 +453,7 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
       reload() // sincroniza con el estado real (pudo cambiar en otra sesión)
       return
     }
+    if (target === 'FINALIZADA') avisarLlegada()   // 24-11: «Entró mercancía»
     setIncNote(''); setShowIncNote(false)
     reload()
   }
@@ -585,6 +587,7 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
     }
     setBusy(false)
     setShowReceive(false)
+    avisarLlegada()   // 24-11: «Entró mercancía» si algo pausado o en 0 en ML ya tiene inventario
     reload()
   }
 
