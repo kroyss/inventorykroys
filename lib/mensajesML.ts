@@ -122,6 +122,21 @@ async function guardarComprador(db: Pool, pack: string, nick: string | null, nom
 export const DIAS_MENSAJES = 60
 export const SQL_MENSAJE_VIGENTE = `(ultimo_at IS NULL OR ultimo_at > NOW() - INTERVAL '${DIAS_MENSAJES} days')`
 
+/** 24-11 (mig 199) «Pendiente de la IA»: la IA respondió sola y dejó algo para el equipo; vale hasta que alguien del equipo
+ *  escribe en la conversación (lo que manda la propia IA no cuenta) o toca «Listo». `a` = alias de ml_conversaciones. */
+export const sqlPendienteIA = (a = 'ml_conversaciones') => `(${a}.pendiente_ia_at IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM ml_mensajes h WHERE h.pack_id = ${a}.pack_id AND h.propio AND h.fecha > ${a}.pendiente_ia_at + INTERVAL '1 minute'
+    AND NOT EXISTS (SELECT 1 FROM ml_mensajes_ia j WHERE j.pack_id = h.pack_id
+                      AND (j.enviada_at BETWEEN h.fecha - INTERVAL '3 minutes' AND h.fecha + INTERVAL '3 minutes'
+                           OR j.escape_at BETWEEN h.fecha - INTERVAL '3 minutes' AND h.fecha + INTERVAL '3 minutes'))))`
+
+/** Marca la conversación «Pendiente de la IA» (después de que la IA respondió sola dejando una nota). */
+export async function marcarPendienteIA(db: Pick<Pool, 'query'>, pack: string, que: string[]) {
+  const texto = que.map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' · ').slice(0, 300)
+  if (!texto) return
+  await db.query(`UPDATE ml_conversaciones SET pendiente_ia_at = NOW(), pendiente_ia = $2 WHERE pack_id = $1::bigint`, [pack, texto])
+}
+
 /** Deja al día una conversación en la bandeja. `contadoML` = sin leer según /messages/unread; null = vino por aviso
  *  (notificaciones paso 2b, 28-10): se cuentan los del comprador visibles sin leer en el hilo. */
 async function actualizarConversacion(db: Pool, conexionId: number, pack: string, seller: number, contadoML: number | null) {

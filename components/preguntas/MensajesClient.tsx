@@ -32,6 +32,7 @@ export interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
   ultimo_at: string | null; productos: string | null; cuenta: string; despachada_at: string | null; cancelada: boolean | null; con_despachos: boolean; notas: string | null; imagen?: string | null
   coincide?: string | null   // buscando: el mensaje de la conversación que coincidió
+  pendiente_ia?: string | null   // 24-11: la IA respondió sola y dejó esto para el equipo (sigue en Por atender)
   comprador_nick: string | null; comprador_nombre: string | null
 }
 interface Adjunto { archivo: string; nombre: string; tipo: string | null }
@@ -110,6 +111,12 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   }, [vista, pagina, q, primera])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
+  // 24-11 «Pendiente de la IA» → «Listo»: sale de Por atender sin tener que escribir.
+  const listoIA = async (pack: string) => {
+    setLista(l => l && l.filter(x => x.pack_id !== pack))
+    await fetch('/api/mensajes/pendiente-ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pack_id: pack }) }).catch(() => {})
+    cargar()
+  }
 
   // Seguimiento (11-11; 12-11 pasó a Por atender, pedido del dueño): chips Sin respuesta (la lista de siempre) · Sin guía ·
   // Sin mensaje. Sin chip activo solo trae los contadores.
@@ -254,7 +261,17 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
                     <span className="font-medium text-neutral-500">Se habló: </span><Resaltar texto={recorte(sinEtiquetas(c.coincide), q)} q={q} />
                   </p>
                 )}
-                {c.notas && (
+                {c.pendiente_ia && (
+                  <p className="flex items-center gap-1.5 text-xs text-violet-900">
+                    <span className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 font-semibold" title="La IA respondió sola y dejó esto para el equipo: sale de aquí cuando alguien escribe en la conversación o tocas Listo">Pendiente de la IA</span>
+                    <span className="min-w-0 flex-1 truncate">{c.pendiente_ia}</span>
+                    <span role="button" tabIndex={0} title="Ya se resolvió (sin escribir): sale de Por atender"
+                      onClick={e => { e.stopPropagation(); listoIA(c.pack_id) }}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); listoIA(c.pack_id) } }}
+                      className="shrink-0 rounded px-1 text-neutral-500 underline-offset-2 hover:text-neutral-900 hover:underline">✓ Listo</span>
+                  </p>
+                )}
+                {c.notas && !c.pendiente_ia && (
                   <p className="text-xs text-amber-800 truncate">
                     <span className="font-semibold bg-amber-100 rounded px-1.5 py-0.5 mr-1.5">Nota</span>{c.notas}
                   </p>
