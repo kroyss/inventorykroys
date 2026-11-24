@@ -55,6 +55,8 @@ export async function GET(req: NextRequest) {
     const base = vista === 'pausadas' ? PAUSADA
       : vista === 'bajas' ? `${FRESCA} AND a.disponible > 0 AND a.disponible < $1` : `${FRESCA} AND a.disponible <= 0`
     const filtro = `((${base}) OR ${llegada})`
+    // Sin Inventario `llegada` es la constante FALSE y Postgres no acepta una constante en ORDER BY (24-11: la pantalla fallaba).
+    const conLlegada = llegada !== 'FALSE'
     const orden = vista === 'pausadas' ? 'COALESCE(a.pausada_desde, a.agotada_desde) DESC' : vista === 'bajas' ? 'a.disponible, a.bajo_desde' : 'a.agotada_desde DESC'
     const caliente = vista === 'pausadas' ? PAUSADA_EN_LISTA : vista === 'bajas' ? sqlCaliente('a.bajo_desde') : sqlCaliente('a.agotada_desde')
     const [{ rows }, { rows: [n] }, { rows: [rev] }, alDia] = await Promise.all([
@@ -63,7 +65,7 @@ export async function GET(req: NextRequest) {
                 a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, a.pausada_desde, a.sub_status, c.nickname AS cuenta,
                 ${caliente} AS caliente, a.descartada_at, ${llegada} AS llegada${conInventario ? `, ${SQL_LLEGO_AT} AS llego_at, ${SQL_LLEGO_REF} AS llego_ref` : ''}${conInventario ? `, ${SQL_INVENTARIO_FILA} AS inventario, ${SQL_ENTERA_VARIANTES} AS entera_variantes, ${SQL_N_PUBS} AS n_pubs` : ''}
          FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
-         WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${llegada} DESC, ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
+         WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${conLlegada ? `${llegada} DESC, ` : ''}${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
       s.db.query(
         `SELECT COUNT(*) FILTER (WHERE (${FRESCA} AND a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')}))::int AS agotadas,
                 COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible > 0 AND a.disponible < $1 AND ${sqlCaliente('a.bajo_desde')})::int AS bajas,
