@@ -14,7 +14,7 @@ import { textoPlano } from '@/lib/mensajesML'
 import { costoDe, cupoIA, registrarUso, iaConfigurada } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
-import { responderHilo } from '@/lib/mensajesML'
+import { responderHilo, marcarPendienteIA } from '@/lib/mensajesML'
 import { leerFrenos, motivosFrenos } from '@/lib/iaFrenos'
 import { borrarNota, copiarNotas, crearNota, editarNota, leerNotas, unirNotas, LARGO_NOTA } from '@/lib/notasML'
 
@@ -250,6 +250,8 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
             await responderHilo(db, r.conexion_id, r.pack_id, b.respuesta)
             await db.query(`UPDATE ml_mensajes_ia SET enviada_at = NOW() WHERE id = $1`, [r.id])
             enviadas++
+            // 24-11 (mig 199): dejó algo para el equipo → sigue en «Por atender» aunque ML la marque leída.
+            if (nv.length) await marcarPendienteIA(db, r.pack_id, nv.map(n => n[1])).catch(() => {})
           } catch (e) {
             const msg = (e instanceof Error ? e.message : String(e)).slice(0, 200)
             console.error('[mensajes ia auto]', r.pack_id, msg)
@@ -488,6 +490,8 @@ async function procesarV2(db: Pool, r: FilaMensaje, country: string, conInventar
         await responderHilo(db, r.conexion_id, r.pack_id, b.respuesta)
         await db.query(`UPDATE ml_mensajes_ia SET enviada_at = NOW() WHERE id = $1`, [r.id])
         enviada = 1
+        // 24-11 (mig 199): dejó algo para el equipo → sigue en «Por atender» aunque ML la marque leída.
+        if (notas.length) await marcarPendienteIA(db, r.pack_id, notas.map(n => n[1])).catch(() => {})
       } catch (err) {
         const msg = (err instanceof Error ? err.message : String(err)).slice(0, 200)
         console.error('[mensajes ia auto]', r.pack_id, msg)

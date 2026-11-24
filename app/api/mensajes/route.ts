@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { leerMensajesRapidos, MENSAJES_SUGERIDOS } from '@/lib/mensajesRapidos'
-import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
+import { SQL_MENSAJE_VIGENTE, sqlPendienteIA } from '@/lib/mensajesML'
 import { tieneModulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 import { contarPedibles } from '@/lib/pedirCalificacion'
@@ -31,14 +31,16 @@ export async function GET(req: NextRequest) {
                 OR c.ultimo_texto ILIKE $2 OR c.notas ILIKE $2
                 OR EXISTS (SELECT 1 FROM ml_mensajes m WHERE m.pack_id = c.pack_id AND m.texto ILIKE $2))`
   } else {
-    filtro += vista === 'todas' ? ' AND c.sin_leer = 0' : vista === 'con_nota' ? ' AND c.notas IS NOT NULL' : ' AND c.sin_leer > 0'
+    // 24-11 (mig 199): «Pendiente de la IA» cuenta como por atender aunque ML la tenga leída.
+    filtro += vista === 'todas' ? ` AND c.sin_leer = 0 AND NOT ${sqlPendienteIA('c')}` : vista === 'con_nota' ? ' AND c.notas IS NOT NULL'
+      : ` AND (c.sin_leer > 0 OR ${sqlPendienteIA('c')})`
   }
   // Por atender: todas (son pocas); atendidas y búsqueda: de a `limite` (+1 para saber si hay más).
   const tope = vista === 'sin_leer' && !q ? 200 : limite + 1
   const paginado = pagina !== null && (vista !== 'sin_leer' || !!q)
   try {
     const { rows } = await s.db.query(
-      `SELECT c.pack_id::text, c.sin_leer, c.ultimo_texto, c.ultimo_de_comprador, c.ultimo_at, c.productos, c.notas,
+      `SELECT c.pack_id::text, c.sin_leer, ${sqlPendienteIA('c')} AS pendiente_activo, c.pendiente_ia, c.ultimo_texto, c.ultimo_de_comprador, c.ultimo_at, c.productos, c.notas,
               NULLIF(c.comprador_nick, '') AS comprador_nick, c.comprador_nombre,
               c.total_filas, x.nickname AS cuenta, d.despachada_at, img.imagen, (o.estado = 'cancelled') AS cancelada, $1::boolean AS con_despachos,
               ${q ? `(SELECT m.texto FROM ml_mensajes m WHERE m.pack_id = c.pack_id AND m.texto ILIKE $2 ORDER BY m.fecha DESC LIMIT 1)` : 'NULL'} AS coincide
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest) {
        -- las 2.600 conversaciones de Atendidas y se mostraban 10 (135 ms → pocos ms).
        -- total_filas: el total de la búsqueda/página en la MISMA pasada (antes un COUNT aparte: buscar recorría los mensajes dos veces).
        FROM (SELECT c.*, COUNT(*) OVER () AS total_filas FROM ml_conversaciones c ${filtro}
-             ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC
+             ORDER BY (c.sin_leer > 0 OR ${sqlPendienteIA('c')}) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC
              ${paginado ? `LIMIT ${POR_PAGINA} OFFSET ${(pagina! - 1) * POR_PAGINA}` : `LIMIT ${tope}`}) c
        JOIN ml_conexiones x ON x.id = c.conexion_id
        -- Lo que sirve para responder "¿ya lo enviaste?": si su guía ya salió en Despachos (en
@@ -67,7 +69,7 @@ export async function GET(req: NextRequest) {
          SELECT COALESCE((SELECT thumbnail FROM ml_catalogo k WHERE k.item_id = o.item),
                          (SELECT item_imagen FROM ml_preguntas q WHERE q.item_id = o.item AND q.item_imagen IS NOT NULL LIMIT 1)) AS imagen
        ) img ON TRUE
-       ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC`, [tieneModulo(s.session.user, 'despachos'), ...params])
+       ORDER BY (c.sin_leer > 0 OR pendiente_activo) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC`, [tieneModulo(s.session.user, 'despachos'), ...params])
     const hayMas = !paginado && tope === limite + 1 && rows.length > limite
     if (hayMas) rows.pop()
     let total: number | null = null
@@ -78,13 +80,13 @@ export async function GET(req: NextRequest) {
       total = t.n
     }
     const { rows: [n] } = await s.db.query(
-      `SELECT COUNT(*) FILTER (WHERE sin_leer > 0)::int AS conversaciones, COALESCE(SUM(sin_leer), 0)::int AS mensajes,
+      `SELECT COUNT(*) FILTER (WHERE sin_leer > 0 OR ${sqlPendienteIA()})::int AS conversaciones, COALESCE(SUM(sin_leer), 0)::int AS mensajes,
               COUNT(*) FILTER (WHERE notas IS NOT NULL)::int AS con_nota
        FROM ml_conversaciones WHERE ${SQL_MENSAJE_VIGENTE}`)
     // Respuestas rápidas (botones en cada conversación); `sugeridas` = ejemplos para el editor.
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
     const { rows: [cta] } = await s.db.query(`SELECT nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id LIMIT 1`)
-    for (const r of rows) delete r.total_filas
+    for (const r of rows) { delete r.total_filas; if (!r.pendiente_activo) r.pendiente_ia = null; delete r.pendiente_activo }
     return NextResponse.json({
       conversaciones: rows, hay_mas: hayMas, total, por_pagina: POR_PAGINA, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: puede(s.session.user, 'automatizaciones_config'),
       sugeridas: MENSAJES_SUGERIDOS(cta?.nickname),
