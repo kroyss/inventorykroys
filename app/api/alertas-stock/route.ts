@@ -4,7 +4,7 @@ import { leerInventarioAlDia } from '@/lib/inventarioAlDia'
 import { filasStockML, type FilaStockML, type PubStockML } from '@/lib/stockConML'
 import { apiError } from '@/lib/apiError'
 import { sesionStock } from '@/lib/preguntasSesion'
-import { SQL_LLEGO_AT, SQL_LLEGO_REF, SQL_VENDIDA, sqlCaliente, sqlLlegada, umbralStock } from '@/lib/alertasStock'
+import { SQL_VENDIDA, sqlCaliente, umbralStock } from '@/lib/alertasStock'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
 
@@ -49,24 +49,21 @@ export async function GET(req: NextRequest) {
   try {
     const umbral = await umbralStock(s.db)
     const conInventario = tieneModulo(s.session.user, 'inventario')
-    // 24-11: «Llegó mercancía» (con Inventario): en 0 o pausadas cuyo producto recibió mercancía; van arriba de todo.
-    const llegada = conInventario && vista !== 'bajas' ? sqlLlegada(vista === 'pausadas' ? 'pausadas' : 'agotadas') : 'FALSE'
-    const base = vista === 'pausadas' ? PAUSADA
+    const filtro = vista === 'pausadas' ? PAUSADA
       : vista === 'bajas' ? `${FRESCA} AND a.disponible > 0 AND a.disponible < $1` : `${FRESCA} AND a.disponible <= 0`
-    const filtro = `((${base}) OR ${llegada})`
     const orden = vista === 'pausadas' ? 'COALESCE(a.pausada_desde, a.agotada_desde) DESC' : vista === 'bajas' ? 'a.disponible, a.bajo_desde' : 'a.agotada_desde DESC'
     const caliente = vista === 'pausadas' ? PAUSADA_EN_LISTA : vista === 'bajas' ? sqlCaliente('a.bajo_desde') : sqlCaliente('a.agotada_desde')
     const [{ rows }, { rows: [n] }, { rows: [rev] }, alDia] = await Promise.all([
       s.db.query(
         `SELECT a.item_id, a.variante_id::text, a.titulo, a.variante, a.disponible, a.estado, a.permalink, a.imagen,
                 a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, a.pausada_desde, a.sub_status, c.nickname AS cuenta,
-                ${caliente} AS caliente, a.descartada_at, ${llegada} AS llegada${conInventario ? `, ${SQL_LLEGO_AT} AS llego_at, ${SQL_LLEGO_REF} AS llego_ref` : ''}${conInventario ? `, ${SQL_INVENTARIO_FILA} AS inventario, ${SQL_ENTERA_VARIANTES} AS entera_variantes, ${SQL_N_PUBS} AS n_pubs` : ''}
+                ${caliente} AS caliente, a.descartada_at${conInventario ? `, ${SQL_INVENTARIO_FILA} AS inventario, ${SQL_ENTERA_VARIANTES} AS entera_variantes, ${SQL_N_PUBS} AS n_pubs` : ''}
          FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
-         WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${llegada} DESC, ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
+         WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
       s.db.query(
-        `SELECT COUNT(*) FILTER (WHERE (${FRESCA} AND a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')}) OR ${conInventario ? sqlLlegada('agotadas') : 'FALSE'})::int AS agotadas,
+        `SELECT COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')})::int AS agotadas,
                 COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible > 0 AND a.disponible < $1 AND ${sqlCaliente('a.bajo_desde')})::int AS bajas,
-                COUNT(*) FILTER (WHERE (${PAUSADA} AND ${PAUSADA_EN_LISTA}) OR ${conInventario ? sqlLlegada('pausadas') : 'FALSE'})::int AS pausadas
+                COUNT(*) FILTER (WHERE ${PAUSADA} AND ${PAUSADA_EN_LISTA})::int AS pausadas
          FROM ml_stock_alertas a`, [umbral]),
       s.db.query(`SELECT MIN(stock_alertas_at) AS desde, MAX(stock_alertas_at) AS hasta, COUNT(*)::int AS cuentas
                   FROM ml_conexiones WHERE estado = 'activa'`),

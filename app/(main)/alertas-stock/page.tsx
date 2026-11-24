@@ -14,7 +14,7 @@ import type { Datos } from '@/components/preguntas/AlertasStockClient'
 export const metadata = { title: 'Stock' }
 
 // Automatizaciones → Stock (lib/alertasStock.ts). Módulo `alertas_stock` (necesita cuentas de ML: `preguntas`).
-export default async function AlertasStockPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
+export default async function AlertasStockPage() {
   const session = await getServerSession(authOptions)
   if (!tieneModulo(session?.user, 'preguntas') || !tieneModulo(session?.user, 'alertas_stock') || !puede(session?.user, 'ver_stock')) redirect('/automatizaciones')
   if (await sinCuentasML(session!)) {
@@ -27,8 +27,5 @@ export default async function AlertasStockPage({ searchParams }: { searchParams:
   // inventario y arreglar en un clic está en Publicaciones → Stock vs inventario. Solo un aviso: nada más cambia aquí.
   const conInventario = pestanasML(session!.user).some(x => x.k === 'stock')
   // 12-11 (rapidez): la pestaña Agotadas viene en el HTML (mismo GET de la API).
-  // 24-11: ?vista=pausadas (el aviso «Llegó mercancía» lleva a la pestaña donde están).
-  const { vista: v } = await searchParams
-  const vista = v === 'pausadas' || v === 'bajas' ? v : 'agotadas'
-  return <AlertasStockClient inicial={await deApi<Datos>(alertas, `/api/alertas-stock?vista=${vista}`)} conInventario={conInventario} vistaInicial={vista} />
+  return <AlertasStockClient inicial={await deApi<Datos>(alertas, '/api/alertas-stock?vista=agotadas')} conInventario={conInventario} />
 }

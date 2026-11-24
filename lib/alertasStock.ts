@@ -39,7 +39,7 @@ const ENTRADAS = `FROM product_ml_codes m JOIN products p ON p.id = m.product_id
      AND COALESCE(mv.reference, '') NOT LIKE 'Venta%'   -- lo que vuelve de una venta corregida, reabierta o anulada no es mercancía nueva
    WHERE m.is_active AND m.ml_code = ${CODIGO_DE_FILA}`
 // Filtro rápido (se arma UNA vez como hash): publicaciones con algún producto que recibió mercancía en DIAS_LLEGADA días.
-const PUBS_CON_ENTRADA = `SELECT split_part(m.ml_code, ':', 1) FROM inventory_movements mv
+export const PUBS_CON_ENTRADA = `SELECT split_part(m.ml_code, ':', 1) FROM inventory_movements mv
     JOIN product_ml_codes m ON m.product_id = mv.product_id AND m.is_active
    WHERE mv.quantity > 0 AND mv.created_at > NOW() - INTERVAL '${DIAS_LLEGADA} days' AND COALESCE(mv.reference, '') NOT LIKE 'Venta%'`
 /** Cuándo entró la última mercancía del producto de la fila (null si no hubo en DIAS_LLEGADA días). */
@@ -203,7 +203,7 @@ export async function revisarStockPendiente(db: Pool) {
 }
 
 /** Cuántas alertas EN CALIENTE hay (agotadas + por agotarse, vendidas en 30 días), para el numerito del menú. */
-export async function contarAlertas(db: Pool, conInventario = false) {
+export async function contarAlertas(db: Pool, conInventario = false) {   // conInventario: suma «Llegó mercancía» (hoy nadie lo pide)
   const umbral = await umbralStock(db)
   const { rows: [r] } = await db.query(
     `SELECT COUNT(*) FILTER (WHERE a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')})::int AS agotadas,

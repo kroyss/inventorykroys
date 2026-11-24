@@ -1,5 +1,6 @@
 import type { Pool } from 'pg'
 import { filasStockML } from '@/lib/stockConML'
+import { PUBS_CON_ENTRADA } from '@/lib/alertasStock'
 
 // Mis publicaciones (Fase 4, 18-11, el dueño: «una sola lista, al estilo ML»): cada fila lleva una etiqueta corta SOLO
 // cuando algo pide atención. Todo sale de lo guardado (ml_catalogo, vínculos, inventario, la foto de Promociones): abrir
@@ -74,3 +75,30 @@ export const SQL_SIN_VINCULAR = `(m.estado = 'active' AND substring(m.item_id FR
 export const SQL_SIN_PESO = `(substring(m.item_id FROM 4) IN (
   SELECT split_part(x.ml_code, ':', 1) FROM product_ml_codes x JOIN products px ON px.id = x.product_id
   WHERE x.is_active AND px.is_active AND x.ml_code IS NOT NULL AND (px.weight_kg IS NULL OR px.weight_kg <= 0)))`
+
+// 24-11 (el dueño: «que el aviso lleve a Mis publicaciones filtrado; puede haber variantes con stock en ML pero pausadas, o
+// llegaron unas variantes y otras no»): filtro «Para activar» = publicación activa o pausada vinculada a algún producto con
+// inventario (alcanza para 1 venta, combos incluidos) y que: está pausada, está en 0, tiene una variante vinculada en 0 cuyo
+// producto sí tiene, o su producto recibió mercancía en los últimos días (recién llegada, aunque ya esté activa).
+const CON_INVENTARIO = `(SELECT x.ml_code FROM product_ml_codes x JOIN products px ON px.id = x.product_id AND px.is_active
+     JOIN inventory i ON i.product_id = x.product_id
+    WHERE x.is_active AND x.ml_code IS NOT NULL AND i.quantity >= GREATEST(COALESCE(x.unidades, 1), 1))`
+export const SQL_PARA_ACTIVAR = `(m.estado IN ('active', 'paused')
+  AND substring(m.item_id FROM 4) IN (SELECT split_part(c.ml_code, ':', 1) FROM ${CON_INVENTARIO} c)
+  AND (m.estado = 'paused' OR m.disponible <= 0
+    OR substring(m.item_id FROM 4) IN (${PUBS_CON_ENTRADA})
+    OR EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(m.variantes) = 'array' THEN m.variantes ELSE '[]'::jsonb END) v
+               WHERE COALESCE((v->>'disponible')::int, 0) <= 0
+                 AND substring(m.item_id FROM 4) || ':' || (v->>'id') IN ${CON_INVENTARIO})))`
+/** Lo que hay en el inventario para esta publicación: suma de sus productos vinculados (combos: ÷ unidades). */
+export const SQL_INVENTARIO_PUB = `(SELECT SUM(FLOOR(GREATEST(i.quantity, 0) / GREATEST(COALESCE(x.unidades, 1), 1)))::int
+   FROM product_ml_codes x JOIN products px ON px.id = x.product_id AND px.is_active JOIN inventory i ON i.product_id = x.product_id
+  WHERE x.is_active AND split_part(x.ml_code, ':', 1) = substring(m.item_id FROM 4))`
+/** Cuántos productos distintos tiene vinculados (variantes): para decir «en N variantes». */
+export const SQL_PRODUCTOS_PUB = `(SELECT COUNT(DISTINCT x.product_id)::int FROM product_ml_codes x
+  WHERE x.is_active AND split_part(x.ml_code, ':', 1) = substring(m.item_id FROM 4))`
+/** Última entrada de mercancía (14 días) de alguno de sus productos; no cuenta lo que vuelve de ventas. */
+export const SQL_LLEGO_PUB = `(SELECT MAX(mv.created_at) FROM product_ml_codes x
+   JOIN inventory_movements mv ON mv.product_id = x.product_id AND mv.quantity > 0 AND mv.created_at > NOW() - INTERVAL '14 days'
+     AND COALESCE(mv.reference, '') NOT LIKE 'Venta%'
+  WHERE x.is_active AND split_part(x.ml_code, ':', 1) = substring(m.item_id FROM 4))`
