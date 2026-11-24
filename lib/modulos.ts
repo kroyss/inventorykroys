@@ -108,7 +108,8 @@ export function soloRadar(modulos: string[]) {
 // Inventario. OJO: el envío gratis por transportista en Preguntas, Mensajes y la IA (empresaConPromociones), la vigilancia
 // de campañas del cron y sus avisos de Telegram siguen mirando el módulo PRENDIDO DE VERDAD (moduloPrendido): eso no
 // cambia para nadie hasta que se prenda Promociones en Plataforma.
-export const CON_INVENTARIO: readonly Modulo[] = ['analisis_stock', 'metricas', 'publicaciones', 'promociones']
+// 24-11 (el dueño): el Catálogo PDF también viene con el Inventario (antes solo SolucionesMC).
+export const CON_INVENTARIO: readonly Modulo[] = ['analisis_stock', 'metricas', 'publicaciones', 'promociones', 'catalogo_pdf']
 
 /** El módulo prendido en Plataforma (sin contar lo que viene implícito con el Inventario). */
 export function moduloPrendido(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {
