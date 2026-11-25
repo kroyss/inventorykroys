@@ -3,13 +3,15 @@ import { comun } from '@/lib/comun'
 import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { nombrePantalla, sugerenciasDe, type Sugerencia } from '@/lib/ayudaSugerencias'
+import { EVENTO_ABRIR_SOPORTE } from './ContactoDudas'
 
 // Burbuja "¿En qué te ayudo?" (30-10-2026), en todas las pantallas del Sistema:
 //   · Preguntar: sugerencias de la pantalla con su respuesta ya escrita (gratis) y pregunta libre que responde la IA
 //     con el manual (lib/ayuda.ts; costo de la plataforma, no créditos del cliente), con el video que sirva.
 //   · Soporte: texto + hasta 3 capturas → bandeja única del dueño (Plataforma → Soporte) y su Telegram. Las
 //     respuestas llegan aquí (punto rojo) y por Telegram si el usuario lo conectó.
-// ?soporte=ID en la URL (link del Telegram) abre ese caso.
+// ?soporte=ID en la URL (link del Telegram) abre ese caso. El evento EVENTO_ABRIR_SOPORTE («Escríbenos aquí» de los
+// avisos de prueba, ContactoDudas) la abre en Soporte con un mensaje nuevo.
 // 19-11 (el dueño, casi no se usaba): el ícono sale solo en Aprendizaje (y sus manuales), salvo que la persona active
 // «Ayuda en todo el sistema» ahí (users.ayuda_flotante, mig. 187). Una respuesta de Soporte sin leer lo muestra igual.
 export const EVENTO_AYUDA_FLOTANTE = 'ayuda-flotante'
@@ -78,6 +80,13 @@ export default function BurbujaAyuda() {
     const id = Number(params.get('soporte'))
     if (id) { setAbierta(true); setPestana('soporte'); setCasoAbierto(id) }
   }, [params])
+
+  // «Escríbenos aquí» (avisos de la prueba): abre en Soporte con el mensaje nuevo listo.
+  useEffect(() => {
+    const abrir = () => { setAbierta(true); setPestana('soporte'); setCasoAbierto(null); setEscribiendo(true); cargarCasos() }
+    window.addEventListener(EVENTO_ABRIR_SOPORTE, abrir)
+    return () => window.removeEventListener(EVENTO_ABRIR_SOPORTE, abrir)
+  }, [cargarCasos])
 
   // Los videos (para enlazar las sugerencias por título), una vez al abrir.
   useEffect(() => {
