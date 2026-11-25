@@ -35,7 +35,7 @@ const PREGUNTAS = [
   { p: '¿Cómo se cuentan las ventas?',
     r: 'Son las órdenes del mes de todas tus cuentas de MercadoLibre, sin las canceladas. Una compra de varios productos cuenta como una.' },
   { p: '¿Qué pasa si un mes vendo más?',
-    r: 'Nada se bloquea. Si pasas dos meses seguidos por encima de tu escalón, pasas al siguiente; si bajas dos meses seguidos, también bajas.' },
+    r: 'Nada se bloquea. Cada mes tu escalón sale de las ventas del mes anterior: si vendiste más, pasas al siguiente; si vendiste menos, bajas.' },
   { p: '¿Qué son los créditos de IA?',
     r: `Cada respuesta de la IA (una pregunta o un mensaje) usa un crédito. Las respuestas rápidas y las parecidas no gastan. La prueba gratis trae ${CREDITOS_PRUEBA}, y tu primer plan te regala más según tus ventas, una sola vez. Los créditos no vencen: se suman y los usas cuando quieras. Si se te acaban, recargas desde ${RECARGA_IA.creditos} por $${RECARGA_IA.precio}.` },
   { p: '¿Qué trae el Radar?',

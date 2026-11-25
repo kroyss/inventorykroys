@@ -214,8 +214,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 - **Pagar o renovar: Mi plan** (menú de tu cuenta, arriba a la derecha → **Mi plan**; solo el administrador):
   1. Ves tu estado y **lo que te toca pagar**: el sistema cuenta tus ventas de MercadoLibre del **mes pasado**
      (del 1 al último día; todas tus cuentas conectadas, también las que procesas por fuera del sistema) y te dice tu
-     escalón y el precio. Si ya tienes plan, el escalón solo sube o baja cuando tus dos últimos meses quedan en otro
-     escalón. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
+     escalón y el precio. El escalón es exacto y se calcula cada mes con el mes anterior: si vendiste más, sube; si
+     vendiste menos, baja. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
      los últimos 90 días, así que no hace falta esperar un mes).
      El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres. **Completo** (21-11) trae Inventario: al confirmarse el pago se prende solo y
      aparece el interruptor **Inventario | Automatiza** junto al logo; si después renuevas con un plan menor, Inventario se
