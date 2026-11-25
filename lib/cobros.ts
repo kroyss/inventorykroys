@@ -4,9 +4,9 @@
 //
 // Escalón = ventas de MercadoLibre del último MES CALENDARIO cerrado (del 1 al último día, igual para todos sin importar
 // cuándo se afilió) de TODAS sus cuentas conectadas (ml_ordenes, sin canceladas), incluidas las que procesa por fuera
-// del sistema; margen del 10% sobre el tope (lib/planes.ts). Al conectar ML se traen 90 días de ventas, así que una
-// cuenta recién llegada ya tiene sus meses anteriores. Con plan activo el escalón solo cambia si los DOS últimos meses
-// cerrados quedan del mismo lado (regla de los 2 meses seguidos). Sin ventas → el escalón más bajo. Para pagar tiene
+// del sistema. Escalón EXACTO y mes a mes (25-11, el dueño): sin margen sobre el tope ni regla de 2 meses; lo que
+// diga el último mes cerrado. Al conectar ML se traen 90 días de ventas, así que una cuenta recién llegada ya tiene su
+// mes anterior. Sin ventas → el escalón más bajo. Para pagar tiene
 // que haber conectado al menos una cuenta de ML (03-11, el dueño).
 //
 // Vencido o en prueba vencida no puede iniciar sesión: entra a /renovar con su usuario y clave y recibe un acceso
@@ -57,11 +57,10 @@ export async function guardarDatosCobro(d: DatosCobro) {
 }
 
 // ── Escalón por ventas ────────────────────────────────────────────────────────────────────────────────────────────
-const TOPES = [50, 300, 1000]          // ESCALONES: hasta 50 · 51 a 300 · 301 a 1.000 · más
-const MARGEN = 1.1                     // 10% sobre el tope antes de subir (regla interna, lib/planes.ts)
+const TOPES = [50, 300, 1000]          // ESCALONES: hasta 50 · 51 a 300 · 301 a 1.000 · más (exactos, sin margen)
 
 export function escalonPorVentas(ventas: number) {
-  const i = TOPES.findIndex(t => ventas <= Math.floor(t * MARGEN))
+  const i = TOPES.findIndex(t => ventas <= t)
   return i === -1 ? TOPES.length : i
 }
 
@@ -88,14 +87,9 @@ export async function ventasOrganizacion(orgId: number) {
   return { vMes, vAnt, cuentas, conectadas }
 }
 
-/** Escalón que le toca: sin plan → por el último mes cerrado; con plan, solo cambia si los dos últimos meses coinciden. */
-export function escalonSugerido(vMes: number, vAnt: number, actual: number | null) {
-  const ultimo = escalonPorVentas(vMes)
-  if (actual == null) return ultimo
-  const anterior = escalonPorVentas(vAnt)
-  if (ultimo > actual && anterior > actual) return Math.min(ultimo, anterior)
-  if (ultimo < actual && anterior < actual) return Math.max(ultimo, anterior)
-  return actual
+/** Escalón que le toca: el del último mes cerrado, tenga o no plan (25-11: sin regla de 2 meses). */
+export function escalonSugerido(vMes: number) {
+  return escalonPorVentas(vMes)
 }
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -239,7 +233,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
   const saldoIA = emp ? await conEmpresa(emp.id, emp.country as Country, db => cupoIA(db, emp.id)).then(c => c.quedan).catch(() => null) : null
   const { rows: [yaPlan] } = await dbGlobal().query(
     `SELECT 1 FROM ia_creditos c JOIN empresas e ON e.id = c.empresa_id WHERE e.organizacion_id = $1 AND c.motivo = 'plan' LIMIT 1`, [orgId])
-  const escalon = escalonSugerido(vMes, vAnt, conPlan ? Number(o.escalon) : null)
+  const escalon = escalonSugerido(vMes)
   const cuentasExtra = Math.max(0, cuentas - CUENTAS_INCLUIDAS)
   const opciones = PLANES.map(p => ({
     id: p.id, nombre: p.nombre, resumen: p.resumen, radar: planConRadar(p.id),

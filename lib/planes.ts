@@ -1,8 +1,8 @@
 // Planes y precios de El Comerciante Digital (27-10-2026, definidos por el dueño). Única fuente: los muestran
 // /precios y el cuadro del inicio. Precio = plan (qué herramientas) × escalón (ventas al mes de todas sus cuentas,
 // sin las canceladas); los créditos de IA de bienvenida van por escalón. Fundadores: 30% de por vida sobre su casilla (no se muestra en la página pública).
-// Reglas internas (no van en la página): margen del 10% sobre el tope del escalón; cambia de escalón tras 2 meses
-// seguidos por encima o por debajo; créditos de IA = UN saldo que no vence (09-11, mig. 156: prueba 500, primer plan según escalón una sola vez, recargas); la cuenta se pausa al día siguiente del vencimiento (aviso 3 días antes; no se pausa si reportó su pago en Mi plan antes de vencer, mig. 141) y los datos se guardan 60 días.
+// Reglas internas (no van en la página): escalón exacto, mes a mes, por las ventas del último mes cerrado (25-11:
+// sin margen ni regla de 2 meses); créditos de IA = UN saldo que no vence (09-11, mig. 156: prueba 500, primer plan según escalón una sola vez, recargas); la cuenta se pausa al día siguiente del vencimiento (aviso 3 días antes; no se pausa si reportó su pago en Mi plan antes de vencer, mig. 141) y los datos se guardan 60 días.
 
 export interface Plan { id: 'esencial' | 'automatizaciones' | 'completo'; nombre: string; resumen: string; base?: string; incluye: string[]; destacado?: boolean }
 
