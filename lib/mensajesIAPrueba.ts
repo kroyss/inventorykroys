@@ -101,6 +101,18 @@ export function textoNotaIA(entradas: [string, string][]): string {
   return out.slice(0, LARGO_NOTA)
 }
 
+/** 25-11 (el dueño): la marca morada «Pendiente de la IA» es para lo que el equipo tiene que hacer en Mensajes. El pago del
+ *  EMBALAJE lo verifica Pagos ME (formulario de MercadoEnvíos): si la empresa lo tiene, ese pago no deja la marca (la nota en
+ *  la venta de ML sí queda). Lo demás (factura, datos, reclamo, pedido, otro pago…) la sigue dejando. */
+const esEmbalaje = (n: [TipoNota, string]) => n[0] === 'pago' && /embalaje/i.test(n[1])
+async function paraElEquipo(db: Pool, notas: [TipoNota, string][]) {
+  if (!notas.some(esEmbalaje)) return notas
+  const { rows: [e] } = await db.query(
+    `SELECT COALESCE((SELECT 'pagos_me' = ANY(modulos) FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int), FALSE) AS pm`)
+    .catch(() => ({ rows: [{ pm: false }] }))
+  return e?.pm ? notas.filter(n => !esEmbalaje(n)) : notas
+}
+
 async function notaVerificar(db: Pool, conexionId: number, pack: string, nuevas: [TipoNota, string][]) {
   if (!nuevas.length) return
   const { notas, error } = await leerNotas(db, conexionId, pack)
@@ -251,7 +263,7 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
             await db.query(`UPDATE ml_mensajes_ia SET enviada_at = NOW() WHERE id = $1`, [r.id])
             enviadas++
             // 24-11 (mig 199): dejó algo para el equipo → sigue en «Por atender» aunque ML la marque leída.
-            if (nv.length) await marcarPendienteIA(db, r.pack_id, nv.map(n => n[1])).catch(() => {})
+            if (nv.length) await marcarPendienteIA(db, r.pack_id, (await paraElEquipo(db, nv)).map(n => n[1])).catch(() => {})
           } catch (e) {
             const msg = (e instanceof Error ? e.message : String(e)).slice(0, 200)
             console.error('[mensajes ia auto]', r.pack_id, msg)
@@ -491,7 +503,7 @@ async function procesarV2(db: Pool, r: FilaMensaje, country: string, conInventar
         await db.query(`UPDATE ml_mensajes_ia SET enviada_at = NOW() WHERE id = $1`, [r.id])
         enviada = 1
         // 24-11 (mig 199): dejó algo para el equipo → sigue en «Por atender» aunque ML la marque leída.
-        if (notas.length) await marcarPendienteIA(db, r.pack_id, notas.map(n => n[1])).catch(() => {})
+        if (notas.length) await marcarPendienteIA(db, r.pack_id, (await paraElEquipo(db, notas)).map(n => n[1])).catch(() => {})
       } catch (err) {
         const msg = (err instanceof Error ? err.message : String(err)).slice(0, 200)
         console.error('[mensajes ia auto]', r.pack_id, msg)
