@@ -1612,7 +1612,8 @@ punto rojo, estés donde estés:
   el botón avisa que te respondimos) y, si conectaste tu Telegram en **Mis avisos**, también te llega por Telegram.
 - **Durante la prueba gratis**, el aviso de arriba (los días que quedan, «ya empezó» y el de vencimiento) trae
   **«¿Dudas? Escríbenos aquí»**, que abre este mismo Soporte con el mensaje listo para escribir, y los logos de
-  **Telegram** e **Instagram** (@comerciantedigital.ve) por si prefieres escribirnos por ahí.
+  **Telegram** e **Instagram** (@comerciantedigital.ve) por si prefieres escribirnos por ahí. El aviso de que **tu
+  plan está por vencer** trae lo mismo («¿Dudas? Escríbenos aquí · Telegram · Instagram»).
   Puedes seguir escribiendo en el mismo caso; cuando se arregle, toca **Ya se resolvió**.
 - Todos los usuarios de la empresa pueden escribir a soporte, no solo el administrador.
 
