@@ -1,4 +1,4 @@
-// Bonos por ventas del mes — 4 fases (la 4ª desde 2026-10-05: el equipo llegó al tope).
+// Bonos por ventas del mes — 5 fases (la 4ª desde 2026-10-05, la 5ª desde 2026-11-25: el equipo llegó al tope).
 //
 // 23-11 (el dueño): NO se suman. Se cobra el bono de la ÚLTIMA meta alcanzada: si el mes cierra
 // en $16.000 con la config default cobró $200 (no $100 + $200). Las metas y los montos son
@@ -16,12 +16,12 @@ export interface BonusPhase {
   bonus: number
 }
 
-export const BONUS_PHASES = 4
-export const DEFAULT_BONUS_METAS  = [10000, 15000, 20000, 25000]
-export const DEFAULT_BONUS_MONTOS = [100, 200, 300, 400]
+export const BONUS_PHASES = 5
+export const DEFAULT_BONUS_METAS  = [10000, 15000, 20000, 25000, 30000]
+export const DEFAULT_BONUS_MONTOS = [100, 200, 300, 400, 500]
 
 /**
- * Arma las 4 fases desde un objeto de settings (`{ bono_meta_1: '12000', … }`).
+ * Arma las 5 fases desde un objeto de settings (`{ bono_meta_1: '12000', … }`).
  * Si las metas no son crecientes o falta algún valor, cae al default completo:
  * una escalera mal formada rompería el cálculo de progreso.
  */
@@ -35,7 +35,7 @@ export function parseBonusPhases(
     return Number.isFinite(n) && n > 0 ? n : fallback
   }
 
-  // Una fase sin configurar (p. ej. la 4ª en una empresa que tenía 3) sigue la escalera: meta =
+  // Una fase sin configurar (p. ej. la 5ª en una empresa que tenía 4) sigue la escalera: meta =
   // anterior + el último salto, bono = anterior + 100. Así no rompe una configuración propia.
   const metas: number[] = []
   const montos: number[] = []

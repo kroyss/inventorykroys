@@ -4,7 +4,7 @@ import { int } from '@/components/ui'
 import { parseBonusPhases, DEFAULT_BONUS_METAS, DEFAULT_BONUS_MONTOS } from '@/lib/bonus'
 
 /**
- * Bonos por ventas del mes — metas y montos editables (4 fases).
+ * Bonos por ventas del mes — metas y montos editables (5 fases).
  * Se guardan en app_settings del país de la sesión (`bono_meta_N` / `bono_monto_N`)
  * y los lee el pipeline del dashboard vía /api/dashboard/my-bonus.
  */
