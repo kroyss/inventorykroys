@@ -104,7 +104,10 @@ export function textoNotaIA(entradas: [string, string][]): string {
 /** 25-11 (el dueño): la marca morada «Pendiente de la IA» es para lo que el equipo tiene que hacer en Mensajes. El pago del
  *  EMBALAJE lo verifica Pagos ME (formulario de MercadoEnvíos): si la empresa lo tiene, ese pago no deja la marca (la nota en
  *  la venta de ML sí queda). Lo demás (factura, datos, reclamo, pedido, otro pago…) la sigue dejando. */
-const esEmbalaje = (n: [TipoNota, string]) => n[0] === 'pago' && /embalaje/i.test(n[1])
+// Solo el pago del embalaje SOLO (26-11): si la nota también habla del producto, del monto o de que falta plata
+// («pagó el monto y 500 Bs de embalaje; reportó 4.491,51 de 4.991,51»), es del equipo y la marca queda.
+const esEmbalaje = (n: [TipoNota, string]) => n[0] === 'pago' && /embala[jg]e/i.test(n[1])
+  && !/producto|monto|total|falta|incomplet|\d\.\d{3},\d{2}/i.test(n[1])
 async function paraElEquipo(db: Pool, notas: [TipoNota, string][]) {
   if (!notas.some(esEmbalaje)) return notas
   const { rows: [e] } = await db.query(

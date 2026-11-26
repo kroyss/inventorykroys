@@ -522,7 +522,7 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   resumido (ML admite hasta 300 caracteres). Un tema repetido reemplaza al anterior. Temas: PEDIDO ESPECIAL, RECLAMO,
   FACTURA, CAMBIO, PAGO, DATOS, ARCHIVO, ENVÍO y PENDIENTE (lo demás). Tus notas propias no las toca.
 - **Pendiente de la IA (en Por atender):** si la IA **respondió sola** y en esa respuesta dejó algo para el equipo (lo
-  que va a la nota), la conversación **sigue en Por atender**. Si lo único que quedó es verificar el **pago del embalaje** y
+  que va a la nota), la conversación **sigue en Por atender**. Si lo único que quedó es verificar el **pago del embalaje** (solo el embalaje: si también habla del producto, del monto o de que falta plata, la marca queda) y
   tienes Pagos ME, no queda la marca (ese pago se verifica en Pagos ME; la nota en la venta sí queda). Fuera de ese caso, sigue en Por atender aunque MercadoLibre la marque leída, con la etiqueta
   morada **«IA»** (junto a la etiqueta **«Nota»** si la venta tiene nota). En la lista van solo las etiquetas: pasando
   el cursor por encima se lee el texto completo, y adentro de la conversación está todo. Sale sola cuando
