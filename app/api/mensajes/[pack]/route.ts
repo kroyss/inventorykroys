@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
       leerHilo(s.db, c.conexion_id, pack, Number(c.ml_user_id), marcar),
       itemsDeVenta(s.db, c.conexion_id, pack).catch(() => null),   // para el link a cada publicación
     ])
-    if (marcar) await s.db.query(`UPDATE ml_conversaciones SET sin_leer = 0, actualizada_at = NOW() WHERE pack_id = $1`, [pack])
+    if (marcar) await s.db.query(`UPDATE ml_conversaciones SET sin_leer = 0, sin_leer_ml = 0, actualizada_at = NOW() WHERE pack_id = $1`, [pack])
     // Lo que este comprador preguntó antes (de lo ya sincronizado en Preguntas).
     const preguntas = venta?.comprador.id ? await preguntasDeComprador(s.db, venta.comprador.id).catch(() => []) : []
     // Recordatorios de pago (solo con Pagos ME): si ya se le mandaron, el botón "Ya pagó, no recordar".

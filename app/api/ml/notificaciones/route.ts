@@ -5,7 +5,7 @@ import { leerMensajeNotificado, procesarPreguntaNotificada, procesarVentaNotific
 // Notificaciones de MercadoLibre (DevCenter → "Notificaciones callbacks URL"). ML exige un 200 rápido o reintenta.
 // Paso 1 (23-10, mig 119): se GUARDAN tal como llegan (cobertura y demora por tema). Paso 2a (25-10): los avisos de
 // VENTA traen esa venta al momento (lib/notificacionesML.ts). Paso 2b (28-10): también preguntas y mensajes (el cron
-// queda como barrido cada 15 min).
+// queda como barrido cada 15 min; los mensajes sin leer, cada 2 min).
 // Nunca falla hacia ML (si no se pudo guardar, igual responde 200).
 export async function POST(req: NextRequest) {
   try {

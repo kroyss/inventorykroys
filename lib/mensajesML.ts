@@ -236,7 +236,9 @@ export async function responderHilo(db: Pool, conexionId: number, pack: string, 
   const ultimo = despues.mensajes[despues.mensajes.length - 1]
   const sinLeer = dejarSinLeer ? await sinLeerEnML(db, conexionId, pack, seller) : 0
   await db.query(
-    `UPDATE ml_conversaciones SET sin_leer = $4, ultimo_texto = $2, ultimo_de_comprador = FALSE, ultimo_at = $3,
+    // 26-11: también el contador de ML (sin_leer_ml). Si quedaba el viejo, el próximo mensaje del comprador daba el
+    // mismo número y el barrido de sin leer la saltaba ("no cambió"): quedaba en Atendidas hasta que llegara el aviso.
+    `UPDATE ml_conversaciones SET sin_leer = $4, sin_leer_ml = $4, ultimo_texto = $2, ultimo_de_comprador = FALSE, ultimo_at = $3,
             actualizada_at = NOW() WHERE pack_id = $1`, [pack, ultimo?.texto || texto || (adjuntos.length ? '📎 Archivo' : ''), ultimo?.fecha ?? new Date().toISOString(), sinLeer])
   return { ...despues, sinLeer }
 }
