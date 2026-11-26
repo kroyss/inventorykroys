@@ -148,6 +148,10 @@ export async function guardarPreguntaNotificada(db: Pool, conexionId: number, pr
  *  (avisosCaidos) o en staging, vuelve a cada minuto como antes. En memoria: al reiniciar barre enseguida. */
 export const BARRIDO_MIN = 15
 const barridoAt = new Map<number, number>()
+/** 26-11: los mensajes sin leer se barren aparte cada BARRIDO_MENSAJES_MIN (una sola consulta por cuenta; el hilo
+ *  solo se relee si cambió): con avisos de ML atrasados (26-11: 10 a 100 min) nada queda más de esto fuera de Por atender. */
+export const BARRIDO_MENSAJES_MIN = 2
+const barridoMensajesAt = new Map<number, number>()
 
 /**
  * Trae las preguntas de todas las cuentas activas de la empresa de `db`:
@@ -195,7 +199,9 @@ export async function sincronizarEmpresa(db: Pool, forzar = false): Promise<Resu
       // Las preguntas ya quedaron al día (por barrido o por aviso): se marca antes de lo opcional (títulos).
       await db.query(`UPDATE ml_conexiones SET ultima_sync = NOW(), ultimo_error = NULL WHERE id = $1`, [c.id])
       // Mensajes post-venta sin leer (bandeja Mensajes; entre barridos solo el relleno de notas e historia). No corta la sync de preguntas.
-      try { await sincronizarMensajes(db, c.id, barrer) } catch (e) {
+      const barrerMensajes = barrer || (barridoMensajesAt.get(c.id) ?? 0) < Date.now() - BARRIDO_MENSAJES_MIN * 60_000 + 5_000
+      if (barrerMensajes) barridoMensajesAt.set(c.id, Date.now())
+      try { await sincronizarMensajes(db, c.id, barrerMensajes) } catch (e) {
         console.error('[ML mensajes]', c.nickname, e instanceof Error ? e.message : e)
       }
       // Ventas para calificar (cada SYNC_MINUTOS; adentro decide si toca).

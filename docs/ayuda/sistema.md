@@ -483,6 +483,8 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   recibió o retiró?»**. Si el sistema ve que es una compra repetida (mismo comprador, mismo producto, mismo día y la
   otra sí se concretó), te sugiere «sin problema». Solo lo ve quien tiene acceso a Calificaciones. Es público en ML.
 - **Leer un mensaje aquí NO lo marca como leído en MercadoLibre:** se marca cuando respondes o tocas el sobre.
+- **Cuándo entra un mensaje nuevo:** al instante con el aviso de MercadoLibre; si ML se atrasa con los avisos, el sistema
+  igual revisa los sin leer de cada cuenta **cada 2 minutos**, así que ninguno queda más de eso fuera de Por atender.
 - **Por atender tiene tres chips:** **Responder** (lo de siempre: mensajes del comprador sin contestar), **Pedir pago**
   y **Escribirle**. «Pedir pago» = ventas de ML sin ninguna señal de pago dentro de los días de plazo que pusiste en
   Calificaciones (no concretada). Una venta sale de la lista si tiene alguna de estas: el mensaje automático de ML «El
