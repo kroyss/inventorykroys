@@ -336,8 +336,10 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   encendida no se apaga: Mi IA muestra «Para la IA en Mensajes falta…» con **Completarlo →** hasta que los llenes.
 - Para apagarla: **Apagar respuestas automáticas…** en la tarjeta de Mi IA. Se apaga al instante.
 - **Todo se enciende y se cambia en Mi IA**: encendido, modo y frenos.
-- **Mensajes automáticos: Próximamente.** Por ahora la IA responde sola solo en **Preguntas**; en Mi IA la tarjeta de
-  Mensajes aparece deshabilitada mientras se afina. En Mensajes sigue funcionando «Proponer con IA».
+- **Mensajes automáticos** (desde el 27-11, para todos los que tienen la IA automática): se encienden en la tarjeta de
+  **Mensajes** de Mi IA, en **Modo Seguro** (el Modo Total en Mensajes todavía no está disponible). Para encenderla
+  hay que completar Mi IA, incluidos los 3 datos de Mensajes (datos para pagar, embalaje y contacto de retiro). Cada
+  mensaje usa 1 crédito. Lo que la IA no manda sola queda en **«Por atender»** con su respuesta escrita para tu equipo.
 - **Modo Seguro o Modo Total** (se elige aparte en Preguntas y en Mensajes, una vez encendida):
   - **Modo Seguro** (de fábrica): responde sola solo cuando está segura. Lo dudoso (reclamos, pagos, «no hay», temas
     de «Siempre una persona») te lo deja escrito para que lo revises y lo mandes tú.
@@ -402,11 +404,11 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
     respuesta escrita para una persona. Sin horario responde a cualquier hora.
   - **Máximo por comprador:** cuántas respuestas automáticas recibe un mismo comprador en 24 horas (de fábrica 3);
     la siguiente queda para una persona.
-  - **Frase de escape de Mensajes** (en la tarjeta de Mensajes, en los dos modos; puede llevar teléfono o web): si la
-    IA no manda la respuesta sola, manda esta frase para que el comprador no quede sin contestar. El campo muestra de
-    fondo el texto de ejemplo; si lo dejas vacío se usa ese, y si escribes el tuyo se usa el tuyo. La conversación sigue
-    en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas. También sale en los
-    **reclamos** (garantía, devolución, llegó mal): el comprador recibe el acuse al momento y la nota RECLAMO queda en la venta.
+  - **Frase de escape de Mensajes** (en la tarjeta de Mensajes, **solo en Modo Total**; puede llevar teléfono o web):
+    en garantías, reclamos, devoluciones o pedidos distintos la IA no responde y manda esta frase para que el comprador
+    no quede sin contestar. El campo muestra de fondo el texto de ejemplo; si lo dejas vacío se usa ese, y si escribes
+    el tuyo se usa el tuyo. Una vez por conversación cada 24 horas. **En Modo Seguro no hay frase de escape**: lo que
+    la IA no responde ya queda en «Por atender» para tu equipo.
   - **Frase de escape de Preguntas** (en la tarjeta de Preguntas; **sin teléfonos ni links**, MercadoLibre no los
     deja: la pantalla avisa si pones uno): **solo en Modo Total**. El campo muestra de fondo el texto de ejemplo
     («¡Hola! Para atenderte con todo el detalle, haz la compra de 1 unidad y escríbenos por la mensajería de la compra:

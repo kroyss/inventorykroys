@@ -489,8 +489,8 @@ type PruebaG = { id: string | null; creado_at: string; casos: Caso[]; marcas: Re
 const aCaso = (x: Caso & { pregunta?: string; mensaje?: string }): Caso => ({ ...x, texto: x.texto ?? x.pregunta ?? x.mensaje ?? '' })
 const fechaPrueba = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
-function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan, nuevos = [], fr }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
-  quedan: number | null; faltan: string[]; nuevos?: { tema: string; ir: string }[]; fr: FrenosEstado }) {
+function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan, nuevos = [], fr, soloSeguro = false }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
+  quedan: number | null; faltan: string[]; nuevos?: { tema: string; ir: string }[]; fr: FrenosEstado; soloSeguro?: boolean }) {
   const [usadas, setUsadas] = useState(0)
   const quedan = quedanAl === null ? null : Math.max(0, quedanAl - usadas)
   const confirm = useConfirm()
@@ -531,9 +531,9 @@ function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedan
         className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">{cambiando ? 'Encendiendo…' : T.encender}</button>}
 
       {encendida && <div className="space-y-2">
-        <ResponderTodo tipo={tipo} todo={todo} onCambio={onCambio} />
+        <ResponderTodo tipo={tipo} todo={todo} onCambio={onCambio} soloSeguro={soloSeguro} />
         {/* 27-11: la frase de escape de cada módulo vive en su tarjeta (en Preguntas sin teléfonos ni links). */}
-        {tipo === 'preguntas' ? <EscapePreguntas fr={fr} total={todo} /> : <EscapeMensajes fr={fr} total={todo} />}
+        {tipo === 'preguntas' ? <EscapePreguntas fr={fr} total={todo} /> : <EscapeMensajes fr={fr} total={todo} soloSeguro={soloSeguro} />}
         <button type="button" onClick={() => cambiar(false)} disabled={cambiando} className="text-xs text-neutral-500 hover:text-red-700 disabled:opacity-50">
           {cambiando ? 'Apagando…' : `Apagar respuestas automáticas en ${tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'}`}</button>
       </div>}
@@ -809,7 +809,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
 export default function MiIA({ inicial = null, frenosInicial = null }: { inicial?: unknown; frenosInicial?: unknown }) {
   useVistoNuevo('mi_ia')   // al entrar se quita la marca «Nuevo» de los menús
   const fr = useFrenos(frenosInicial)   // 27-11: un solo estado de frenos para las dos tarjetas y los compartidos
-  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; msgPronto?: boolean; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number; sugerir?: number; politicas?: number } | null } | null>(null)
+  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; msgPronto?: boolean; msgSoloSeguro?: boolean; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number; sugerir?: number; politicas?: number } | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
   const [sug, setSug] = useState<Sugerencia | null>(null)
   const [sugeridos, setSugeridos] = useState<string[]>([])
@@ -1148,7 +1148,7 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
           <button type="button" disabled className="w-full cursor-not-allowed rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-400">Encender en Mensajes</button>
         </div>
       ) : (
-      <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} todo={!!datos.msgTodo} onCambio={cargar} abrir={abrirTema}
+      <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} todo={!!datos.msgTodo} soloSeguro={!!datos.msgSoloSeguro} onCambio={cargar} abrir={abrirTema}
         quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={[...faltan.map(i => PASOS[i].tema), ...nuevosMsg.map(t => t.tema)]} nuevos={nuevosMsg} fr={fr} />
       )}
       </div>

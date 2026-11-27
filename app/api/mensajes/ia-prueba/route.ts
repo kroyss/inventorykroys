@@ -7,6 +7,7 @@ import { CLAVE_AUTO, listaPrueba, autoTodo } from '@/lib/mensajesIAPrueba'
 import { puede } from '@/lib/permisos'
 import { errorFaltanMiIA, faltanMiIA } from '@/lib/miIA'
 import { frenosDeFabrica } from '@/lib/iaFrenos'
+import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 
 // Mensajes → IA en prueba (mig 145, lib/mensajesIAPrueba.ts). GET → los casos, el resumen y si está en automático
 // · POST → marcar Bien / Mal · PUT { auto } → enciende / apaga el envío automático (mig 149, permiso automatizaciones_config).
@@ -42,6 +43,9 @@ export async function PUT(req: NextRequest) {
     let actual: Record<string, unknown> = {}
     try { actual = JSON.parse(a?.value ?? '{}') } catch { /* vacío */ }
     if ('todo' in p.data) {
+      // 27-11 (el dueño): Mensajes abierto a todos, pero el Modo Total solo para la plataforma por ahora.
+      if (p.data.todo && s.session.user.organizacionId !== ORGANIZACION_PLATAFORMA)
+        return NextResponse.json({ error: 'El Modo Total en Mensajes todavía no está disponible. Usa el Modo Seguro.' }, { status: 403 })
       await s.db.query(
         `INSERT INTO app_settings (key, value) VALUES ($1, $2)
          ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
@@ -56,7 +60,7 @@ export async function PUT(req: NextRequest) {
     await s.db.query(
       `INSERT INTO app_settings (key, value) VALUES ($1, $2)
        ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [CLAVE_AUTO, JSON.stringify({ modo: p.data.auto ? 'real' : 'apagado', todo: p.data.auto && actual.todo === true, por: s.session.user.id, at: new Date().toISOString() })])
+      [CLAVE_AUTO, JSON.stringify({ modo: p.data.auto ? 'real' : 'apagado', todo: p.data.auto && actual.todo === true && s.session.user.organizacionId === ORGANIZACION_PLATAFORMA, por: s.session.user.id, at: new Date().toISOString() })])
     if (p.data.auto) await frenosDeFabrica(s.db)
     return NextResponse.json({ ok: true, auto: p.data.auto })
   } catch (err) { return apiError(err) }

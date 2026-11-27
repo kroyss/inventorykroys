@@ -155,8 +155,9 @@ export async function GET(req: NextRequest) {
     }
     // Mensajes con IA (lib/mensajesIAPrueba.ts, mig 145): la propietaria, borrador de cada mensaje nuevo (prueba interna);
     // los clientes (09-11), solo con el automático encendido y con créditos.
-    // 12-11: de momento solo la propietaria (los clientes lo ven «Próximamente»).
-    for (const e of sincronizadas.filter(x => x.msg_ia && x.propietaria)) {
+    // 12-11: de momento solo la propietaria. 27-11 (el dueño): abierto a todos los que tienen el módulo (los clientes,
+    // solo Modo Seguro, con el automático encendido y créditos: procesarMensajesIA lo revisa).
+    for (const e of sincronizadas.filter(x => x.msg_ia)) {
       try {
         const r = await conEmpresa(e.id, e.country as Country, db => procesarMensajesIA(db, e.country, e.inventario, !e.propietaria, e.id))
         if (r) console.log('[mensajes ia]', e.id, r)
