@@ -6,6 +6,7 @@ import CountrySwitcher from './CountrySwitcher'
 import NavLinks from './NavLinks'
 import AprendizajeNav from './AprendizajeNav'
 import NovedadesNav from './NovedadesNav'
+import AyudaNav from './AyudaNav'
 import ActualizarCentral from './ActualizarCentral'
 import { gruposDe } from '@/lib/actualizarGrupos'
 import EspacioSwitcher from './EspacioSwitcher'
@@ -45,6 +46,7 @@ export default async function Navbar() {
           {/* 18-11: central de actualización (también en el teléfono): reemplaza los botones de traer de cada pantalla. */}
           <ActualizarCentral grupos={gruposDe(session?.user)} />
           <AprendizajeNav />
+          <AyudaNav />
           <NovedadesNav />
           {session?.user.empresaId && !session.user.soporte && (
             <CountrySwitcher actual={session.user.empresaId}

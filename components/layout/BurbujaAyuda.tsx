@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { nombrePantalla, sugerenciasDe, type Sugerencia } from '@/lib/ayudaSugerencias'
 import { EVENTO_ABRIR_SOPORTE } from './ContactoDudas'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { avisarAyuda, EVENTO_ABRIR_AYUDA } from './AyudaNav'
 
 // Burbuja "¿En qué te ayudo?" (30-10-2026), en todas las pantallas del Sistema:
 //   · Preguntar: sugerencias de la pantalla con su respuesta ya escrita (gratis) y pregunta libre que responde la IA
@@ -23,7 +24,8 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 const OCULTO_KEY = 'soporte_oculto_at'
 const leerOculto = () => { try { return localStorage.getItem(OCULTO_KEY) } catch { return null } }
 const guardarOculto = (v: string) => { try { localStorage.setItem(OCULTO_KEY, v) } catch { /* sin almacenamiento */ } }
-export const EVENTO_AYUDA_FLOTANTE = 'ayuda-flotante'
+// 27-11 (el dueño): el botón de Ayuda pasó a la barra de arriba (AyudaNav, siempre visible); ya no hay botón flotante
+// ni «Ayuda en todo el sistema». Abre en Soporte (lo que más se usa). Abajo solo queda la cajita del ticket abierto.
 
 const MAX_ADJUNTOS = 3
 const MAX_MB = 5
@@ -50,7 +52,7 @@ export default function BurbujaAyuda() {
   const ruta = usePathname()
   const params = useSearchParams()
   const [abierta, setAbierta] = useState(false)
-  const [pestana, setPestana] = useState<'preguntar' | 'soporte'>('preguntar')
+  const [pestana, setPestana] = useState<'preguntar' | 'soporte'>('soporte')
   const [turnos, setTurnos] = useState<Turno[]>([])
   const [pregunta, setPregunta] = useState('')
   const [pensando, setPensando] = useState(false)
@@ -67,12 +69,11 @@ export default function BurbujaAyuda() {
   const [archivos, setArchivos] = useState<File[]>([])
   const [enviando, setEnviando] = useState(false)
   const [videos, setVideos] = useState<Video[]>([])
-  const [flotante, setFlotante] = useState(false)
+  // El botón de arriba (AyudaNav) abre y cierra el panel; abre en Soporte.
   useEffect(() => {
-    comun<{ ayudaFlotante?: boolean }>('aprendizaje').then(d => { if (d) setFlotante(!!d.ayudaFlotante) }).catch(() => {})
-    const cambio = (e: Event) => setFlotante(!!(e as CustomEvent<boolean>).detail)
-    window.addEventListener(EVENTO_AYUDA_FLOTANTE, cambio)
-    return () => window.removeEventListener(EVENTO_AYUDA_FLOTANTE, cambio)
+    const f = () => setAbierta(a => { if (!a) { setPestana('soporte'); setEscribiendo(false) } return !a })
+    window.addEventListener(EVENTO_ABRIR_AYUDA, f)
+    return () => window.removeEventListener(EVENTO_ABRIR_AYUDA, f)
   }, [])
   const fin = useRef<HTMLDivElement>(null)
 
@@ -241,14 +242,15 @@ export default function BurbujaAyuda() {
     ocultar()
   }
 
-  const visible = flotante || abierta || nuevos > 0 || hayTicket || ruta.startsWith('/aprendizaje') || !!params.get('soporte')
-  if (!visible) return null
+  // El punto del botón de arriba: rojo = respuesta nueva o (dueño) tickets sin responder; verde = mi caso esperando.
+  const punto = nuevos > 0 || (!abiertos.length && !!dueno?.n) ? 'rojo' : abiertos.length ? 'verde' : null
+  useEffect(() => { avisarAyuda(punto, abierta) }, [punto, abierta])
 
   return (
     <>
       {abierta && (
         <div role="dialog" aria-label="Ayuda"
-          className="fixed z-[70] right-3 left-3 sm:left-auto bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-20 sm:w-[24rem] h-[min(78vh,38rem)] flex flex-col rounded-2xl border border-neutral-200 bg-white shadow-2xl overflow-hidden">
+          className="fixed z-[70] right-3 left-3 sm:left-auto top-16 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] sm:bottom-auto sm:w-[24rem] sm:h-[min(78vh,38rem)] flex flex-col rounded-2xl border border-neutral-200 bg-white shadow-2xl overflow-hidden">
           <div className="bg-neutral-900 text-white px-4 pt-3">
             <div className="flex items-center justify-between">
               <p className="font-semibold">¿En qué te ayudo?</p>
@@ -258,7 +260,7 @@ export default function BurbujaAyuda() {
               <button onClick={() => setAbierta(false)} className="text-neutral-400 hover:text-white text-lg leading-none" aria-label="Cerrar">✕</button>
             </div>
             <div className="mt-2 flex gap-1">
-              {([['preguntar', 'Preguntar'], ['soporte', 'Soporte']] as const).map(([k, t]) => (
+              {([['soporte', 'Soporte'], ['preguntar', 'Preguntar']] as const).map(([k, t]) => (
                 <button key={k} onClick={() => { setPestana(k); setError(null) }}
                   className={`px-3 py-1.5 text-sm border-b-2 ${pestana === k ? 'border-lime-400 text-white font-semibold' : 'border-transparent text-neutral-400 hover:text-neutral-200'}`}>
                   {t}{k === 'soporte' && nuevos > 0 && <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
@@ -383,20 +385,12 @@ export default function BurbujaAyuda() {
       )}
 
       {!abierta && hayTicket && estadoTicket && (
-        <div className={`fixed z-[70] right-14 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 flex h-9 items-center rounded-full border bg-white pl-3 pr-1 shadow-lg text-xs [body:has([data-barra-fija])_&]:hidden ${nuevos > 0 ? 'border-red-300' : 'border-neutral-200'}`}>
+        <div className={`fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 flex h-9 items-center rounded-full border bg-white pl-3 pr-1 shadow-lg text-xs [body:has([data-barra-fija])_&]:hidden ${nuevos > 0 ? 'border-red-300' : 'border-neutral-200'}`}>
           <button onClick={abrirTicket} className={`max-w-[14rem] truncate font-medium ${nuevos > 0 ? 'text-red-600' : 'text-neutral-700'} hover:underline`}>{estadoTicket}</button>
           <button onClick={ocultarTicket} aria-label="Ocultar" title="Ocultar"
             className="ml-1 grid h-6 w-6 place-items-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">✕</button>
         </div>
       )}
-      {/* Solo un ícono de mensaje (menos invasivo); al pasar el cursor dice "Ayuda". */}
-      <button onClick={() => setAbierta(a => !a)} aria-expanded={abierta} title={abierta ? 'Cerrar' : 'Ayuda'} aria-label={abierta ? 'Cerrar ayuda' : 'Ayuda'}
-        className={`fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 grid place-items-center h-9 w-9 rounded-full border border-neutral-900 bg-neutral-900 text-lime-400 shadow-lg hover:border-lime-400 ${abierta ? '' : '[body:has([data-barra-fija])_&]:hidden'}`}>
-        {abierta
-          ? <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
-          : <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>}
-        {!abierta && nuevos > 0 && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white" />}
-      </button>
     </>
   )
 }

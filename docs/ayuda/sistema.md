@@ -1606,10 +1606,9 @@ barras de abajo (Stock en ML, cambios sin guardar de una publicación) quedan en
 
 *Cómo lo pregunta la gente:* hablar con alguien, ayuda, soporte, contacto, horario, Telegram del soporte, la burbuja, el botón de ayuda, mis casos.
 
-**Botón de Ayuda**: un globo de mensaje abajo a la derecha (al pasar el cursor dice «Ayuda»; en el celular, encima del
-menú de abajo). Sale en **Aprendizaje** y sus manuales; para tenerlo en **todas las pantallas**, activa **Ayuda en todo el
-sistema** en Aprendizaje (cada persona decide; empieza apagado). Si Soporte te respondió, el botón aparece igual con su
-punto rojo, estés donde estés:
+**Botón de Ayuda**: un globo de mensaje en la **barra de arriba**, entre Aprendizaje y Novedades (también en el
+celular), siempre a la vista para todos. Abre en **Soporte** (y al lado, **Preguntar**). Un **punto** en el botón avisa:
+**rojo** = Soporte te respondió; **verde** = tienes un caso esperando respuesta:
 - **Preguntar:** preguntas frecuentes de la pantalla donde estás (con su respuesta, al instante) y una caja para
   preguntar lo que quieras: responde un asistente con este manual y, si hay un video que lo explica, te deja el
   enlace. **No gasta tus créditos de IA.** Puede equivocarse: con 👍 / 👎 nos dices si te sirvió. Hay un máximo de
@@ -1623,9 +1622,9 @@ punto rojo, estés donde estés:
   **Telegram** e **Instagram** (@comerciantedigital.ve) por si prefieres escribirnos por ahí. El aviso de que **tu
   plan está por vencer** trae lo mismo («¿Dudas? Escríbenos aquí · Telegram · Instagram»).
   Puedes seguir escribiendo en el mismo caso; cuando se arregle, toca **Ya se resolvió**.
-- **Casos abiertos siempre a la vista:** mientras tengas un caso sin resolver, el botón de Ayuda queda en todas las
-  pantallas con su estado al lado («Caso #12 · esperando respuesta», «● Soporte te respondió»). Tocándolo abres el
-  caso. La **✕** lo oculta: si ya te respondimos te pregunta **«¿Quedó resuelto?»** (**Sí, cerrar el ticket** o **No,
+- **Casos abiertos siempre a la vista:** mientras tengas un caso sin resolver, abajo a la derecha sale una cajita con su
+  estado («Caso #12 · esperando respuesta», «● Soporte te respondió»). Tocándola se abre el caso, listo para responder,
+  adjuntar o darlo por resuelto. La **✕** la oculta (el punto del botón de arriba sigue): si ya te respondimos te pregunta **«¿Quedó resuelto?»** (**Sí, cerrar el ticket** o **No,
   solo ocultar**); si todavía esperas respuesta, solo lo oculta y vuelve a salir cuando te respondamos. Vuelve a
   aparecer cada vez que el caso tiene algo nuevo.
 - **Cuándo se cierra un caso:** cuando tocas **Ya se resolvió** (o «Sí, cerrar el ticket»), cuando Soporte lo marca
