@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type Rea
 import { usePathname, useSearchParams } from 'next/navigation'
 import { nombrePantalla, sugerenciasDe, type Sugerencia } from '@/lib/ayudaSugerencias'
 import { EVENTO_ABRIR_SOPORTE } from './ContactoDudas'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 // Burbuja "¿En qué te ayudo?" (30-10-2026), en todas las pantallas del Sistema:
 //   · Preguntar: sugerencias de la pantalla con su respuesta ya escrita (gratis) y pregunta libre que responde la IA
@@ -14,6 +15,14 @@ import { EVENTO_ABRIR_SOPORTE } from './ContactoDudas'
 // avisos de prueba, ContactoDudas) la abre en Soporte con un mensaje nuevo.
 // 19-11 (el dueño, casi no se usaba): el ícono sale solo en Aprendizaje (y sus manuales), salvo que la persona active
 // «Ayuda en todo el sistema» ahí (users.ayuda_flotante, mig. 187). Una respuesta de Soporte sin leer lo muestra igual.
+// 27-11 (el dueño): TICKETS ABIERTOS. Mientras el usuario tenga un caso sin resolver, la burbuja queda en todas las
+// pantallas con su estado al lado («Caso #12 · esperando respuesta» / «● Soporte te respondió»). La ✕ del estado la
+// oculta: si ya hay respuesta pregunta «¿Quedó resuelto?» (Sí = cierra el ticket; No = solo oculta). Vuelve a salir
+// cuando el caso se mueve (respuesta nueva o el cliente escribe: cambia updated_at). Al dueño de la plataforma le
+// muestra los casos de clientes sin responder (→ Plataforma → Soporte). Lo oculto se recuerda en este navegador.
+const OCULTO_KEY = 'soporte_oculto_at'
+const leerOculto = () => { try { return localStorage.getItem(OCULTO_KEY) } catch { return null } }
+const guardarOculto = (v: string) => { try { localStorage.setItem(OCULTO_KEY, v) } catch { /* sin almacenamiento */ } }
 export const EVENTO_AYUDA_FLOTANTE = 'ayuda-flotante'
 
 const MAX_ADJUNTOS = 3
@@ -48,6 +57,10 @@ export default function BurbujaAyuda() {
   const [error, setError] = useState<string | null>(null)
   const [casos, setCasos] = useState<Caso[] | null>(null)
   const [nuevos, setNuevos] = useState(0)
+  const [dueno, setDueno] = useState<{ n: number; ultimo: string | null; id: number | null } | null>(null)
+  const [oculto, setOculto] = useState<string | null>(null)
+  useEffect(() => { setOculto(leerOculto()) }, [])
+  const confirm = useConfirm()
   const [casoAbierto, setCasoAbierto] = useState<number | null>(null)
   const [escribiendo, setEscribiendo] = useState(false)     // formulario de caso nuevo
   const [texto, setTexto] = useState('')
@@ -64,8 +77,8 @@ export default function BurbujaAyuda() {
   const fin = useRef<HTMLDivElement>(null)
 
   const cargarCasos = useCallback(async (fresco = true) => {
-    const d = await comun<{ casos: typeof casos; nuevos: typeof nuevos }>('soporte', { fresco }).catch(() => null)
-    if (d) { setCasos(d.casos); setNuevos(d.nuevos) }
+    const d = await comun<{ casos: typeof casos; nuevos: typeof nuevos; dueno?: typeof dueno }>('soporte', { fresco }).catch(() => null)
+    if (d) { setCasos(d.casos); setNuevos(d.nuevos); setDueno(d.dueno ?? null) }
   }, [])
 
   // Respuestas nuevas de soporte: al entrar y cada 3 minutos (solo con la pestaña a la vista).
@@ -78,8 +91,8 @@ export default function BurbujaAyuda() {
   // Link de Telegram: ?soporte=ID abre ese caso.
   useEffect(() => {
     const id = Number(params.get('soporte'))
-    if (id) { setAbierta(true); setPestana('soporte'); setCasoAbierto(id) }
-  }, [params])
+    if (id && !ruta.startsWith('/plataforma')) { setAbierta(true); setPestana('soporte'); setCasoAbierto(id) }
+  }, [params, ruta])
 
   // «Escríbenos aquí» (avisos de la prueba): abre en Soporte con el mensaje nuevo listo.
   useEffect(() => {
@@ -201,7 +214,34 @@ export default function BurbujaAyuda() {
     </div>
   )
 
-  const visible = flotante || abierta || nuevos > 0 || ruta.startsWith('/aprendizaje') || !!params.get('soporte')
+  // Tickets abiertos (27-11): los míos sin resolver, o (dueño) los de clientes por responder.
+  const abiertos = (casos ?? []).filter(c => c.estado !== 'resuelto')
+  const actividad = [...abiertos.map(c => c.updated_at), ...(dueno?.n ? [dueno.ultimo ?? ''] : [])].sort().at(-1) ?? null
+  const hayTicket = (abiertos.length > 0 || !!dueno?.n) && !(oculto && actividad && new Date(oculto) >= new Date(actividad))
+  const respondidos = abiertos.filter(c => c.estado === 'respondido')
+  const estadoTicket = nuevos > 0 ? '● Soporte te respondió'
+    : abiertos.length > 1 ? `${abiertos.length} casos abiertos`
+    : abiertos.length === 1 ? `Caso #${abiertos[0].id} · ${abiertos[0].estado === 'respondido' ? 'respondido' : 'esperando respuesta'}`
+    : dueno?.n ? `${dueno.n === 1 ? '1 ticket' : `${dueno.n} tickets`} sin responder` : ''
+  const abrirTicket = () => {
+    if (!abiertos.length && dueno?.n) { window.location.href = `/plataforma?soporte=${dueno.id ?? ''}`; return }
+    setAbierta(true); setPestana('soporte'); setEscribiendo(false)
+    setCasoAbierto(abiertos.length === 1 ? abiertos[0].id : null)
+  }
+  async function ocultarTicket() {
+    const ocultar = () => { const v = new Date().toISOString(); guardarOculto(v); setOculto(v) }
+    if (respondidos.length) {
+      const c = respondidos[0]
+      const si = await confirm({ title: `¿Quedó resuelto tu caso #${c.id}?`,
+        message: 'Si dices que sí, se cierra el ticket. Si vuelve a pasar, escríbenos y se reabre.',
+        confirmText: 'Sí, cerrar el ticket', cancelText: 'No, solo ocultar' })
+      if (si) { await resolver(c.id); return }
+    } else if (abiertos.length && !(await confirm({ title: 'Ocultar el aviso',
+      message: 'Tu caso sigue abierto: te avisamos aquí apenas te respondamos.', confirmText: 'Ocultar' }))) return
+    ocultar()
+  }
+
+  const visible = flotante || abierta || nuevos > 0 || hayTicket || ruta.startsWith('/aprendizaje') || !!params.get('soporte')
   if (!visible) return null
 
   return (
@@ -342,6 +382,13 @@ export default function BurbujaAyuda() {
         </div>
       )}
 
+      {!abierta && hayTicket && estadoTicket && (
+        <div className={`fixed z-[70] right-14 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 flex h-9 items-center rounded-full border bg-white pl-3 pr-1 shadow-lg text-xs [body:has([data-barra-fija])_&]:hidden ${nuevos > 0 ? 'border-red-300' : 'border-neutral-200'}`}>
+          <button onClick={abrirTicket} className={`max-w-[14rem] truncate font-medium ${nuevos > 0 ? 'text-red-600' : 'text-neutral-700'} hover:underline`}>{estadoTicket}</button>
+          <button onClick={ocultarTicket} aria-label="Ocultar" title="Ocultar"
+            className="ml-1 grid h-6 w-6 place-items-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">✕</button>
+        </div>
+      )}
       {/* Solo un ícono de mensaje (menos invasivo); al pasar el cursor dice "Ayuda". */}
       <button onClick={() => setAbierta(a => !a)} aria-expanded={abierta} title={abierta ? 'Cerrar' : 'Ayuda'} aria-label={abierta ? 'Cerrar ayuda' : 'Ayuda'}
         className={`fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 grid place-items-center h-9 w-9 rounded-full border border-neutral-900 bg-neutral-900 text-lime-400 shadow-lg hover:border-lime-400 ${abierta ? '' : '[body:has([data-barra-fija])_&]:hidden'}`}>
