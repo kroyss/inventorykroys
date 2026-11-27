@@ -6,6 +6,7 @@ import { tieneModulo } from '@/lib/modulos'
 import { puede, type Permiso } from '@/lib/permisos'
 import {
   CLAVE_CONFIG, HORAS, MAX_TEXTO, armarTexto, candidatos, detenerRecordatorio, leerConfigDb, ultimoTurno,
+  variablesDesconocidas, errorVariables,
 } from '@/lib/recordatoriosPago'
 
 // Recordatorios de pago (lib/recordatoriosPago.ts): solo empresas con el módulo `pagos_me`.
@@ -67,6 +68,8 @@ export async function PUT(req: NextRequest) {
   if ('error' in s) return s.error
   try {
     const cfg = Config.parse(await req.json())
+    const malas = variablesDesconocidas(`${cfg.texto} ${cfg.final.texto}`)
+    if (malas.length) return NextResponse.json({ error: errorVariables(malas) }, { status: 400 })
     if (cfg.final.activo && cfg.final.texto.length < 10) {
       return NextResponse.json({ error: 'Escribe el texto del último aviso (o apágalo)' }, { status: 400 })
     }

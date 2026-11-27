@@ -98,7 +98,7 @@ export default function RecordatoriosPago() {
           <h2 className="text-sm font-semibold text-neutral-900">Texto del recordatorio</h2>
           <textarea value={cfg.texto} disabled={lectura} rows={3} maxLength={290} onChange={e => setCfg({ ...cfg, texto: e.target.value })}
             className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm" />
-          <p className="text-xs text-neutral-500">{'{nombre}'} = primer nombre del comprador · {'{producto}'} = lo que compró. Deja la frase &quot;si ya pagaste, ignora este mensaje&quot;: si a alguien le llega por error, no molesta.</p>
+          <p className="text-xs text-neutral-500">{'{nombre}'} = primer nombre del comprador · {'{producto}'} = lo que compró · {'{precio}'} = total de la compra en $ · {'{precio_bs}'} = ese total × tasa BCV del día del recordatorio · {'{tasa_bcv}'} = la tasa (si falta un dato, esa línea no se manda). Deja la frase &quot;si ya pagaste, ignora este mensaje&quot;: si a alguien le llega por error, no molesta.</p>
         </div>
         <div className="space-y-1">
           <label className="flex items-center gap-2 text-sm font-semibold text-neutral-900 cursor-pointer">

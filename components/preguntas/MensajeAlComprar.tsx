@@ -18,7 +18,9 @@ const ESTADO: Record<string, { t: string; c: string }> = {
 }
 // Ejemplo para medir el largo: un nombre y un producto típicos (el producto se acorta solo si hace falta, como armarTexto).
 const EJEMPLO = { nombre: 'Alejandra', producto: 'Audífonos Bluetooth Inalámbricos Con Micrófono Negro' }
-const armar = (t: string) => t.replaceAll('{nombre}', EJEMPLO.nombre).replaceAll('{producto}', EJEMPLO.producto).replace(/[ \t]{2,}/g, ' ')
+// 27-11: los montos con un ejemplo de largo típico (Bs con miles).
+const armar = (t: string) => t.replaceAll('{nombre}', EJEMPLO.nombre).replaceAll('{producto}', EJEMPLO.producto)
+  .replace(/\{precio_bs\}/gi, '12.345,67').replace(/\{precio\}/gi, '45,00').replace(/\{tasa_bcv\}/gi, '274,35').replace(/[ \t]{2,}/g, ' ')
   .replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 
 /** Campo que crece con el texto: se ve completo, sin barra interna. */
@@ -126,7 +128,7 @@ export default function MensajeAlComprar() {
                   <div className="space-y-1.5 border-t border-neutral-100 px-3 pb-3 pt-2.5">
                     <CampoTexto valor={t} onCambio={v => setTexto(i, v)} disabled={lectura} max={d.max} />
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <span className="text-neutral-500"><code>{'{nombre}'}</code> = primer nombre del comprador · <code>{'{producto}'}</code> = lo que compró</span>
+                      <span className="text-neutral-500"><code>{'{nombre}'}</code> = primer nombre del comprador · <code>{'{producto}'}</code> = lo que compró · <code>{'{precio}'}</code> = total de la compra en $ · <code>{'{precio_bs}'}</code> = ese total × tasa BCV de hoy · <code>{'{tasa_bcv}'}</code> = la tasa. Si falta un dato, esa línea no se manda.</span>
                       {i > 0 && !lectura && <button type="button" onClick={() => quitar(i)} className="text-red-600 hover:underline">Quitar este mensaje</button>}
                     </div>
                     {largo > d.max && <p className="text-xs text-red-700">Con un nombre y un producto normales pasa de {d.max} caracteres: MercadoLibre lo cortaría. Acórtalo{cfg.textos.length < d.maxMensajes ? ' o pasa una parte al mensaje 2' : ''}.</p>}

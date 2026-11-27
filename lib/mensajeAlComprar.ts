@@ -15,7 +15,7 @@ import { mlFetch, ErrorML } from '@/lib/ml'
 import { leerHilo } from '@/lib/mensajesML'
 import { registrarOrigen } from '@/lib/respuestasOrigen'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
-import { armarTexto, MAX_TEXTO } from '@/lib/recordatoriosPago'
+import { armarTexto, MAX_TEXTO, montosVenta, usaMontos } from '@/lib/recordatoriosPago'
 import { avisosCaidos } from '@/lib/notificacionesML'
 
 export const CLAVE_CONFIG = 'mensaje_al_comprar'
@@ -142,7 +142,9 @@ async function mandarUno(db: Pool, c: Candidato, cfg: ConfigAlComprar): Promise<
     if (hilo.mensajes.some(m => !m.propio && new Date(m.fecha) > new Date(c.fecha))) {
       await anotar(db, c.pack, 'saltado', ESCRIBIO, null); return 'saltado'
     }
-    const textos = cfg.textos.map(t => armarTexto(t, orden.buyer!.first_name || c.comprador_nombre, c.producto))
+    // 27-11: {precio}/{precio_bs}/{tasa_bcv} = total de la compra (solo se pide a ML si la plantilla los usa).
+    const montos = cfg.textos.some(usaMontos) ? await montosVenta(db, c.conexion_id, c.pack) : undefined
+    const textos = cfg.textos.map(t => armarTexto(t, orden.buyer!.first_name || c.comprador_nombre, c.producto, montos))
     const mandar = (text: string) => mlFetch(db, c.conexion_id, `/messages/packs/${c.pack}/sellers/${seller}?tag=post_sale`, {
       method: 'POST', body: { from: { user_id: seller }, to: { user_id: orden.buyer!.id }, text },
     })

@@ -563,6 +563,11 @@ lo que guardas en un lado lo usan las dos IA. Las Respuestas rápidas de Mensaje
   después de los dos de ML; el segundo, unos segundos después del primero), una sola vez por venta, solo a ventas que
   entren desde que lo prendes. No se manda si la venta se canceló o si el comprador escribió primero (su mensaje queda en
   «Por atender»; en el historial sale «No se mandó» con el motivo). `{nombre}` = primer nombre del comprador.
+  **Datos que se llenan solos** (también en los Recordatorios de pago): `{nombre}`, `{producto}`, `{precio}` = **total**
+  de la compra en $ (todas las unidades y productos del carrito, con los descuentos de ML; en Colombia, en pesos),
+  `{precio_bs}` = ese total × tasa BCV del día en que sale el mensaje y `{tasa_bcv}` = esa tasa. Si falta un dato (ej. no
+  hay tasa del día), **esa línea no se manda**: nunca le llega al comprador un «{precio}» suelto. Al guardar avisa si
+  escribiste una variable que no existe (ej. `{monto}`).
   MercadoLibre corta cada mensaje de más de **350 caracteres** sin avisar: si no te alcanza, toca **+ Agregar un
   segundo mensaje**. Se edita uno a la vez (al abrir uno se cierra el otro) y el campo crece con el texto.
   **Ver cómo llega** muestra la conversación como la ve el comprador. ML limita los mensajes seguidos sin respuesta:

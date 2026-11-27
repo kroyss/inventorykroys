@@ -4,6 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
 import { CLAVE_CONFIG, ESPERA_MIN, MAX_MENSAJES, MAX_TEXTO, leerConfigDb, ultimos } from '@/lib/mensajeAlComprar'
+import { variablesDesconocidas, errorVariables } from '@/lib/recordatoriosPago'
 
 // Mensaje al comprar (lib/mensajeAlComprar.ts, mig 118). En la pantalla: Mensajes → Configuración → Al recibir compra.
 // GET ?pagina=N → configuración y los últimos mensajes (de a 20) · PUT { activo, textos[1..2] } (automatizaciones_config)
@@ -31,6 +32,8 @@ export async function PUT(req: NextRequest) {
   if ('error' in s) return s.error
   try {
     const b = Config.parse(await req.json())
+    const malas = variablesDesconocidas(b.textos.join(' '))
+    if (malas.length) return NextResponse.json({ error: errorVariables(malas) }, { status: 400 })
     const antes = await leerConfigDb(s.db)
     // Al prenderlo arranca de cero: solo las ventas hechas desde ahora (nunca a las viejas).
     const desde = b.activo ? (antes.activo && antes.desde ? antes.desde : new Date().toISOString()) : null
