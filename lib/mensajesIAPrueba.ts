@@ -275,9 +275,10 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
         }
       }
       // Frase de escape: no salió sola, hay algo que contestar y no se frenó por el tope. Una por conversación cada 24 h.
+      // 27-11 (el dueño): también en reclamos (antes no, b347f70): acusa al instante y el equipo lo resuelve.
       // Sin marcarla como leída: sigue en «Por atender» y el equipo encuentra el borrador de la IA escrito.
       const porTope = topeOHorario.some(t => t.startsWith('Este comprador'))
-      if (real && frenos?.escape && decision === 'revisar' && !porTope && !b.pedido_especial && !b.reclamo) {
+      if (real && frenos?.escape && decision === 'revisar' && !porTope && !b.pedido_especial) {
         const { rows: [c] } = await db.query(
           `SELECT ultimo_de_comprador AND ultimo_at <= $2::timestamptz AS espera,
                   EXISTS (SELECT 1 FROM ml_mensajes_ia WHERE pack_id = $1 AND escape_at > NOW() - INTERVAL '24 hours') AS ya
@@ -516,7 +517,7 @@ async function procesarV2(db: Pool, r: FilaMensaje, country: string, conInventar
   }
   // Frase de escape: igual que antes, y tampoco en el precio de otro producto (es un pedido).
   const porTope = topeOHorario.some(t => t.startsWith('Este comprador'))
-  if (real && frenos?.escape && decision === 'revisar' && !porTope && !b.pedido_especial && !b.reclamo && !motivos.includes(PRECIO_OTRO)) {
+  if (real && frenos?.escape && decision === 'revisar' && !porTope && !b.pedido_especial && !motivos.includes(PRECIO_OTRO)) {
     const { rows: [c] } = await db.query(
       `SELECT ultimo_de_comprador AND ultimo_at <= $2::timestamptz AS espera,
               EXISTS (SELECT 1 FROM ml_mensajes_ia WHERE pack_id = $1 AND escape_at > NOW() - INTERVAL '24 hours') AS ya
