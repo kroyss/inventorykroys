@@ -24,6 +24,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ consultas: rows }, { headers: { 'Cache-Control': 'no-store' } })
     }
     await cerrarRespondidosViejos()   // 27-11: respondidos sin novedad en 3 días → resueltos
+    // 27-11 (el dueño): ?tickets=1 → solo los casos sin resolver, para responderlos desde el botón de Ayuda sin salir.
+    if (req.nextUrl.searchParams.get('tickets')) {
+      const { rows } = await db.query(
+        `SELECT c.id, c.origen, c.estado, c.pantalla, c.created_at, c.updated_at,
+                COALESCE(u.full_name, u.username) AS persona, u.username, e.nombre AS empresa,
+                COALESCE((SELECT json_agg(json_build_object('id', m.id, 'autor', m.autor, 'texto', m.texto,
+                            'adjuntos', m.adjuntos, 'created_at', m.created_at) ORDER BY m.id)
+                          FROM soporte_mensajes m WHERE m.caso_id = c.id), '[]') AS mensajes
+         FROM soporte_casos c LEFT JOIN users u ON u.id = c.user_id LEFT JOIN empresas e ON e.id = c.empresa_id
+         WHERE c.estado <> 'resuelto' ORDER BY (c.estado = 'abierto') DESC, c.updated_at DESC LIMIT 50`)
+      return NextResponse.json({ casos: rows }, { headers: { 'Cache-Control': 'no-store' } })
+    }
     const [{ rows: casos }, { rows: dias }, { rows: falta }, { rows: [tot] }] = await Promise.all([
       db.query(
         `SELECT c.id, c.origen, c.estado, c.pantalla, c.navegador, c.created_at, c.updated_at,

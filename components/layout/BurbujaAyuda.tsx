@@ -6,6 +6,7 @@ import { nombrePantalla, sugerenciasDe, type Sugerencia } from '@/lib/ayudaSuger
 import { EVENTO_ABRIR_SOPORTE } from './ContactoDudas'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { avisarAyuda, EVENTO_ABRIR_AYUDA } from './AyudaNav'
+import TicketsClientes from './TicketsClientes'
 
 // Burbuja "¿En qué te ayudo?" (30-10-2026), en todas las pantallas del Sistema:
 //   · Preguntar: sugerencias de la pantalla con su respuesta ya escrita (gratis) y pregunta libre que responde la IA
@@ -63,6 +64,7 @@ export default function BurbujaAyuda() {
   const [nuevos, setNuevos] = useState(0)
   const [dueno, setDueno] = useState<{ n: number; ultimo: string | null; id: number | null } | null>(null)
   const [oculto, setOculto] = useState<string | null>(null)
+  const [ticketCli, setTicketCli] = useState<number | null>(null)   // dueño: el ticket de cliente a abrir
   useEffect(() => { setOculto(leerOculto()) }, [])
   const confirm = useConfirm()
   const [casoAbierto, setCasoAbierto] = useState<number | null>(null)
@@ -235,7 +237,8 @@ export default function BurbujaAyuda() {
     : abiertos.length === 1 ? `Caso #${abiertos[0].id} · ${abiertos[0].estado === 'respondido' ? 'respondido' : 'esperando respuesta'}`
     : dueno?.n ? `${dueno.n === 1 ? '1 ticket' : `${dueno.n} tickets`} sin responder` : ''
   const abrirTicket = () => {
-    if (!abiertos.length && dueno?.n) { window.location.href = `/plataforma?soporte=${dueno.id ?? ''}`; return }
+    // Dueño: el ticket del cliente se abre aquí mismo, sin salir de la pantalla (27-11).
+    if (!abiertos.length && dueno?.n) { setTicketCli(dueno.id); setCasoAbierto(null); setEscribiendo(false); setPestana('soporte'); setAbierta(true); return }
     setAbierta(true); setPestana('soporte'); setEscribiendo(false)
     setCasoAbierto(abiertos.length === 1 ? abiertos[0].id : null)
   }
@@ -346,23 +349,14 @@ export default function BurbujaAyuda() {
                 <button onClick={() => resolver(caso.id)} className="btn-secondary text-xs">✓ Ya se resolvió</button>
               )}
               {error && <p className="text-red-600 text-xs">{error}</p>}
-            </> : escribiendo || (casos && casos.length === 0) ? <>
-              {dueno?.n ? (
-                <a href={`/plataforma?soporte=${dueno.id ?? ''}`} className="flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800 hover:border-red-300">
-                  <span className="font-medium">{dueno.n === 1 ? '1 ticket de cliente sin responder' : `${dueno.n} tickets de clientes sin responder`}</span>
-                  <span className="text-xs">Responder →</span>
-                </a>) : null}
+            </> : escribiendo || (casos && casos.length === 0 && !dueno) ? <>
               {casos && casos.length > 0 && <button onClick={() => setEscribiendo(false)} className="text-xs text-neutral-500 hover:text-neutral-800">← Mis casos</button>}
               <p className="font-medium text-neutral-800">Escribir a Soporte</p>
               <p className="text-xs text-neutral-500">{HORARIO} Junto con tu mensaje nos llega en qué pantalla estás, para ayudarte más rápido.</p>
               {formulario()}
               {error && <p className="text-red-600 text-xs">{error}</p>}
             </> : <>
-              {dueno?.n ? (
-                <a href={`/plataforma?soporte=${dueno.id ?? ''}`} className="flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800 hover:border-red-300">
-                  <span className="font-medium">{dueno.n === 1 ? '1 ticket de cliente sin responder' : `${dueno.n} tickets de clientes sin responder`}</span>
-                  <span className="text-xs">Responder →</span>
-                </a>) : null}
+              {dueno && <TicketsClientes key={ticketCli ?? 0} inicial={ticketCli} onCambio={() => cargarCasos()} />}
               <div className="flex items-center justify-between">
                 <p className="font-medium text-neutral-800">Mis casos</p>
                 <button onClick={() => { setEscribiendo(true); setError(null) }} className="btn-primary text-xs">+ Escribir</button>
