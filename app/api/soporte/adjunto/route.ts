@@ -15,7 +15,9 @@ export async function GET(req: Request) {
   const u = new URL(req.url)
   const caso = Number(u.searchParams.get('caso')), archivo = u.searchParams.get('archivo') ?? ''
   if (!esDuenoPlataforma(session.user)) {
-    const { rowCount } = await dbGlobal().query(`SELECT 1 FROM soporte_casos WHERE id = $1 AND user_id = $2`, [caso, Number(session.user.soporte?.usuarioId ?? session.user.verComo?.id ?? session.user.id)]   // 27-11: en «Ver como», los de la persona vista)
+    // 27-11: en «Ver como», los de la persona vista.
+    const quien = Number(session.user.soporte?.usuarioId ?? session.user.verComo?.id ?? session.user.id)
+    const { rowCount } = await dbGlobal().query(`SELECT 1 FROM soporte_casos WHERE id = $1 AND user_id = $2`, [caso, quien])
     if (!rowCount) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
   }
   const datos = await leerAdjunto(caso, archivo)
