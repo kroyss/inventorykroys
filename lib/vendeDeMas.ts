@@ -20,7 +20,8 @@ const TOPE_RELEER = 200
 
 const nivelVende = (f: FilaStockML): NivelVende | null => f.vende
 
-export interface ProductoVende { id: number; code: string; name: string; disponible: number; ofrece: number; cuentas: string[] }
+// 27-11: stock y comprometidas para explicar el 0 en el aviso (opcionales: estados guardados antes no los traen).
+export interface ProductoVende { id: number; code: string; name: string; disponible: number; ofrece: number; cuentas: string[]; stock?: number; comprometidas?: number }
 export interface EstadoVende {
   at: string
   sin: number
@@ -84,7 +85,7 @@ export async function guardarEstadoVende(db: Pick<Pool, 'query'>, filas: FilaSto
     sin++
     desde[f.product_id] = antes?.desde?.[f.product_id] ?? ahora
     if (lista.length < 50) lista.push({
-      id: f.product_id, code: f.code, name: f.name, disponible: f.disponible, ofrece: f.ofrece,
+      id: f.product_id, code: f.code, name: f.name, disponible: f.disponible, ofrece: f.ofrece, stock: f.stock, comprometidas: f.comprometidas,
       cuentas: [...new Set(f.pubs.filter(p => p.estado === 'active' && (p.ml_disponible ?? 0) > 0).map(p => p.cuenta))],
     })
   }
