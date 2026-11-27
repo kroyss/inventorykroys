@@ -395,7 +395,8 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
     la siguiente queda para una persona.
   - **Frase de escape (solo Mensajes):** si la IA no manda la respuesta sola, puede mandar una frase corta
     («¡Recibido! En un momento te confirmamos») para que el comprador no quede sin contestar. La conversación sigue
-    en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas.
+    en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas. También sale en los
+    **reclamos** (garantía, devolución, llegó mal): el comprador recibe el acuse al momento y la nota RECLAMO queda en la venta.
   - **Frase de escape en Preguntas:** viene **escrita de fábrica** («¡Hola! Lo verificamos y te confirmamos en breve
     por aquí.»); la cambias si quieres (o «Volver a la de fábrica»). En **Modo Total** se usa **siempre**: la posventa
     (cancelar, devolver, reclamo: la IA no las responde), lo que llega fuera de horario o si la IA no logró escribir
