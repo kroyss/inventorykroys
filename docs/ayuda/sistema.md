@@ -349,6 +349,11 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
     comprador. Acierta cerca del 94 % con Mi IA completo. En Modo Total no valen **«Siempre una persona»** ni la
     opción **«Dejarla para una persona»** de «Si no sabe algo» (si era la única opción, recomienda verificarlo con un
     técnico).
+    La **posventa nunca la escribe la IA**, ni en Modo Total: en Preguntas (cancelar, devolver, reclamo) contesta con
+    la frase de escape; en **Mensajes** (garantías, reclamos, devoluciones o pedidos distintos a lo publicado) manda
+    **siempre** la frase de escape de Mensajes y deja la conversación en «Por atender». Ahí se recomienda poner un
+    **contacto directo** (WhatsApp o teléfono) para que el comprador escriba y el vendedor lo resuelva; si está vacía,
+    sale la de fábrica («¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.»).
   - **En los dos modos cada pregunta o mensaje usa 1 crédito**, salga sola o quede escrita para revisar (la IA hace el
     mismo trabajo para decidir; en Modo Seguro te deja la respuesta lista).
 - **¿Quién respondió?** En Preguntas (Respondidas) y en las conversaciones de Mensajes, lo que salió solo dice
@@ -390,16 +395,18 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   que diga que no hay, que recomiende otra publicación o con datos que no están en la publicación o tus políticas. El
   resto te queda con la respuesta ya escrita para revisar y enviar.
 - Cada pregunta que la IA procesa usa 1 crédito. La pausa de respuestas automáticas también la detiene.
-- **Frenos de la IA automática** (en la misma pantalla y en Mi IA; valen también para Mensajes):
+- **Frenos de la IA automática.** En Mi IA cada tarjeta (Preguntas / Mensajes) trae **su propia frase de escape**
+  debajo del modo, y abajo queda un recuadro **«Frenos para Preguntas y Mensajes»** con lo que vale para los dos
+  (horario y máximo por comprador); solo se ve con la IA automática encendida en alguno:
   - **Horario:** días y horas en que la IA responde sola (ej. de 19:00 a 08:00). Fuera de ese horario deja la
     respuesta escrita para una persona. Sin horario responde a cualquier hora.
   - **Máximo por comprador:** cuántas respuestas automáticas recibe un mismo comprador en 24 horas (de fábrica 3);
     la siguiente queda para una persona.
-  - **Frase de escape (solo Mensajes):** si la IA no manda la respuesta sola, puede mandar una frase corta
+  - **Frase de escape de Mensajes** (en la tarjeta de Mensajes; puede llevar teléfono o web): si la IA no manda la respuesta sola, puede mandar una frase corta
     («¡Recibido! En un momento te confirmamos») para que el comprador no quede sin contestar. La conversación sigue
     en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas. También sale en los
     **reclamos** (garantía, devolución, llegó mal): el comprador recibe el acuse al momento y la nota RECLAMO queda en la venta.
-  - **Frase de escape en Preguntas:** viene **escrita de fábrica** («¡Hola! Lo verificamos y te confirmamos en breve
+  - **Frase de escape de Preguntas** (en la tarjeta de Preguntas; **sin teléfonos ni links**, MercadoLibre no los deja: la pantalla avisa si pones uno): viene **escrita de fábrica** («¡Hola! Lo verificamos y te confirmamos en breve
     por aquí.»); la cambias si quieres (o «Volver a la de fábrica»). En **Modo Total** se usa **siempre**: la posventa
     (cancelar, devolver, reclamo: la IA no las responde), lo que llega fuera de horario o si la IA no logró escribir
     nada se contestan con la frase, así **todo tiene respuesta**. En **Modo Seguro** solo si marcas «Usarla también en

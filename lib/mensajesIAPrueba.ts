@@ -15,7 +15,7 @@ import { costoDe, cupoIA, registrarUso, iaConfigurada } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
 import { responderHilo, marcarPendienteIA } from '@/lib/mensajesML'
-import { leerFrenos, motivosFrenos } from '@/lib/iaFrenos'
+import { leerFrenos, motivosFrenos, fraseEscapeMensajes } from '@/lib/iaFrenos'
 import { borrarNota, copiarNotas, crearNota, editarNota, leerNotas, unirNotas, LARGO_NOTA } from '@/lib/notasML'
 
 // AUTOMÁTICO (07-11, mig 149, pedido del dueño: las de confianza alta venían bien): con 'mensajes_ia_auto' = {"modo":"real"}
@@ -236,7 +236,9 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
         topeOHorario = await motivosFrenos(db, frenos, country, 'mensajes', cv?.comprador_id ?? null)
         motivos.push(...topeOHorario)
       }
-      const sinSeguro = todo && !!b.respuesta && motivos.length > 0 && !topeOHorario.length
+      // 27-11 (el dueño): en Modo Total la posventa (reclamo, garantía, devolución, pedido distinto a lo publicado) NO la
+      // escribe la IA: queda para una persona y sale la frase de escape (con el contacto directo del vendedor).
+      const sinSeguro = todo && !!b.respuesta && motivos.length > 0 && !topeOHorario.length && !esPosventa(b, motivos)
       const decision = !b.respuesta && b.confianza === 'alta' && !motivos.length ? 'nada' : motivos.length && !sinSeguro ? 'revisar' : 'sola'
       await registrarUso(db, cliente ? 'mensajes' : 'simulacion', [{ modelo: b.modelo, uso: b.uso }], null)
       await db.query(
@@ -278,14 +280,15 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
       // 27-11 (el dueño): también en reclamos (antes no, b347f70): acusa al instante y el equipo lo resuelve.
       // Sin marcarla como leída: sigue en «Por atender» y el equipo encuentra el borrador de la IA escrito.
       const porTope = topeOHorario.some(t => t.startsWith('Este comprador'))
-      if (real && frenos?.escape && decision === 'revisar' && !porTope && !b.pedido_especial) {
+      const escapeTxt = fraseEscapeMensajes(frenos, todo)
+      if (real && escapeTxt && decision === 'revisar' && !porTope && (todo || !b.pedido_especial)) {
         const { rows: [c] } = await db.query(
           `SELECT ultimo_de_comprador AND ultimo_at <= $2::timestamptz AS espera,
                   EXISTS (SELECT 1 FROM ml_mensajes_ia WHERE pack_id = $1 AND escape_at > NOW() - INTERVAL '24 hours') AS ya
            FROM ml_conversaciones WHERE pack_id = $1`, [r.pack_id, r.mensaje_at])
         if (c?.espera && !c.ya) {
           try {
-            await responderHilo(db, r.conexion_id, r.pack_id, frenos.escape, true)
+            await responderHilo(db, r.conexion_id, r.pack_id, escapeTxt, true)
             await db.query(`UPDATE ml_mensajes_ia SET escape_at = NOW() WHERE id = $1`, [r.id])
             escapes++
           } catch (e) {
@@ -386,6 +389,10 @@ const LLEGADA = /(tarda|tardan|demora|demoran|llega|llegan|llegar[ií]a|recibe|r
 const LLEGADA_DIAS = /\b\d+\s*(a|-|y)?\s*\d*\s*d[ií]as/i
 // 21-11: en postventa, el precio de OTRO producto abre un pedido nuevo: lo ve una persona (no se corrige).
 export const PRECIO_OTRO = 'Precio de otro producto: lo ve una persona'
+/** Posventa que en Modo Total tampoco escribe la IA (27-11): reclamo, garantía, devolución o pedido distinto a lo publicado. */
+function esPosventa(b: { reclamo?: string | null; pedido_especial?: string | null }, motivos: string[]) {
+  return !!b.reclamo || !!b.pedido_especial || motivos.includes(PRECIO_OTRO) || motivos.some(m => m.startsWith('Reclamo'))
+}
 const PIDE_PRECIO = /precio|costo|cu[aá]nto (cuesta|sale|es|vale|cobra)/i
 const MONTO_USD = /(\d[\d.,]*)\s*(usd|\$|d[oó]lares)|\$\s*(\d[\d.,]*)/gi
 const CORTESIA = /^(hola|buenas|buenos d[ií]as|buenas (tardes|noches)|ok|okey|oki|okay|listo|perfecto|gracias|muchas gracias|excelente|de acuerdo|vale|dale|bendiciones|am[eé]n|dios (le|te) bendiga|saludos|feliz d[ií]a|amigo|hermano|\s|[.,!¡]|[^\p{L}\p{N}])+$/iu
@@ -469,7 +476,9 @@ async function procesarV2(db: Pool, r: FilaMensaje, country: string, conInventar
     topeOHorario = await motivosFrenos(db, frenos, country, 'mensajes', cv?.comprador_id ?? null)
     motivos.push(...topeOHorario)
   }
-  const sinSeguro = todo && !!b.respuesta && motivos.length > 0 && !topeOHorario.length
+  // 27-11 (el dueño): en Modo Total la posventa (reclamo, garantía, devolución, pedido distinto a lo publicado) NO la
+  // escribe la IA: queda para una persona y sale la frase de escape (con el contacto directo del vendedor).
+  const sinSeguro = todo && !!b.respuesta && motivos.length > 0 && !topeOHorario.length && !esPosventa(b, motivos)
   const decision = !b.respuesta && b.confianza === 'alta' && !motivos.length ? 'nada' : motivos.length && !sinSeguro ? 'revisar' : 'sola'
   const costo = e.llamadas.reduce((s, l) => s + costoDe(l.modelo, l.uso), 0)
   await db.query(
@@ -517,14 +526,15 @@ async function procesarV2(db: Pool, r: FilaMensaje, country: string, conInventar
   }
   // Frase de escape: igual que antes, y tampoco en el precio de otro producto (es un pedido).
   const porTope = topeOHorario.some(t => t.startsWith('Este comprador'))
-  if (real && frenos?.escape && decision === 'revisar' && !porTope && !b.pedido_especial && !motivos.includes(PRECIO_OTRO)) {
+  const escapeTxt = fraseEscapeMensajes(frenos, todo)
+  if (real && escapeTxt && decision === 'revisar' && !porTope && (todo || (!b.pedido_especial && !motivos.includes(PRECIO_OTRO)))) {
     const { rows: [c] } = await db.query(
       `SELECT ultimo_de_comprador AND ultimo_at <= $2::timestamptz AS espera,
               EXISTS (SELECT 1 FROM ml_mensajes_ia WHERE pack_id = $1 AND escape_at > NOW() - INTERVAL '24 hours') AS ya
        FROM ml_conversaciones WHERE pack_id = $1`, [r.pack_id, r.mensaje_at])
     if (c?.espera && !c.ya) {
       try {
-        await responderHilo(db, r.conexion_id, r.pack_id, frenos.escape, true)
+        await responderHilo(db, r.conexion_id, r.pack_id, escapeTxt, true)
         await db.query(`UPDATE ml_mensajes_ia SET escape_at = NOW() WHERE id = $1`, [r.id])
         escape = 1
       } catch (err) {

@@ -7,6 +7,8 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 // y «Dejarla para una persona»); solo se respetan el horario y el máximo por comprador. En la base sigue siendo `todo`.
 export const AVISO_TODO = 'La IA acierta cerca del 94 % de las preguntas cuando tu Mi IA está completo.'
 export const MODO_TOTAL_DETALLE = 'En Modo Total la IA responde también lo que en Modo Seguro dejaría para revisar. Solo respeta tu horario y el máximo por comprador.'
+// 27-11 (el dueño): en Mensajes la posventa no la escribe la IA ni en Modo Total: sale la frase de escape con tu contacto.
+const AVISO_TOTAL_MENSAJES = 'La IA responde sola casi todo. En garantías, reclamos, devoluciones o pedidos distintos a lo publicado no responde ella: manda siempre tu frase de escape y te deja la conversación en «Por atender». Pon en esa frase un contacto directo (WhatsApp o teléfono) para que el comprador te escriba.\n\nOjo: en Modo Total salen solos también pagos, datos y dudas que en Modo Seguro revisaría una persona.'
 export const nombreModo = (todo: boolean) => todo ? 'Modo Total' : 'Modo Seguro'
 
 export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'mensajes'; todo: boolean; onCambio: () => void }) {
@@ -17,7 +19,7 @@ export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'm
     if (v === todo) return
     if (v && !(await confirm({
       title: `Modo Total en ${tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'}`,
-      message: `${AVISO_TODO}\n\n${MODO_TOTAL_DETALLE}`,
+      message: tipo === 'preguntas' ? `${AVISO_TODO}\n\n${MODO_TOTAL_DETALLE}` : AVISO_TOTAL_MENSAJES,
       confirmText: 'Entiendo, usar Modo Total',
     }))) return
     setGuardando(true); setError(null)
@@ -43,7 +45,7 @@ export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'm
         {op(true, 'Modo Total', tipo === 'preguntas'
           // 12-11 (el dueño): todo tiene respuesta; la posventa sale con la frase de escape (Frenos) y la sigues tú.
           ? `Responde todo sola. Lo de posventa (cancelar, devolver, reclamo) lo contesta con tu frase de escape para que tú sigas el caso. Respeta tu horario y el máximo por comprador. ${AVISO_TODO}`
-          : `Responde todo sola, sin dejarte nada para revisar. Solo respeta tu horario y el máximo por comprador. ${AVISO_TODO}`)}
+          : 'Responde todo sola. En garantías, reclamos, devoluciones o pedidos distintos a lo publicado manda siempre tu frase de escape (recomendado: tu contacto directo) y te lo deja en «Por atender». Respeta tu horario y el máximo por comprador.')}
       </div>
       {error && <p className="text-xs text-red-700">{error}</p>}
     </div>
