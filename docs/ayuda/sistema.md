@@ -1621,7 +1621,8 @@ celular), siempre a la vista para todos. Abre en **Soporte** (y al lado, **Pregu
   **«¿Dudas? Escríbenos aquí»**, que abre este mismo Soporte con el mensaje listo para escribir, y los logos de
   **Telegram** e **Instagram** (@comerciantedigital.ve) por si prefieres escribirnos por ahí. El aviso de que **tu
   plan está por vencer** trae lo mismo («¿Dudas? Escríbenos aquí · Telegram · Instagram»).
-  Puedes seguir escribiendo en el mismo caso; cuando se arregle, toca **Ya se resolvió**.
+  Puedes seguir escribiendo en el mismo caso (la caja para responder queda fija abajo, también en el celular);
+  cuando se arregle, toca **✓ Ya se resolvió** (arriba del caso, al lado de «← Mis casos»).
 - **Casos abiertos siempre a la vista:** mientras tengas un caso sin resolver, abajo a la derecha sale una cajita con su
   estado («Caso #12 · esperando respuesta», «● Soporte te respondió»). Tocándola se abre el caso, listo para responder,
   adjuntar o darlo por resuelto. La **✕** la oculta (el punto del botón de arriba sigue): si ya te respondimos te pregunta **«¿Quedó resuelto?»** (**Sí, cerrar el ticket** o **No,

@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { leerVolverTicket } from './TicketsClientes'
 
 /** Franja de "Ver como este usuario" (lib/auth.ts): arriba de todo, mientras el admin mira el sistema
  *  como otra persona. Solo lectura (proxy.ts). "Volver a mi cuenta" lo deja de nuevo en Usuarios.
@@ -11,7 +12,9 @@ export default function VerComoBarra({ nombre, empresa }: { nombre: string; empr
   const volver = async () => {
     setVolviendo(true)
     await update(empresa ? { soporte: null } : { verComo: null })
-    window.location.assign(empresa ? '/plataforma' : '/usuarios')
+    // 27-11: si entró desde un ticket (botón de Ayuda), vuelve a donde estaba y BurbujaAyuda reabre el ticket.
+    const t = empresa ? leerVolverTicket() : null
+    window.location.assign(t ? t.ruta : empresa ? '/plataforma' : '/usuarios')
   }
   return (
     <div className="bg-neutral-900 text-white">
