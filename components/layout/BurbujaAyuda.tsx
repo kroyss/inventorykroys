@@ -67,14 +67,6 @@ export default function BurbujaAyuda() {
   const [ticketCli, setTicketCli] = useState<number | null>(null)   // dueño: el ticket de cliente a abrir
   const duenoRef = useRef<typeof dueno>(null)
   useEffect(() => { duenoRef.current = dueno }, [dueno])
-  // Vuelta de «Ver como» desde un ticket: reabre ese ticket aquí (TicketsClientes guardó a dónde volver).
-  useEffect(() => {
-    if (!dueno) return
-    const t = leerVolverTicket()
-    if (!t) return
-    borrarVolverTicket()
-    setTicketCli(t.id); setCasoAbierto(null); setEscribiendo(false); setPestana('soporte'); setAbierta(true)
-  }, [dueno])
   useEffect(() => { setOculto(leerOculto()) }, [])
   const confirm = useConfirm()
   const [casoAbierto, setCasoAbierto] = useState<number | null>(null)
@@ -83,6 +75,14 @@ export default function BurbujaAyuda() {
   const [archivos, setArchivos] = useState<File[]>([])
   const [enviando, setEnviando] = useState(false)
   const [videos, setVideos] = useState<Video[]>([])
+  // Vuelta de «Ver como» desde un ticket: reabre ese ticket aquí (TicketsClientes guardó a dónde volver).
+  useEffect(() => {
+    if (!dueno) return
+    const t = leerVolverTicket()
+    if (!t) return
+    borrarVolverTicket()
+    setTicketCli(t.id); setCasoAbierto(null); setEscribiendo(false); setPestana('soporte'); setAbierta(true)
+  }, [dueno])
   // El botón de arriba (AyudaNav) abre y cierra el panel; abre en Soporte.
   useEffect(() => {
     // 27-11: con UN caso abierto entra directo a ese caso (para responder, adjuntar o darlo por resuelto).
