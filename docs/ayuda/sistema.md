@@ -342,7 +342,8 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   mensaje usa 1 crédito. Lo que la IA no manda sola queda en **«Por atender»** con su respuesta escrita para tu equipo.
 - **Modo Seguro o Modo Total** (se elige aparte en Preguntas y en Mensajes, una vez encendida):
   - **Modo Seguro** (de fábrica): responde sola solo cuando está segura. Lo dudoso (reclamos, pagos, «no hay», temas
-    de «Siempre una persona») te lo deja escrito para que lo revises y lo mandes tú.
+    de «Siempre una persona») te lo deja escrito para que lo revises y lo mandes tú. Lo que manda sola acierta cerca
+    del **94 %** en Preguntas y del **97 %** en Mensajes (según las marcas Bien/Mal; se ve en la descripción del modo).
     Si la respuesta quedó frenada solo por cómo estaba escrita (decía algo que no está en tus datos, hablaba como
     alguien de afuera, prometía confirmar después o salió vacía), la IA **la corrige sola** y la vuelve a revisar
     entera; si pasa, sale. Cancelaciones, devoluciones y reclamos los contesta siempre una persona. No gasta créditos
