@@ -292,7 +292,10 @@ export default function BurbujaAyuda() {
 
   // El punto del botón de arriba: rojo = respuesta nueva o (dueño) tickets sin responder; verde = mi caso esperando.
   const pagoListo = verPago && pago?.estado !== 'revision'
-  const punto = nuevos > 0 || (!abiertos.length && pendDueno > 0) || pagoListo ? 'rojo' : abiertos.length || verPago ? 'verde' : null
+  // 27-11 (el dueño): el punto es para lo que espera algo de la persona. Pago aprobado = buena noticia, sin punto
+  // (solo la cajita); rechazado = rojo (tiene que volver a reportar); en revisión = verde (esperando).
+  const punto = nuevos > 0 || (!abiertos.length && pendDueno > 0) || (verPago && pago?.estado === 'rechazado') ? 'rojo'
+    : abiertos.length || (verPago && pago?.estado === 'revision') ? 'verde' : null
   useEffect(() => { avisarAyuda(punto, abierta) }, [punto, abierta])
 
   return (

@@ -25,12 +25,12 @@ export async function GET() {
            FROM soporte_casos WHERE estado = 'abierto'`)).rows[0]
       : null
     // 27-11 (el dueño): el pago reportado se sigue desde la cajita de abajo («en revisión» → «aprobado» / «no aprobado»),
-    // solo para los administradores de la cuenta. Aprobado o rechazado se muestra hasta 7 días; el detalle sigue en Mi plan.
+    // solo para los administradores de la cuenta. Aprobado se muestra 3 días y rechazado 7; el detalle sigue en Mi plan.
     const pago = !dueno && session.user.role === 'admin' && session.user.organizacionId
       ? (await dbGlobal().query(
           `SELECT k.id, k.estado, k.motivo, COALESCE(k.detalle->>'hasta', to_char(p.hasta, 'YYYY-MM-DD')) AS hasta
            FROM organizacion_cobros k LEFT JOIN organizacion_pagos p ON p.id = k.pago_id
-           WHERE k.organizacion_id = $1 AND (k.estado = 'revision' OR k.revisado_at > NOW() - INTERVAL '7 days')
+           WHERE k.organizacion_id = $1 AND (k.estado = 'revision' OR (k.estado = 'aprobado' AND k.revisado_at > NOW() - INTERVAL '3 days') OR (k.estado = 'rechazado' AND k.revisado_at > NOW() - INTERVAL '7 days'))
            ORDER BY k.creado_at DESC LIMIT 1`, [session.user.organizacionId])).rows[0] ?? null
       : null
     const { rows: casos } = await dbGlobal().query(
