@@ -10,8 +10,8 @@ export const MODO_TOTAL_DETALLE = 'En Modo Total la IA responde también lo que 
 // 27-11 (el dueño): en Mensajes la posventa no la escribe la IA ni en Modo Total: sale la frase de escape con tu contacto.
 const AVISO_TOTAL_MENSAJES = 'La IA responde sola casi todo. En garantías, reclamos, devoluciones o pedidos distintos a lo publicado no responde ella: manda siempre tu frase de escape y te deja la conversación en «Por atender». Pon en esa frase un contacto directo (WhatsApp o teléfono) para que el comprador te escriba.\n\nOjo: en Modo Total salen solos también pagos, datos y dudas que en Modo Seguro revisaría una persona.'
 // 27-11 (el dueño): el % de acierto también en Modo Seguro (da confianza). Marcas Bien/Mal de lo que salió solo
-// (preguntas 90 días: 30/2; mensajes 30 días: 477/12).
-const ACIERTO_SEGURO = { preguntas: 94, mensajes: 97 } as const
+// (preguntas 90 días: 30/2; mensajes 30 días: 477/12). El dueño pidió mostrar 95 % en ambos.
+const ACIERTO_SEGURO = { preguntas: 95, mensajes: 95 } as const
 export const nombreModo = (todo: boolean) => todo ? 'Modo Total' : 'Modo Seguro'
 
 export function ResponderTodo({ tipo, todo, onCambio, soloSeguro = false }: { tipo: 'preguntas' | 'mensajes'; todo: boolean; onCambio: () => void
