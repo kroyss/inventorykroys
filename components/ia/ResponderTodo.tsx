@@ -11,7 +11,9 @@ export const MODO_TOTAL_DETALLE = 'En Modo Total la IA responde también lo que 
 const AVISO_TOTAL_MENSAJES = 'La IA responde sola casi todo. En garantías, reclamos, devoluciones o pedidos distintos a lo publicado no responde ella: manda siempre tu frase de escape y te deja la conversación en «Por atender». Pon en esa frase un contacto directo (WhatsApp o teléfono) para que el comprador te escriba.\n\nOjo: en Modo Total salen solos también pagos, datos y dudas que en Modo Seguro revisaría una persona.'
 export const nombreModo = (todo: boolean) => todo ? 'Modo Total' : 'Modo Seguro'
 
-export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'mensajes'; todo: boolean; onCambio: () => void }) {
+export function ResponderTodo({ tipo, todo, onCambio, soloSeguro = false }: { tipo: 'preguntas' | 'mensajes'; todo: boolean; onCambio: () => void
+  /** 27-11 (el dueño): Mensajes para clientes, solo Modo Seguro por ahora. */
+  soloSeguro?: boolean }) {
   const confirm = useConfirm()
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +39,13 @@ export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'm
         <span className={`w-3.5 h-3.5 rounded-full border ${todo === v ? 'border-neutral-900 bg-neutral-900 ring-2 ring-white ring-inset' : 'border-neutral-300'}`} />{t}</span>
       <span className="block mt-0.5 text-xs text-neutral-600">{d}</span>
     </button>
+  )
+  if (soloSeguro) return (
+    <div className="rounded-lg border border-neutral-900 ring-1 ring-neutral-900 bg-white px-3 py-2">
+      <span className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
+        <span className="w-3.5 h-3.5 rounded-full border border-neutral-900 bg-neutral-900 ring-2 ring-white ring-inset" />Modo Seguro</span>
+      <span className="block mt-0.5 text-xs text-neutral-600">Responde sola solo cuando está segura. Lo dudoso (reclamos, pagos, «no hay», temas de «Siempre una persona») te lo deja escrito en «Por atender» para que lo revises y lo mandes tú.</span>
+    </div>
   )
   return (
     <div className="space-y-1">

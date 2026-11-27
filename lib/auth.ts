@@ -11,7 +11,8 @@ import { soloRadar } from '@/lib/modulos'
 
 // 12-11 (el dueño): Mi IA y la automática de Preguntas, abiertas a todos; Mensajes automáticos solo la plataforma
 // (los clientes lo ven «Próximamente» en Mi IA) mientras se afina.
-const IA_EN_PAUSA = ['mensajes_ia']
+// 27-11 (el dueño): Mensajes automáticos abierto a todos (solo Modo Seguro para clientes; ver /api/mensajes/ia-prueba).
+const IA_EN_PAUSA: string[] = []
 
 // Multiempresa: el usuario es uno solo (users es global) y entra a una de SUS empresas
 // (usuario_empresas). La sesión guarda esa empresa; su país y su rol salen de ahí.

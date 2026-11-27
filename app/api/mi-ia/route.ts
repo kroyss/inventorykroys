@@ -37,8 +37,9 @@ export async function GET() {
       msgTodo: tieneModulo(s.session.user, 'mensajes_ia') ? await autoTodo(s.db) : false,
       // 09-11: Mensajes automáticos (módulo mensajes_ia): encendido sí/no; null = no lo tiene.
       msgAuto: tieneModulo(s.session.user, 'mensajes_ia') ? await mensajesAuto(s.db) : null,
-      // 12-11: Mensajes automáticos todavía solo para la plataforma: el resto lo ve «Próximamente».
-      msgPronto: s.session.user.organizacionId !== ORGANIZACION_PLATAFORMA,
+      // 12-11: «Próximamente» para clientes. 27-11 (el dueño): abierto a todos; Modo Total en Mensajes solo la plataforma.
+      msgPronto: false,
+      msgSoloSeguro: s.session.user.organizacionId !== ORGANIZACION_PLATAFORMA,
       // 09-11: pruebas gratis que le quedan hoy (null = sin tope).
       pruebas: await pruebasQuedan(s.db, s.session.user),
     })

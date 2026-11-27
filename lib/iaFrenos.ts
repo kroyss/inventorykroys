@@ -29,11 +29,12 @@ export interface FrenosIA { horario: HorarioIA | null; tope: number; escape: str
 /** El texto que se publica en Preguntas: el propio o el de fábrica. */
 export const fraseEscapePreguntas = (f: Pick<FrenosIA, 'escapePreguntas'>) => f.escapePreguntas ?? ESCAPE_PREGUNTAS_FABRICA
 
-// 27-11 (el dueño): la frase de Mensajes, en los dos modos: la escrita o, vacía, la de fábrica (se ve de fondo en el
-// campo; el vendedor decide la redacción final). En Mensajes el «por aquí» sí se cumple: el chat sigue.
+// 27-11 (el dueño): la frase de Mensajes, SOLO en Modo Total (como Preguntas): la escrita o, vacía, la de fábrica (se ve
+// de fondo en el campo; el vendedor decide la redacción final). En Modo Seguro no se manda: lo que la IA no responde ya
+// queda en «Por atender» para el equipo, y un acuse automático antes de la respuesta real no suma.
 export const ESCAPE_MENSAJES_FABRICA = '¡Hola! Gracias por escribirnos. Para más información, cambios en tu pedido o compras al mayor, en breve te atendemos personalmente por aquí.'
 const ESCAPE_MENSAJES_VIEJA = '¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.'
-export const fraseEscapeMensajes = (f: Pick<FrenosIA, 'escape'> | null, _total?: boolean) => f ? f.escape ?? ESCAPE_MENSAJES_FABRICA : null
+export const fraseEscapeMensajes = (f: Pick<FrenosIA, 'escape'> | null, total: boolean) => f && total ? f.escape ?? ESCAPE_MENSAJES_FABRICA : null
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 

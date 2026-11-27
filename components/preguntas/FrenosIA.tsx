@@ -42,12 +42,13 @@ export function EscapePreguntas({ fr, total }: { fr: FrenosEstado; total: boolea
   const f = fr.f
   if (!f) return null
   const texto = f.escapePreguntas ?? ''
+  if (!total) return <NotaSoloTotal />
   return (
     <div className="space-y-1.5 border-t border-neutral-100 pt-3">
-      <p className="text-sm font-medium text-neutral-800">Frase de escape {!total && <span className="font-normal text-neutral-400">(solo Modo Total)</span>}</p>
+      <p className="text-sm font-medium text-neutral-800">Frase de escape</p>
       <p className="text-xs text-neutral-500">{total
         ? <>La IA contesta con esta frase lo que no puede responder (posventa, fuera de tu horario o si no logró escribir nada), para que ninguna pregunta quede sin respuesta.</>
-        : <>En Modo Seguro no se usa: lo que la IA no sabe queda para que lo respondas tú.</>}
+        : null}
         {' '}MercadoLibre acepta <b>una sola respuesta</b> por pregunta y <b>no deja teléfonos ni links</b>. Si lo dejas vacío se usa el texto de ejemplo.</p>
       <textarea rows={3} maxLength={350} value={texto} placeholder={ESCAPE_FABRICA} onChange={e => fr.setF({ ...f, escapePreguntas: e.target.value })}
         onBlur={() => { const t = (f.escapePreguntas ?? '').trim(); fr.guardar({ ...f, escapePreguntas: !t || t === ESCAPE_FABRICA ? null : t }) }}
@@ -60,21 +61,32 @@ export function EscapePreguntas({ fr, total }: { fr: FrenosEstado; total: boolea
 
 /** Frase de escape de Mensajes: va dentro de la tarjeta de Mensajes. Aquí sí puede llevar teléfono o web.
  *  27-11 (el dueño): en los dos modos; el texto de fábrica se ve de fondo en el campo: vacío = ese. */
-export function EscapeMensajes({ fr, total }: { fr: FrenosEstado; total: boolean }) {
+export function EscapeMensajes({ fr, total, soloSeguro = false }: { fr: FrenosEstado; total: boolean; soloSeguro?: boolean }) {
   const f = fr.f
   if (!f) return null
+  if (!total) return soloSeguro ? null : <NotaSoloTotal />
   return (
     <div className="space-y-1.5 border-t border-neutral-100 pt-3">
       <p className="text-sm font-medium text-neutral-800">Frase de escape</p>
       <p className="text-xs text-neutral-500">{total
         ? <>En <b>garantías, reclamos, devoluciones o pedidos distintos a lo publicado</b> la IA no responde: manda esta frase y te deja la conversación en «Por atender».</>
-        : <>Cuando la IA deja un mensaje para tu equipo (reclamos, pagos, dudas), manda al momento esta frase para que el comprador no quede sin contestar. La conversación sigue en «Por atender».</>}
+        : null}
         {' '}Puedes agregar tu <b>WhatsApp o teléfono</b>. Si lo dejas vacío se usa el texto de ejemplo. Una vez por conversación cada 24 h.</p>
       <textarea rows={3} maxLength={200} value={f.escape ?? ''} placeholder={ESCAPE_MENSAJES_FABRICA} onChange={e => fr.setF({ ...f, escape: e.target.value })}
         onBlur={() => { const t = (f.escape ?? '').trim(); fr.guardar({ ...f, escape: !t || t === ESCAPE_MENSAJES_FABRICA ? null : t }) }}
         aria-label="Frase de escape en Mensajes" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm placeholder:text-neutral-400" />
       <Estado fr={fr} />
     </div>
+  )
+}
+
+/** 27-11 (el dueño): la frase de escape es solo del Modo Total; en Seguro todo lo que la IA no responde lo atiende el equipo. */
+function NotaSoloTotal() {
+  return (
+    <p className="border-t border-neutral-100 pt-3 text-xs text-neutral-500">
+      <b className="font-medium text-neutral-700">Frase de escape:</b> se usa solo en Modo Total. En Modo Seguro lo que la IA no
+      responde queda en «Por atender» para tu equipo.
+    </p>
   )
 }
 
