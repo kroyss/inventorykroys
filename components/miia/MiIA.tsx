@@ -4,7 +4,7 @@ import { usePrimera } from '@/lib/primera'
 import type { MiIA as Config, Agencia, MotivoCambio } from '@/lib/miIA'
 import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA, temasFaltanMensajes } from '@/lib/miIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { FrenosIA } from '@/components/preguntas/FrenosIA'
+import { useFrenos, FrenosCompartidos, EscapePreguntas, EscapeMensajes, type FrenosEstado } from '@/components/preguntas/FrenosIA'
 import { ResponderTodo } from '@/components/ia/ResponderTodo'
 import { useVistoNuevo } from '@/components/ui/Nuevo'
 
@@ -489,8 +489,8 @@ type PruebaG = { id: string | null; creado_at: string; casos: Caso[]; marcas: Re
 const aCaso = (x: Caso & { pregunta?: string; mensaje?: string }): Caso => ({ ...x, texto: x.texto ?? x.pregunta ?? x.mensaje ?? '' })
 const fechaPrueba = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
-function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan, nuevos = [] }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
-  quedan: number | null; faltan: string[]; nuevos?: { tema: string; ir: string }[] }) {
+function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan, nuevos = [], fr }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
+  quedan: number | null; faltan: string[]; nuevos?: { tema: string; ir: string }[]; fr: FrenosEstado }) {
   const [usadas, setUsadas] = useState(0)
   const quedan = quedanAl === null ? null : Math.max(0, quedanAl - usadas)
   const confirm = useConfirm()
@@ -532,6 +532,8 @@ function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedan
 
       {encendida && <div className="space-y-2">
         <ResponderTodo tipo={tipo} todo={todo} onCambio={onCambio} />
+        {/* 27-11: la frase de escape de cada módulo vive en su tarjeta (en Preguntas sin teléfonos ni links). */}
+        {tipo === 'preguntas' ? <EscapePreguntas fr={fr} total={todo} /> : <EscapeMensajes fr={fr} total={todo} />}
         <button type="button" onClick={() => cambiar(false)} disabled={cambiando} className="text-xs text-neutral-500 hover:text-red-700 disabled:opacity-50">
           {cambiando ? 'Apagando…' : `Apagar respuestas automáticas en ${tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'}`}</button>
       </div>}
@@ -806,6 +808,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
 // ── componente ───────────────────────────────────────────────────────────────
 export default function MiIA({ inicial = null, frenosInicial = null }: { inicial?: unknown; frenosInicial?: unknown }) {
   useVistoNuevo('mi_ia')   // al entrar se quita la marca «Nuevo» de los menús
+  const fr = useFrenos(frenosInicial)   // 27-11: un solo estado de frenos para las dos tarjetas y los compartidos
   const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; msgPronto?: boolean; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number; sugerir?: number; politicas?: number } | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
   const [sug, setSug] = useState<Sugerencia | null>(null)
@@ -1134,7 +1137,7 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
       {verTexto && datos.texto && <pre className="whitespace-pre-wrap rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-700">{datos.texto.mensajes}</pre>}
       <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0 items-start">
       <Prueba tipo="preguntas" encendida={datos.iaAuto === null ? null : datos.iaAuto === 'real'} todo={!!datos.iaTodo} onCambio={cargar} abrir={abrirTema}
-        quedan={datos.pruebas ? datos.pruebas.preguntas : null} faltan={faltan.map(i => PASOS[i].tema)} />
+        quedan={datos.pruebas ? datos.pruebas.preguntas : null} faltan={faltan.map(i => PASOS[i].tema)} fr={fr} />
       {datos.msgPronto ? (
         <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 p-4 space-y-2" aria-disabled="true">
           <div className="flex items-center justify-between gap-2">
@@ -1146,10 +1149,10 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
         </div>
       ) : (
       <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} todo={!!datos.msgTodo} onCambio={cargar} abrir={abrirTema}
-        quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={[...faltan.map(i => PASOS[i].tema), ...nuevosMsg.map(t => t.tema)]} nuevos={nuevosMsg} />
+        quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={[...faltan.map(i => PASOS[i].tema), ...nuevosMsg.map(t => t.tema)]} nuevos={nuevosMsg} fr={fr} />
       )}
       </div>
-      {(datos.iaAuto !== null || datos.msgAuto != null) && <FrenosIA inicial={frenosInicial} preguntas={datos.iaAuto !== null} mensajes={datos.msgAuto != null} />}
+      {(datos.iaAuto === 'real' || datos.msgAuto === true) && <FrenosCompartidos fr={fr} />}
     </div>
   )
 }

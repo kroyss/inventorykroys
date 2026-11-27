@@ -26,6 +26,11 @@ export interface FrenosIA { horario: HorarioIA | null; tope: number; escape: str
 /** El texto que se publica en Preguntas: el propio o el de fábrica. */
 export const fraseEscapePreguntas = (f: Pick<FrenosIA, 'escapePreguntas'>) => f.escapePreguntas ?? ESCAPE_PREGUNTAS_FABRICA
 
+// 27-11 (el dueño): la frase de Mensajes. Modo Seguro: solo si la escribió. Modo Total: siempre (si la borró, la de
+// fábrica), porque ahí la posventa no la responde la IA y el comprador no puede quedar sin contestar.
+export const ESCAPE_MENSAJES_FABRICA = '¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.'
+export const fraseEscapeMensajes = (f: Pick<FrenosIA, 'escape'> | null, total: boolean) => f?.escape ?? (f && total ? ESCAPE_MENSAJES_FABRICA : null)
+
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
 export function normalizarFrenos(v: unknown): FrenosIA {
@@ -49,7 +54,7 @@ export function normalizarFrenos(v: unknown): FrenosIA {
 // Si la empresa ya tiene sus frenos guardados no se tocan. Se editan en Mi IA → Frenos.
 export const FRENOS_FABRICA: FrenosIA = {
   horario: null, tope: TOPE_DEFAULT,
-  escape: '¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.', escapePreguntas: null, escapeSeguro: false,
+  escape: ESCAPE_MENSAJES_FABRICA, escapePreguntas: null, escapeSeguro: false,
 }
 export async function frenosDeFabrica(db: Pick<Pool, 'query'>) {
   await db.query(
