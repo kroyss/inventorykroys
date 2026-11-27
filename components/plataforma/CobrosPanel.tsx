@@ -54,8 +54,9 @@ const bs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigit
 // Clientes y desde el botón del aviso de Telegram. modo 'pendientes' = por revisar · 'pagados' = los ya revisados
 // (quién pagó, qué y hasta cuándo) · 'datos' = Pago Móvil y Binance que ve el cliente.
 // Vencen y Pagando como listas aparte se quitaron: son los filtros «Por vencer» y «Pagando» de la lista de clientes.
-export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }: {
-  inicial?: unknown; onCambio?: () => void; onAbrir?: (organizacionId: number) => void; modo: 'pendientes' | 'pagados' | 'datos' }) {
+// 27-11: `compacto` = dentro del botón de Ayuda (panel angosto): tarjeta en columna y sin aviso de «no hay pagos».
+export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo, compacto = false }: {
+  inicial?: unknown; onCambio?: () => void; onAbrir?: (organizacionId: number) => void; modo: 'pendientes' | 'pagados' | 'datos'; compacto?: boolean }) {
   // 13-11 (el dueño): el nombre del cliente abre su ficha (cuenta, plan, usuarios y pagos en un solo panel).
   const nombre = (id: number, n: string) => onAbrir
     ? <button onClick={e => { e.preventDefault(); e.stopPropagation(); onAbrir(id) }} className="font-bold hover:underline" title="Abrir la ficha del cliente">{n}</button>
@@ -99,13 +100,13 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }:
       {error && <p className="text-sm bg-red-50 border border-red-200 text-red-800 rounded px-3 py-2">{error}</p>}
 
       {modo === 'pendientes' && <section className="space-y-2">
-        {!d.pendientes.length && <p className="rounded-xl border border-dashed border-neutral-200 py-10 text-center text-sm text-neutral-400">No hay pagos por revisar. Cuando un cliente reporte uno te llega un Telegram.</p>}
+        {!d.pendientes.length && !compacto && <p className="rounded-xl border border-dashed border-neutral-200 py-10 text-center text-sm text-neutral-400">No hay pagos por revisar. Cuando un cliente reporte uno te llega un Telegram.</p>}
         {d.pendientes.map(k => (
-          <div key={k.id} className="rounded-xl border border-amber-200 bg-white p-3 flex flex-col sm:flex-row gap-3">
+          <div key={k.id} className={`rounded-xl border border-amber-200 bg-white p-3 flex flex-col gap-3 ${compacto ? '' : 'sm:flex-row'}`}>
             {k.tiene_comprobante && (
               <a href={`/api/mi-plan/comprobante/${k.id}`} target="_blank" rel="noopener noreferrer" className="shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/mi-plan/comprobante/${k.id}`} alt="Captura del pago" className="h-32 w-32 object-cover rounded border border-neutral-200 bg-neutral-50"
+                <img src={`/api/mi-plan/comprobante/${k.id}`} alt="Captura del pago" className={`${compacto ? 'h-24 w-24' : 'h-32 w-32'} object-cover rounded border border-neutral-200 bg-neutral-50`}
                   onError={e => { (e.currentTarget as HTMLImageElement).replaceWith(Object.assign(document.createElement('span'), { textContent: '📄 Ver PDF', className: 'text-sm text-sky-700' })) }} />
               </a>
             )}

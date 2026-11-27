@@ -238,7 +238,9 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      (con el botón, arrastrándola o pegándola con Ctrl+V; ves la miniatura antes de enviar).
   El pago queda **En revisión**: lo confirmamos a mano y, al aprobarlo, tu plan se activa o renueva solo y lo ves
   como **Pago aprobado · activo hasta dd/mm** (y por Telegram, si lo tienes conectado). Si algo no cuadra, ves el
-  motivo y lo puedes volver a reportar. **Si lo reportas antes de que venza, tu cuenta no se pausa** mientras lo
+  motivo y lo puedes volver a reportar. **No hace falta volver a Mi plan para enterarte:** abajo a la derecha, en
+  cualquier pantalla, sale una cajita con el estado («💳 Tu pago está en revisión» → «✅ Pago aprobado · activo
+  hasta dd/mm» o «❌ Pago no aprobado · ver motivo»); tocándola vas a Mi plan y la ✕ la oculta hasta que cambie. **Si lo reportas antes de que venza, tu cuenta no se pausa** mientras lo
   revisamos. Pagar antes no hace perder días: el nuevo período arranca donde termina el actual.
 - **Cuenta ya vencida:** al intentar entrar aparece el aviso con el botón **Pagar mi plan**, que abre Mi plan sin
   iniciar sesión (también en app.elcomerciantedigital.com/renovar con tu usuario y contraseña). Al aprobarse el

@@ -19,7 +19,19 @@ export async function GET() {
     const comoQuien = Number(session.user.soporte?.usuarioId ?? session.user.verComo?.id ?? session.user.id)
     const dueno = esDuenoPlataforma(session.user) && !session.user.soporte && !session.user.verComo
       ? (await dbGlobal().query(
-          `SELECT count(*)::int AS n, max(updated_at) AS ultimo, max(id) AS id FROM soporte_casos WHERE estado = 'abierto'`)).rows[0]
+          `SELECT count(*)::int AS n, max(updated_at) AS ultimo, max(id) AS id,
+                  (SELECT count(*)::int FROM organizacion_cobros WHERE estado = 'revision') AS pagos,
+                  (SELECT max(creado_at) FROM organizacion_cobros WHERE estado = 'revision') AS ultimo_pago
+           FROM soporte_casos WHERE estado = 'abierto'`)).rows[0]
+      : null
+    // 27-11 (el dueño): el pago reportado se sigue desde la cajita de abajo («en revisión» → «aprobado» / «no aprobado»),
+    // solo para los administradores de la cuenta. Aprobado o rechazado se muestra hasta 7 días; el detalle sigue en Mi plan.
+    const pago = !dueno && session.user.role === 'admin' && session.user.organizacionId
+      ? (await dbGlobal().query(
+          `SELECT k.id, k.estado, k.motivo, COALESCE(k.detalle->>'hasta', to_char(p.hasta, 'YYYY-MM-DD')) AS hasta
+           FROM organizacion_cobros k LEFT JOIN organizacion_pagos p ON p.id = k.pago_id
+           WHERE k.organizacion_id = $1 AND (k.estado = 'revision' OR k.revisado_at > NOW() - INTERVAL '7 days')
+           ORDER BY k.creado_at DESC LIMIT 1`, [session.user.organizacionId])).rows[0] ?? null
       : null
     const { rows: casos } = await dbGlobal().query(
       `SELECT c.id, c.estado, c.created_at, c.updated_at,
@@ -30,7 +42,7 @@ export async function GET() {
                         FROM soporte_mensajes m WHERE m.caso_id = c.id), '[]') AS mensajes
        FROM soporte_casos c WHERE c.user_id = $1 AND c.origen = 'sistema'
        ORDER BY c.updated_at DESC LIMIT 20`, [comoQuien])
-    return NextResponse.json({ casos, nuevos: casos.filter(c => c.nuevo).length, dueno }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ casos, nuevos: casos.filter(c => c.nuevo).length, dueno, pago }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     return apiError(err)
   }
