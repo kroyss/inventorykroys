@@ -16,7 +16,7 @@ function cargar() {
   // Si falla (sesión recién abierta, deploy a medias) NO se guarda el vacío: la próxima pantalla lo vuelve a pedir.
   // 20-11 (el dueño: Reportes → Inventario con todo en «Sin foto»): además se reintenta sola a los 3, 10 y 30 s; antes
   // un solo fallo dejaba la página entera en gris hasta cambiar de pantalla.
-  if (!pedido) { pedidoAt = Date.now(); pedido = fetch('/api/products/fotos').then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+  if (!pedido) { pedidoAt = Date.now(); pedido = fetch('/api/products/fotos', { cache: 'no-store' }).then(r => (r.ok ? r.json() : Promise.reject(r.status)))
     .then((d: Record<number, string>) => { fallos = 0; fotos = d; avisar.forEach(f => f()) })
     .catch(() => {
       pedido = null
