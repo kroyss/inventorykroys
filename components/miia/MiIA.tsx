@@ -406,7 +406,7 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
           <p className="text-xs text-amber-800 rounded-lg bg-amber-50 px-3 py-2">Si el monto cambia más adelante, recuerda actualizarlo aquí: la IA usa siempre el que está guardado.</p>
         </div>}
       </Pregunta>
-      <Pregunta t="¿Quieres que la IA mande tus datos para pagar cuando el comprador los pide?" ayuda="Por ejemplo, para pagar el embalaje. Si eliges que no, esos mensajes quedan para que los responda una persona.">
+      <Pregunta t="¿Quieres que la IA mande tus datos para pagar cuando el comprador los pide?" ayuda="Para pagar la compra o el embalaje. Si eliges que no, esos mensajes quedan para que los responda una persona.">
         <div className="flex flex-wrap gap-2">
           <Chip activo={manda} onClick={() => setPv({ mandaDatos: true })}>Sí, que los mande</Chip>
           <Chip activo={pv.mandaDatos === false} onClick={() => setPv({ mandaDatos: false })}>No, los mando yo</Chip>

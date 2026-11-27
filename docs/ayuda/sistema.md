@@ -320,7 +320,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
    probar antes) y acepta el aviso. Haz lo mismo en Mensajes.
 - **En «Después de la compra» (Mi IA) hay dos datos nuevos:** **¿Cobras embalaje?** (Sí/No, cuánto y qué incluye) y
   **¿Quieres que la IA mande tus datos para pagar?** (Sí/No y los datos, escritos una sola vez, como los copiaría el
-  comprador). Con esto la IA contesta sola cuánto es el embalaje y, solo si el comprador los pide, dónde pagar; si eliges
+  comprador). Con esto la IA contesta sola cuánto es el embalaje y, solo si el comprador los pide, dónde pagar (sea la compra —le recuerda subir el comprobante en MercadoEnvíos— o el embalaje); si eliges
   No, esas preguntas te quedan para revisar. **Si el monto del embalaje cambia, actualízalo ahí** (la IA usa siempre el
   que esté escrito).
 - **Retiro en persona (21-11-2026):** en «Ubicación y retiro», si marcas que se puede retirar, Mi IA pregunta **cómo te
