@@ -6,6 +6,7 @@ import { nombrePantalla, sugerenciasDe, type Sugerencia } from '@/lib/ayudaSuger
 import { EVENTO_ABRIR_SOPORTE } from './ContactoDudas'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { avisarAyuda, EVENTO_ABRIR_AYUDA } from './AyudaNav'
+import dynamic from 'next/dynamic'
 import TicketsClientes, { borrarVolverTicket, leerVolverTicket } from './TicketsClientes'
 
 // Burbuja "¿En qué te ayudo?" (30-10-2026), en todas las pantallas del Sistema:
@@ -22,6 +23,14 @@ import TicketsClientes, { borrarVolverTicket, leerVolverTicket } from './Tickets
 // oculta: si ya hay respuesta pregunta «¿Quedó resuelto?» (Sí = cierra el ticket; No = solo oculta). Vuelve a salir
 // cuando el caso se mueve (respuesta nueva o el cliente escribe: cambia updated_at). Al dueño de la plataforma le
 // muestra los casos de clientes sin responder (→ Plataforma → Soporte). Lo oculto se recuerda en este navegador.
+// Pagos por aprobar del dueño (27-11): la misma tarjeta de Plataforma → Cobros, cargada solo cuando hace falta.
+const CobrosPanel = dynamic(() => import('@/components/plataforma/CobrosPanel'), { ssr: false })
+// Pago reportado del cliente (27-11): «en revisión» → «aprobado» / «no aprobado» en la cajita; lo ocultado se recuerda
+// por pago y estado (vuelve a salir cuando el estado cambia). Al tocarla va a Mi plan, donde está el detalle.
+interface Pago { id: number; estado: 'revision' | 'aprobado' | 'rechazado'; motivo: string | null; hasta: string | null }
+const PAGO_KEY = 'pago_visto'
+const leerPagoVisto = () => { try { return localStorage.getItem(PAGO_KEY) } catch { return null } }
+const ddmm = (f: string) => f.slice(0, 10).split('-').reverse().slice(0, 2).join('/')
 const OCULTO_KEY = 'soporte_oculto_at'
 const leerOculto = () => { try { return localStorage.getItem(OCULTO_KEY) } catch { return null } }
 const guardarOculto = (v: string) => { try { localStorage.setItem(OCULTO_KEY, v) } catch { /* sin almacenamiento */ } }
@@ -62,7 +71,10 @@ export default function BurbujaAyuda() {
   const casosRef = useRef<Caso[] | null>(null)
   useEffect(() => { casosRef.current = casos }, [casos])
   const [nuevos, setNuevos] = useState(0)
-  const [dueno, setDueno] = useState<{ n: number; ultimo: string | null; id: number | null } | null>(null)
+  const [dueno, setDueno] = useState<{ n: number; ultimo: string | null; id: number | null; pagos: number; ultimo_pago: string | null } | null>(null)
+  const [pago, setPago] = useState<Pago | null>(null)
+  const [pagoVisto, setPagoVisto] = useState<string | null>(null)
+  useEffect(() => { setPagoVisto(leerPagoVisto()) }, [])
   const [oculto, setOculto] = useState<string | null>(null)
   const [ticketCli, setTicketCli] = useState<number | null>(null)   // dueño: el ticket de cliente a abrir
   const duenoRef = useRef<typeof dueno>(null)
@@ -92,7 +104,7 @@ export default function BurbujaAyuda() {
         const ab = (casosRef.current ?? []).filter(c => c.estado !== 'resuelto')
         setCasoAbierto(ab.length === 1 ? ab[0].id : null)
         const d = duenoRef.current
-        setTicketCli(!ab.length && d?.n === 1 ? d.id : null)
+        setTicketCli(!ab.length && d?.n === 1 && !d.pagos ? d.id : null)
       }
       return !a
     })
@@ -102,8 +114,8 @@ export default function BurbujaAyuda() {
   const fin = useRef<HTMLDivElement>(null)
 
   const cargarCasos = useCallback(async (fresco = true) => {
-    const d = await comun<{ casos: typeof casos; nuevos: typeof nuevos; dueno?: typeof dueno }>('soporte', { fresco }).catch(() => null)
-    if (d) { setCasos(d.casos); setNuevos(d.nuevos); setDueno(d.dueno ?? null) }
+    const d = await comun<{ casos: typeof casos; nuevos: typeof nuevos; dueno?: typeof dueno; pago?: Pago | null }>('soporte', { fresco }).catch(() => null)
+    if (d) { setCasos(d.casos); setNuevos(d.nuevos); setDueno(d.dueno ?? null); setPago(d.pago ?? null) }
   }, [])
 
   // Respuestas nuevas de soporte: al entrar y cada 3 minutos (solo con la pestaña a la vista).
@@ -241,16 +253,27 @@ export default function BurbujaAyuda() {
 
   // Tickets abiertos (27-11): los míos sin resolver, o (dueño) los de clientes por responder.
   const abiertos = (casos ?? []).filter(c => c.estado !== 'resuelto')
-  const actividad = [...abiertos.map(c => c.updated_at), ...(dueno?.n ? [dueno.ultimo ?? ''] : [])].sort().at(-1) ?? null
-  const hayTicket = (abiertos.length > 0 || !!dueno?.n) && !(oculto && actividad && new Date(oculto) >= new Date(actividad))
+  const pendDueno = (dueno?.n ?? 0) + (dueno?.pagos ?? 0)
+  const actividad = [...abiertos.map(c => c.updated_at), ...(dueno?.n ? [dueno.ultimo ?? ''] : []), ...(dueno?.pagos ? [dueno.ultimo_pago ?? ''] : [])]
+    .map(x => (x ? new Date(x).toISOString() : '')).sort().at(-1) ?? null
+  const hayTicket = (abiertos.length > 0 || pendDueno > 0) && !(oculto && actividad && new Date(oculto) >= new Date(actividad))
   const respondidos = abiertos.filter(c => c.estado === 'respondido')
   const estadoTicket = nuevos > 0 ? '● Soporte te respondió'
     : abiertos.length > 1 ? `${abiertos.length} casos abiertos`
     : abiertos.length === 1 ? `Caso #${abiertos[0].id} · ${abiertos[0].estado === 'respondido' ? 'respondido' : 'esperando respuesta'}`
-    : dueno?.n ? `${dueno.n === 1 ? '1 ticket' : `${dueno.n} tickets`} sin responder` : ''
+    : pendDueno ? [dueno?.n ? `${dueno.n === 1 ? '1 ticket' : `${dueno.n} tickets`} sin responder` : '',
+        dueno?.pagos ? `${dueno.pagos === 1 ? '1 pago' : `${dueno.pagos} pagos`} por aprobar` : ''].filter(Boolean).join(' · ') : ''
+  // Pago del cliente: se muestra mientras no se haya ocultado ESE pago en ESE estado.
+  const clavePago = pago ? `${pago.id}:${pago.estado}` : null
+  const verPago = !!pago && pagoVisto !== clavePago
+  const textoPago = !pago ? '' : pago.estado === 'revision' ? '💳 Tu pago está en revisión'
+    : pago.estado === 'aprobado' ? `✅ Pago aprobado${pago.hasta ? ` · activo hasta el ${ddmm(pago.hasta)}` : ''}` : '❌ Pago no aprobado · ver motivo'
+  const marcarPago = useCallback(() => { if (!clavePago) return; try { localStorage.setItem(PAGO_KEY, clavePago) } catch { /* sin almacenamiento */ } setPagoVisto(clavePago) }, [clavePago])
+  // En Mi plan ya se ve el resultado: aprobado o rechazado se da por visto.
+  useEffect(() => { if (verPago && pago?.estado !== 'revision' && ruta.startsWith('/mi-plan')) marcarPago() }, [verPago, pago, ruta, marcarPago])
   const abrirTicket = () => {
     // Dueño: el ticket del cliente se abre aquí mismo, sin salir de la pantalla (27-11).
-    if (!abiertos.length && dueno?.n) { setTicketCli(dueno.id); setCasoAbierto(null); setEscribiendo(false); setPestana('soporte'); setAbierta(true); return }
+    if (!abiertos.length && pendDueno) { setTicketCli(dueno?.n === 1 && !dueno.pagos ? dueno.id : null); setCasoAbierto(null); setEscribiendo(false); setPestana('soporte'); setAbierta(true); return }
     setAbierta(true); setPestana('soporte'); setEscribiendo(false)
     setCasoAbierto(abiertos.length === 1 ? abiertos[0].id : null)
   }
@@ -268,7 +291,8 @@ export default function BurbujaAyuda() {
   }
 
   // El punto del botón de arriba: rojo = respuesta nueva o (dueño) tickets sin responder; verde = mi caso esperando.
-  const punto = nuevos > 0 || (!abiertos.length && !!dueno?.n) ? 'rojo' : abiertos.length ? 'verde' : null
+  const pagoListo = verPago && pago?.estado !== 'revision'
+  const punto = nuevos > 0 || (!abiertos.length && pendDueno > 0) || pagoListo ? 'rojo' : abiertos.length || verPago ? 'verde' : null
   useEffect(() => { avisarAyuda(punto, abierta) }, [punto, abierta])
 
   return (
@@ -288,7 +312,8 @@ export default function BurbujaAyuda() {
               {([['soporte', 'Soporte'], ['preguntar', 'Preguntar']] as const).map(([k, t]) => (
                 <button key={k} onClick={() => { setPestana(k); setError(null) }}
                   className={`px-3 py-1.5 text-sm border-b-2 ${pestana === k ? 'border-lime-400 text-white font-semibold' : 'border-transparent text-neutral-400 hover:text-neutral-200'}`}>
-                  {t}{k === 'soporte' && nuevos > 0 && <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
+                  {k === 'soporte' && dueno ? `Tickets${pendDueno ? ` (${pendDueno})` : ''}` : t}
+                  {k === 'soporte' && (nuevos > 0 || (dueno && pendDueno > 0)) && <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
                 </button>
               ))}
             </div>
@@ -373,7 +398,11 @@ export default function BurbujaAyuda() {
               {formulario()}
               {error && <p className="text-red-600 text-xs">{error}</p>}
             </> : dueno ? <>
-              {/* Dueño de la plataforma (27-11): aquí solo los tickets de clientes; él no le escribe a soporte. */}
+              {/* Dueño de la plataforma (27-11): pagos por aprobar y tickets de clientes; él no le escribe a soporte. */}
+              {dueno.pagos > 0 && !ticketCli && <section className="space-y-1.5">
+                <p className="font-medium text-neutral-800">Pagos por aprobar <span className="ml-1 text-xs font-semibold text-red-600">· {dueno.pagos}</span></p>
+                <CobrosPanel modo="pendientes" compacto onCambio={() => cargarCasos()} />
+              </section>}
               <TicketsClientes key={ticketCli ?? 0} inicial={ticketCli} onCambio={() => cargarCasos()} />
             </> : <>
               <div className="flex items-center justify-between">
@@ -417,11 +446,23 @@ export default function BurbujaAyuda() {
         </div>
       )}
 
-      {!abierta && hayTicket && estadoTicket && (
-        <div className={`fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 flex h-9 items-center rounded-full border bg-white pl-3 pr-1 shadow-lg text-xs [body:has([data-barra-fija])_&]:hidden ${nuevos > 0 ? 'border-red-300' : 'border-neutral-200'}`}>
-          <button onClick={abrirTicket} className={`max-w-[14rem] truncate font-medium ${nuevos > 0 ? 'text-red-600' : 'text-neutral-700'} hover:underline`}>{estadoTicket}</button>
-          <button onClick={ocultarTicket} aria-label="Ocultar" title="Ocultar"
-            className="ml-1 grid h-6 w-6 place-items-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">✕</button>
+      {!abierta && ((hayTicket && estadoTicket) || verPago) && (
+        <div className="fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 flex flex-col items-end gap-2 [body:has([data-barra-fija])_&]:hidden">
+          {verPago && (
+            <div className={`flex h-9 max-w-[calc(100vw-1.5rem)] items-center rounded-full border bg-white pl-3 pr-1 shadow-lg text-xs ${pagoListo ? (pago?.estado === 'aprobado' ? 'border-lime-300' : 'border-red-300') : 'border-neutral-200'}`}>
+              <a href="/mi-plan" onClick={() => { if (pagoListo) marcarPago() }}
+                className={`truncate font-medium hover:underline ${pago?.estado === 'aprobado' ? 'text-lime-800' : pago?.estado === 'rechazado' ? 'text-red-600' : 'text-neutral-700'}`}>{textoPago}</a>
+              <button onClick={marcarPago} aria-label="Ocultar" title="Ocultar"
+                className="ml-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">✕</button>
+            </div>
+          )}
+          {hayTicket && estadoTicket && (
+            <div className={`flex h-9 max-w-[calc(100vw-1.5rem)] items-center rounded-full border bg-white pl-3 pr-1 shadow-lg text-xs ${nuevos > 0 || pendDueno > 0 ? 'border-red-300' : 'border-neutral-200'}`}>
+              <button onClick={abrirTicket} className={`max-w-[16rem] truncate font-medium ${nuevos > 0 || pendDueno > 0 ? 'text-red-600' : 'text-neutral-700'} hover:underline`}>{estadoTicket}</button>
+              <button onClick={ocultarTicket} aria-label="Ocultar" title="Ocultar"
+                className="ml-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">✕</button>
+            </div>
+          )}
         </div>
       )}
     </>
