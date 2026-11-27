@@ -9,7 +9,9 @@ export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
   try {
-    return NextResponse.json(await fotosProductos(db), { headers: { 'Cache-Control': 'private, max-age=60' } })
+    // 27-11 (bug del dueño): sin caché del navegador. La URL es la misma para todas las empresas: con max-age=60, al
+    // cambiar de empresa (VE↔CO) o entrar/salir de «Ver como» quedaban las fotos de la otra empresa y todo «Sin foto».
+    return NextResponse.json(await fotosProductos(db), { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (err) {
     return apiError(err)
   }
