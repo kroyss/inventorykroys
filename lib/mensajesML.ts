@@ -285,6 +285,34 @@ export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) 
   return d.id
 }
 
+/** 27-11 (el dueño, pedido de un cliente): el TOTAL de la venta para {precio}/{precio_bs} del mensaje al comprar y los
+ *  recordatorios. Suma unidades y órdenes del carrito con lo que se cobró (descuentos incluidos). `usd`: con la conversión
+ *  de ML o Bs ÷ BCV del día de la venta (como itemsDeVenta); `local`: en la moneda de la venta (pesos en CO). */
+export async function totalVenta(db: Pool, conexionId: number, pack: string): Promise<{ usd: number | null; local: number | null; moneda: string | null }> {
+  const its = (await ordenesDeVenta(db, conexionId, pack)).flatMap(o => o.order_items)
+  if (!its.length) return { usd: null, local: null, moneda: null }
+  const moneda = its.every(i => i.currency_id === its[0].currency_id) ? its[0].currency_id ?? null : null
+  const local = moneda ? its.reduce((t, i) => t + (i.unit_price ?? 0) * i.quantity, 0) : null
+  let usd: number | null = 0
+  let faltaTasa = false
+  for (const i of its) {
+    const tasaML = i.base_currency_id === 'USD' && i.base_exchange_rate && i.base_exchange_rate > 0 ? i.base_exchange_rate : null
+    const u = i.currency_id === 'USD' ? i.unit_price ?? null : tasaML && i.unit_price ? i.unit_price / tasaML : null
+    if (u == null) { if (i.currency_id === 'VES' && i.unit_price) { faltaTasa = true; continue } usd = null; break }
+    usd! += u * i.quantity
+  }
+  if (usd != null && faltaTasa) {
+    const { rows: [t] } = await db.query(
+      `SELECT official_rate::float AS r FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`)
+    if (!t?.r) usd = null
+    else for (const i of its) {
+      const tasaML = i.base_currency_id === 'USD' && i.base_exchange_rate && i.base_exchange_rate > 0 ? i.base_exchange_rate : null
+      if (i.currency_id === 'VES' && i.unit_price && !tasaML) usd += i.unit_price / t.r * i.quantity
+    }
+  }
+  return { usd: usd && usd > 0 ? Math.round(usd * 100) / 100 : null, local, moneda }
+}
+
 /** `variante`: lo que eligió el comprador ("Color: Azul · Talla: M"); el título solo no lo dice. */
 export interface ItemVenta { id: string; titulo: string; variante: string | null; cantidad: number; precio: number | null; moneda: string | null; link: string | null; imagen: string | null
   /** Precio unitario en dólares al que se vendió (con el descuento): la conversión de ML o, si no la

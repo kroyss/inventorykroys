@@ -16,7 +16,8 @@
 //   - justo antes de mandar se relee la orden y la conversación en ML (no solo lo guardado).
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
-import { leerHilo } from '@/lib/mensajesML'
+import { leerHilo, totalVenta } from '@/lib/mensajesML'
+import { tasaBCVHoy } from '@/lib/tasaDia'
 import { registrarOrigen } from '@/lib/respuestasOrigen'
 
 export const CLAVE_CONFIG = 'recordatorios_pago'
@@ -80,17 +81,51 @@ const primerNombre = (n: string | null | undefined) => {
   return p ? p[0].toUpperCase() + p.slice(1).toLowerCase() : ''
 }
 
-/** El texto con los datos de la venta, dentro del largo que acepta ML (se acorta el producto). */
-export function armarTexto(plantilla: string, nombre: string | null, producto: string | null) {
+/** 27-11: datos para {precio} (total en $; en CO, en pesos), {precio_bs} (total × BCV de hoy) y {tasa_bcv}. */
+export interface MontosVenta { precio: number | null; tasa: number | null }
+// Las variables que entienden el mensaje al comprar y los recordatorios (las mismas de las respuestas rápidas).
+export const VARIABLES_VENTA = ['{nombre}', '{producto}', '{precio}', '{precio_bs}', '{tasa_bcv}']
+/** Variables escritas que no existen (ej. {monto}): se avisa al guardar. */
+export const variablesDesconocidas = (t: string) =>
+  [...new Set((t.match(/\{[^{}\s]{1,30}\}/g) ?? []).filter(v => !VARIABLES_VENTA.includes(v.toLowerCase())))]
+export const errorVariables = (malas: string[]) =>
+  `No existe${malas.length > 1 ? 'n' : ''} ${malas.join(', ')}. Puedes usar: ${VARIABLES_VENTA.join(', ')}.`
+const dineroTxt = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/** ¿La plantilla usa algún monto? (así solo se le pregunta a ML el total cuando hace falta) */
+export const usaMontos = (t: string) => /\{(precio|precio_bs|tasa_bcv)\}/i.test(t)
+
+/** Rellena los montos; la línea que quede con una variable sin dato (o desconocida) NO se manda: nunca sale "{precio}". */
+function rellenarMontos(t: string, m: MontosVenta) {
+  const val: Record<string, string | null> = {
+    precio: m.precio != null && m.precio > 0 ? dineroTxt(m.precio) : null,
+    tasa_bcv: m.tasa != null && m.tasa > 0 ? dineroTxt(m.tasa) : null,
+    precio_bs: m.precio != null && m.precio > 0 && m.tasa != null && m.tasa > 0 ? dineroTxt(m.precio * m.tasa) : null,
+  }
+  return t.replace(/\{(precio_bs|precio|tasa_bcv)\}/gi, (x, k: string) => val[k.toLowerCase()] ?? x)
+    .split('\n').filter(l => !(l.match(/\{[^{}\s]{1,30}\}/g) ?? []).some(v => !['{nombre}', '{producto}'].includes(v.toLowerCase())))
+    .join('\n')
+}
+
+/** El texto con los datos de la venta, dentro del largo que acepta ML (se acorta el producto). Sin `montos` (vista previa) las variables de monto quedan escritas. */
+export function armarTexto(plantilla: string, nombre: string | null, producto: string | null, montos?: MontosVenta) {
   const n = primerNombre(nombre)
   let prod = (producto ?? 'tu producto').trim()
-  const armar = () => plantilla.replaceAll('{nombre}', n).replaceAll('{producto}', prod)
+  const base = montos ? rellenarMontos(plantilla, montos) : plantilla
+  const armar = () => base.replaceAll('{nombre}', n).replaceAll('{producto}', prod)
     .replace(/[ \t]+,/g, ',').replace(/[ \t]{2,}/g, ' ')
     // Los saltos de línea se respetan (24-10, pedido del dueño): sin espacios alrededor y como mucho un renglón en blanco.
     .replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
   let t = armar()
   while (t.length > MAX_TEXTO && prod.length > 20) { prod = prod.slice(0, prod.length - 10).trimEnd() + '…'; t = armar() }
   return t.slice(0, MAX_TEXTO)
+}
+
+/** Total de la venta + tasa BCV de hoy. En VE {precio} va en $; en CO, en pesos (y {precio_bs} no aplica). */
+export async function montosVenta(db: Pool, conexionId: number, pack: string): Promise<MontosVenta> {
+  const t = await totalVenta(db, conexionId, pack).catch(() => null)
+  if (!t) return { precio: null, tasa: null }
+  if (t.moneda === 'COP') return { precio: t.local, tasa: null }
+  return { precio: t.usd, tasa: await tasaBCVHoy(db) }
 }
 
 /** Ventas a recordar HOY (sin mirar el turno): dentro de los días, sin ninguna señal de pago.
@@ -248,8 +283,9 @@ async function recordarUna(db: Pool, c: Candidato, cfg: ConfigRecordatorios, tur
     if (conversacionViva(hilo.mensajes, c.fecha)) {
       await anotar(db, c, { turno }); return 'saltado'
     }
-    const texto = armarTexto(ultimo && cfg.final.activo ? cfg.final.texto : cfg.texto,
-      orden.buyer.first_name || c.comprador_nombre, c.producto)
+    const plantilla = ultimo && cfg.final.activo ? cfg.final.texto : cfg.texto
+    const texto = armarTexto(plantilla, orden.buyer.first_name || c.comprador_nombre, c.producto,
+      usaMontos(plantilla) ? await montosVenta(db, c.conexion_id, c.pack) : undefined)
     await mlFetch(db, c.conexion_id, `/messages/packs/${c.pack}/sellers/${seller}?tag=post_sale`, {
       method: 'POST', body: { from: { user_id: seller }, to: { user_id: orden.buyer.id }, text: texto },
     })
