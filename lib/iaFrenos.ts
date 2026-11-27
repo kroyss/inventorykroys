@@ -18,18 +18,22 @@ export const CLAVE_FRENOS = 'ia_frenos'
 export const TOPE_DEFAULT = 3
 
 export interface HorarioIA { dias: number[]; desde: string; hasta: string }   // dias: 0 = domingo … 6 = sábado; "HH:MM"
-// 12-11 (el dueño): la frase de escape de Preguntas viene PRECARGADA con la de fábrica (escapePreguntas null = esa).
-// Modo Total la usa SIEMPRE (todo tiene respuesta: la posventa, fuera de horario o si la IA no escribió nada). Modo Seguro
-// solo si `escapeSeguro` (lo que ya la tenían activada antes de esto la siguen usando).
-export const ESCAPE_PREGUNTAS_FABRICA = '¡Hola! Lo verificamos y te confirmamos en breve por aquí.'
+// Frase de escape de Preguntas (escapePreguntas null = la de fábrica, que en la pantalla se ve de fondo en el campo).
+// 27-11 (el dueño): SOLO en Modo Total. En Modo Seguro no se usa: ML acepta UNA respuesta por pregunta y la frase la
+// cerraba sin que el vendedor pudiera contestarla bien (Maikel: pedidos al mayor de 164 lámparas y 10.000 m).
+// El texto de fábrica pasa la conversación a la mensajería de la compra (como hace Mercasist con las cantidades);
+// el viejo prometía «te confirmamos por aquí», que en Preguntas no se puede cumplir. `escapeSeguro` queda sin uso.
+export const ESCAPE_PREGUNTAS_FABRICA = '¡Hola! Para atenderte con todo el detalle, haz la compra de 1 unidad y escríbenos por la mensajería de la compra: ahí te atendemos personalmente con cantidades, pedidos al mayor o lo que necesites.'
+const ESCAPE_PREGUNTAS_VIEJA = '¡Hola! Lo verificamos y te confirmamos en breve por aquí.'
 export interface FrenosIA { horario: HorarioIA | null; tope: number; escape: string | null; escapePreguntas: string | null; escapeSeguro: boolean }
 /** El texto que se publica en Preguntas: el propio o el de fábrica. */
 export const fraseEscapePreguntas = (f: Pick<FrenosIA, 'escapePreguntas'>) => f.escapePreguntas ?? ESCAPE_PREGUNTAS_FABRICA
 
-// 27-11 (el dueño): la frase de Mensajes. Modo Seguro: solo si la escribió. Modo Total: siempre (si la borró, la de
-// fábrica), porque ahí la posventa no la responde la IA y el comprador no puede quedar sin contestar.
-export const ESCAPE_MENSAJES_FABRICA = '¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.'
-export const fraseEscapeMensajes = (f: Pick<FrenosIA, 'escape'> | null, total: boolean) => f?.escape ?? (f && total ? ESCAPE_MENSAJES_FABRICA : null)
+// 27-11 (el dueño): la frase de Mensajes, en los dos modos: la escrita o, vacía, la de fábrica (se ve de fondo en el
+// campo; el vendedor decide la redacción final). En Mensajes el «por aquí» sí se cumple: el chat sigue.
+export const ESCAPE_MENSAJES_FABRICA = '¡Hola! Gracias por escribirnos. Para más información, cambios en tu pedido o compras al mayor, en breve te atendemos personalmente por aquí.'
+const ESCAPE_MENSAJES_VIEJA = '¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.'
+export const fraseEscapeMensajes = (f: Pick<FrenosIA, 'escape'> | null, _total?: boolean) => f ? f.escape ?? ESCAPE_MENSAJES_FABRICA : null
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
@@ -40,9 +44,11 @@ export function normalizarFrenos(v: unknown): FrenosIA {
   const horario = h && dias.length && HHMM.test(String(h.desde)) && HHMM.test(String(h.hasta)) && h.desde !== h.hasta
     ? { dias, desde: String(h.desde), hasta: String(h.hasta) } : null
   const tope = Number.isInteger(o.tope) && (o.tope as number) >= 0 && (o.tope as number) <= 50 ? o.tope as number : TOPE_DEFAULT
-  const escape = typeof o.escape === 'string' && o.escape.trim() ? o.escape.trim().slice(0, 200) : null
+  const escrita = typeof o.escape === 'string' && o.escape.trim() ? o.escape.trim().slice(0, 200) : null
+  // La de fábrica guardada como texto (la vieja o la nueva) = vacía: así sigue a la de fábrica vigente.
+  const escape = escrita === ESCAPE_MENSAJES_VIEJA || escrita === ESCAPE_MENSAJES_FABRICA ? null : escrita
   const propia = typeof o.escapePreguntas === 'string' && o.escapePreguntas.trim() ? o.escapePreguntas.trim().slice(0, 350) : null
-  const escapePreguntas = propia === ESCAPE_PREGUNTAS_FABRICA ? null : propia
+  const escapePreguntas = propia === ESCAPE_PREGUNTAS_FABRICA || propia === ESCAPE_PREGUNTAS_VIEJA ? null : propia
   // Antes de 12-11 tener frase = usarla en Modo Seguro: se respeta.
   const escapeSeguro = typeof o.escapeSeguro === 'boolean' ? o.escapeSeguro : propia !== null
   return { horario, tope, escape, escapePreguntas, escapeSeguro }
@@ -54,7 +60,7 @@ export function normalizarFrenos(v: unknown): FrenosIA {
 // Si la empresa ya tiene sus frenos guardados no se tocan. Se editan en Mi IA → Frenos.
 export const FRENOS_FABRICA: FrenosIA = {
   horario: null, tope: TOPE_DEFAULT,
-  escape: ESCAPE_MENSAJES_FABRICA, escapePreguntas: null, escapeSeguro: false,
+  escape: null, escapePreguntas: null, escapeSeguro: false,
 }
 export async function frenosDeFabrica(db: Pick<Pool, 'query'>) {
   await db.query(
