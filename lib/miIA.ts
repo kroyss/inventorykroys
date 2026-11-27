@@ -234,7 +234,7 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
     sec('DESPUÉS DE LA COMPRA', [
       pv.pasos?.length && `Lo que tiene que hacer el comprador: ${lista(pv.pasos)}.`,
       lineaEmbalaje,
-      manda && limpio(pv.datosPago) && `Datos para pagar (cópialos EXACTOS, sin cambiar nada; dalos si el comprador los pide, p. ej. para pagar el embalaje): ${limpio(pv.datosPago)}`,
+      manda && limpio(pv.datosPago) && `Datos para pagar (cópialos EXACTOS, sin cambiar nada; dalos si el comprador los pide, para pagar la compra —y que suba el comprobante en el formulario de MercadoEnvíos— o el embalaje u otro adicional): ${limpio(pv.datosPago)}`,
       !manda && 'Los datos para pagar (cuentas, pago móvil) los manda una persona: si los pide, deja la respuesta VACÍA con confianza "baja" y falta_dato "Pide datos de pago: los da el equipo".',
     ])
   }
