@@ -58,6 +58,8 @@ export default function BurbujaAyuda() {
   const [pensando, setPensando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [casos, setCasos] = useState<Caso[] | null>(null)
+  const casosRef = useRef<Caso[] | null>(null)
+  useEffect(() => { casosRef.current = casos }, [casos])
   const [nuevos, setNuevos] = useState(0)
   const [dueno, setDueno] = useState<{ n: number; ultimo: string | null; id: number | null } | null>(null)
   const [oculto, setOculto] = useState<string | null>(null)
@@ -71,7 +73,15 @@ export default function BurbujaAyuda() {
   const [videos, setVideos] = useState<Video[]>([])
   // El botón de arriba (AyudaNav) abre y cierra el panel; abre en Soporte.
   useEffect(() => {
-    const f = () => setAbierta(a => { if (!a) { setPestana('soporte'); setEscribiendo(false) } return !a })
+    // 27-11: con UN caso abierto entra directo a ese caso (para responder, adjuntar o darlo por resuelto).
+    const f = () => setAbierta(a => {
+      if (!a) {
+        setPestana('soporte'); setEscribiendo(false)
+        const ab = (casosRef.current ?? []).filter(c => c.estado !== 'resuelto')
+        setCasoAbierto(ab.length === 1 ? ab[0].id : null)
+      }
+      return !a
+    })
     window.addEventListener(EVENTO_ABRIR_AYUDA, f)
     return () => window.removeEventListener(EVENTO_ABRIR_AYUDA, f)
   }, [])
@@ -337,12 +347,22 @@ export default function BurbujaAyuda() {
               )}
               {error && <p className="text-red-600 text-xs">{error}</p>}
             </> : escribiendo || (casos && casos.length === 0) ? <>
+              {dueno?.n ? (
+                <a href={`/plataforma?soporte=${dueno.id ?? ''}`} className="flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800 hover:border-red-300">
+                  <span className="font-medium">{dueno.n === 1 ? '1 ticket de cliente sin responder' : `${dueno.n} tickets de clientes sin responder`}</span>
+                  <span className="text-xs">Responder →</span>
+                </a>) : null}
               {casos && casos.length > 0 && <button onClick={() => setEscribiendo(false)} className="text-xs text-neutral-500 hover:text-neutral-800">← Mis casos</button>}
               <p className="font-medium text-neutral-800">Escribir a Soporte</p>
               <p className="text-xs text-neutral-500">{HORARIO} Junto con tu mensaje nos llega en qué pantalla estás, para ayudarte más rápido.</p>
               {formulario()}
               {error && <p className="text-red-600 text-xs">{error}</p>}
             </> : <>
+              {dueno?.n ? (
+                <a href={`/plataforma?soporte=${dueno.id ?? ''}`} className="flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800 hover:border-red-300">
+                  <span className="font-medium">{dueno.n === 1 ? '1 ticket de cliente sin responder' : `${dueno.n} tickets de clientes sin responder`}</span>
+                  <span className="text-xs">Responder →</span>
+                </a>) : null}
               <div className="flex items-center justify-between">
                 <p className="font-medium text-neutral-800">Mis casos</p>
                 <button onClick={() => { setEscribiendo(true); setError(null) }} className="btn-primary text-xs">+ Escribir</button>
