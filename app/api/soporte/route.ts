@@ -14,6 +14,9 @@ export async function GET() {
   try {
     await cerrarRespondidosViejos()
     // 27-11: al dueño de la plataforma, los casos de clientes que esperan su respuesta (la burbuja los muestra).
+    // 27-11 (el dueño): en «Ver como» se ven los casos de la persona vista, como los ve ella (solo mirar: marcar visto o
+    // resuelto no hace nada en ese modo, ver /api/soporte/[id]).
+    const comoQuien = Number(session.user.soporte?.usuarioId ?? session.user.verComo?.id ?? session.user.id)
     const dueno = esDuenoPlataforma(session.user) && !session.user.soporte && !session.user.verComo
       ? (await dbGlobal().query(
           `SELECT count(*)::int AS n, max(updated_at) AS ultimo, max(id) AS id FROM soporte_casos WHERE estado = 'abierto'`)).rows[0]
@@ -26,7 +29,7 @@ export async function GET() {
                           'adjuntos', m.adjuntos, 'created_at', m.created_at) ORDER BY m.id)
                         FROM soporte_mensajes m WHERE m.caso_id = c.id), '[]') AS mensajes
        FROM soporte_casos c WHERE c.user_id = $1 AND c.origen = 'sistema'
-       ORDER BY c.updated_at DESC LIMIT 20`, [Number(session.user.id)])
+       ORDER BY c.updated_at DESC LIMIT 20`, [comoQuien])
     return NextResponse.json({ casos, nuevos: casos.filter(c => c.nuevo).length, dueno }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     return apiError(err)
