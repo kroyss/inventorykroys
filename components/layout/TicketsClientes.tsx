@@ -64,7 +64,9 @@ export default function TicketsClientes({ inicial, onCambio }: { inicial: number
         {caso.empresa_id && caso.user_id && caso.origen === 'sistema' && (
           <button onClick={() => verComo(caso)} disabled={entrando}
             className="rounded-full border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:border-lime-500 hover:text-neutral-900 disabled:opacity-60">
-            {entrando ? 'Entrando…' : '👁 Ver como'}
+            {!entrando && <svg viewBox="0 0 24 24" className="mr-1 inline h-3.5 w-3.5 -mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>}
+            {entrando ? 'Entrando…' : 'Ver como'}
           </button>
         )}
       </div>
@@ -100,7 +102,7 @@ export default function TicketsClientes({ inicial, onCambio }: { inicial: number
   return (
     <div className="space-y-1.5">
       <p className="font-medium text-neutral-800">Tickets de clientes{porResponder > 0 && <span className="ml-1.5 text-xs font-semibold text-red-600">· {porResponder} por responder</span>}</p>
-      {!casos.length && <p className="rounded-lg bg-neutral-50 px-3 py-4 text-center text-xs text-neutral-500">No hay tickets abiertos. 🎉</p>}
+      {!casos.length && <p className="rounded-lg bg-neutral-50 px-3 py-4 text-center text-xs text-neutral-500">No hay tickets abiertos.</p>}
       {casos.map(c => {
         const ult = c.mensajes[c.mensajes.length - 1]
         return (

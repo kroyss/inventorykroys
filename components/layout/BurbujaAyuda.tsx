@@ -31,6 +31,18 @@ interface Pago { id: number; estado: 'revision' | 'aprobado' | 'rechazado'; moti
 const PAGO_KEY = 'pago_visto'
 const leerPagoVisto = () => { try { return localStorage.getItem(PAGO_KEY) } catch { return null } }
 const ddmm = (f: string) => f.slice(0, 10).split('-').reverse().slice(0, 2).join('/')
+/** Ícono del estado del pago (círculo de color con trazo): reloj = en revisión, check = aprobado, X = no aprobado. */
+function IconoPago({ estado }: { estado: Pago['estado'] }) {
+  const fondo = estado === 'aprobado' ? 'bg-lime-500 text-white' : estado === 'rechazado' ? 'bg-red-500 text-white' : 'bg-amber-100 text-amber-700'
+  return (
+    <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${fondo}`} aria-hidden="true">
+      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        {estado === 'aprobado' ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : estado === 'rechazado' ? <path d="M7 7l10 10M17 7L7 17" />
+          : <><circle cx="12" cy="12" r="8" strokeWidth="2.5" /><path d="M12 8v4l2.5 2" strokeWidth="2.5" /></>}
+      </svg>
+    </span>
+  )
+}
 const OCULTO_KEY = 'soporte_oculto_at'
 const leerOculto = () => { try { return localStorage.getItem(OCULTO_KEY) } catch { return null } }
 const guardarOculto = (v: string) => { try { localStorage.setItem(OCULTO_KEY, v) } catch { /* sin almacenamiento */ } }
@@ -266,8 +278,8 @@ export default function BurbujaAyuda() {
   // Pago del cliente: se muestra mientras no se haya ocultado ESE pago en ESE estado.
   const clavePago = pago ? `${pago.id}:${pago.estado}` : null
   const verPago = !!pago && pagoVisto !== clavePago
-  const textoPago = !pago ? '' : pago.estado === 'revision' ? '💳 Tu pago está en revisión'
-    : pago.estado === 'aprobado' ? `✅ Pago aprobado${pago.hasta ? ` · activo hasta el ${ddmm(pago.hasta)}` : ''}` : '❌ Pago no aprobado · ver motivo'
+  const textoPago = !pago ? '' : pago.estado === 'revision' ? 'Tu pago está en revisión'
+    : pago.estado === 'aprobado' ? `Pago aprobado${pago.hasta ? ` · activo hasta el ${ddmm(pago.hasta)}` : ''}` : 'Pago no aprobado · ver motivo'
   const marcarPago = useCallback(() => { if (!clavePago) return; try { localStorage.setItem(PAGO_KEY, clavePago) } catch { /* sin almacenamiento */ } setPagoVisto(clavePago) }, [clavePago])
   // En Mi plan ya se ve el resultado: aprobado o rechazado se da por visto.
   useEffect(() => { if (verPago && pago?.estado !== 'revision' && ruta.startsWith('/mi-plan')) marcarPago() }, [verPago, pago, ruta, marcarPago])
@@ -450,9 +462,11 @@ export default function BurbujaAyuda() {
       {!abierta && ((hayTicket && estadoTicket) || verPago) && (
         <div className="fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 flex flex-col items-end gap-2 [body:has([data-barra-fija])_&]:hidden">
           {verPago && (
-            <div className={`flex h-9 max-w-[calc(100vw-1.5rem)] items-center rounded-full border bg-white pl-3 pr-1 shadow-lg text-xs ${pagoListo ? (pago?.estado === 'aprobado' ? 'border-lime-300' : 'border-red-300') : 'border-neutral-200'}`}>
+            <div className={`flex h-9 max-w-[calc(100vw-1.5rem)] items-center rounded-full border bg-white pl-2 pr-1 shadow-lg text-xs ${pagoListo ? (pago?.estado === 'aprobado' ? 'border-lime-300' : 'border-red-300') : 'border-neutral-200'}`}>
               <a href="/mi-plan" onClick={() => { if (pagoListo) marcarPago() }}
-                className={`truncate font-medium hover:underline ${pago?.estado === 'aprobado' ? 'text-lime-800' : pago?.estado === 'rechazado' ? 'text-red-600' : 'text-neutral-700'}`}>{textoPago}</a>
+                className={`flex min-w-0 items-center gap-2 font-medium hover:underline ${pago?.estado === 'aprobado' ? 'text-lime-800' : pago?.estado === 'rechazado' ? 'text-red-700' : 'text-neutral-700'}`}>
+                {pago && <IconoPago estado={pago.estado} />}<span className="truncate">{textoPago}</span>
+              </a>
               <button onClick={marcarPago} aria-label="Ocultar" title="Ocultar"
                 className="ml-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">✕</button>
             </div>
