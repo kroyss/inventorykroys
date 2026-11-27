@@ -6,7 +6,7 @@ import { nombrePantalla, sugerenciasDe, type Sugerencia } from '@/lib/ayudaSuger
 import { EVENTO_ABRIR_SOPORTE } from './ContactoDudas'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { avisarAyuda, EVENTO_ABRIR_AYUDA } from './AyudaNav'
-import TicketsClientes from './TicketsClientes'
+import TicketsClientes, { borrarVolverTicket, leerVolverTicket } from './TicketsClientes'
 
 // Burbuja "¿En qué te ayudo?" (30-10-2026), en todas las pantallas del Sistema:
 //   · Preguntar: sugerencias de la pantalla con su respuesta ya escrita (gratis) y pregunta libre que responde la IA
@@ -65,6 +65,16 @@ export default function BurbujaAyuda() {
   const [dueno, setDueno] = useState<{ n: number; ultimo: string | null; id: number | null } | null>(null)
   const [oculto, setOculto] = useState<string | null>(null)
   const [ticketCli, setTicketCli] = useState<number | null>(null)   // dueño: el ticket de cliente a abrir
+  const duenoRef = useRef<typeof dueno>(null)
+  useEffect(() => { duenoRef.current = dueno }, [dueno])
+  // Vuelta de «Ver como» desde un ticket: reabre ese ticket aquí (TicketsClientes guardó a dónde volver).
+  useEffect(() => {
+    if (!dueno) return
+    const t = leerVolverTicket()
+    if (!t) return
+    borrarVolverTicket()
+    setTicketCli(t.id); setCasoAbierto(null); setEscribiendo(false); setPestana('soporte'); setAbierta(true)
+  }, [dueno])
   useEffect(() => { setOculto(leerOculto()) }, [])
   const confirm = useConfirm()
   const [casoAbierto, setCasoAbierto] = useState<number | null>(null)
@@ -81,6 +91,8 @@ export default function BurbujaAyuda() {
         setPestana('soporte'); setEscribiendo(false)
         const ab = (casosRef.current ?? []).filter(c => c.estado !== 'resuelto')
         setCasoAbierto(ab.length === 1 ? ab[0].id : null)
+        const d = duenoRef.current
+        setTicketCli(!ab.length && d?.n === 1 ? d.id : null)
       }
       return !a
     })
@@ -201,9 +213,9 @@ export default function BurbujaAyuda() {
 
   const formulario = (casoId?: number) => (
     <div className="space-y-2">
-      <textarea value={texto} onChange={e => setTexto(e.target.value)} onPaste={pegar} rows={casoId ? 3 : 5}
+      <textarea value={texto} onChange={e => setTexto(e.target.value)} onPaste={pegar} rows={casoId ? 2 : 5}
         placeholder={casoId ? 'Escribe tu respuesta… (Ctrl+V pega una captura)' : 'Cuéntanos qué pasó: qué hiciste y qué esperabas. Puedes pegar una captura con Ctrl+V.'}
-        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:border-lime-600 focus:ring-2 focus:ring-lime-400/40" />
+        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-lime-600 focus:ring-2 focus:ring-lime-400/40" />
       {archivos.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {archivos.map((a, i) => (
@@ -326,7 +338,12 @@ export default function BurbujaAyuda() {
               )}
               {error && <p className="text-red-600 text-xs">{error}</p>}
             </> : caso ? <>
-              <button onClick={() => setCasoAbierto(null)} className="text-xs text-neutral-500 hover:text-neutral-800">← Mis casos</button>
+              <div className="flex items-center justify-between gap-2">
+                <button onClick={() => setCasoAbierto(null)} className="py-1 text-xs text-neutral-500 hover:text-neutral-800">← Mis casos</button>
+                {caso.estado === 'respondido' && (
+                  <button onClick={() => resolver(caso.id)} className="rounded-full border border-lime-300 bg-lime-50 px-2.5 py-1 text-xs font-medium text-lime-800 hover:bg-lime-100">✓ Ya se resolvió</button>
+                )}
+              </div>
               <p className="text-xs text-neutral-500">Caso #{caso.id} · {caso.estado === 'resuelto' ? 'resuelto' : caso.estado === 'respondido' ? 'respondido' : 'esperando respuesta'}</p>
               {caso.mensajes.map(m => (
                 <div key={m.id} className={m.autor === 'cliente' ? 'ml-auto max-w-[88%]' : 'max-w-[92%]'}>
@@ -344,19 +361,21 @@ export default function BurbujaAyuda() {
               {caso.estado === 'resuelto'
                 ? <p className="text-xs text-neutral-500">Este caso está resuelto. Si vuelve a pasar, escríbenos aquí mismo y se reabre.</p>
                 : caso.estado === 'abierto' && <p className="text-xs text-neutral-500">{HORARIO}</p>}
-              {formulario(caso.id)}
-              {caso.estado === 'respondido' && (
-                <button onClick={() => resolver(caso.id)} className="btn-secondary text-xs">✓ Ya se resolvió</button>
-              )}
-              {error && <p className="text-red-600 text-xs">{error}</p>}
+              {/* 27-11: la respuesta queda fija abajo, como un chat (en el celular no hay que bajar para escribir). */}
+              <div className="sticky -bottom-3 -mx-4 -mb-3 space-y-2 border-t border-neutral-100 bg-white px-4 py-3">
+                {formulario(caso.id)}
+                {error && <p className="text-red-600 text-xs">{error}</p>}
+              </div>
             </> : escribiendo || (casos && casos.length === 0 && !dueno) ? <>
-              {casos && casos.length > 0 && <button onClick={() => setEscribiendo(false)} className="text-xs text-neutral-500 hover:text-neutral-800">← Mis casos</button>}
+              {casos && casos.length > 0 && <button onClick={() => setEscribiendo(false)} className="py-1 text-xs text-neutral-500 hover:text-neutral-800">← Mis casos</button>}
               <p className="font-medium text-neutral-800">Escribir a Soporte</p>
               <p className="text-xs text-neutral-500">{HORARIO} Junto con tu mensaje nos llega en qué pantalla estás, para ayudarte más rápido.</p>
               {formulario()}
               {error && <p className="text-red-600 text-xs">{error}</p>}
+            </> : dueno ? <>
+              {/* Dueño de la plataforma (27-11): aquí solo los tickets de clientes; él no le escribe a soporte. */}
+              <TicketsClientes key={ticketCli ?? 0} inicial={ticketCli} onCambio={() => cargarCasos()} />
             </> : <>
-              {dueno && <TicketsClientes key={ticketCli ?? 0} inicial={ticketCli} onCambio={() => cargarCasos()} />}
               <div className="flex items-center justify-between">
                 <p className="font-medium text-neutral-800">Mis casos</p>
                 <button onClick={() => { setEscribiendo(true); setError(null) }} className="btn-primary text-xs">+ Escribir</button>

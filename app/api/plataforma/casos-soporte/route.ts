@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     // 27-11 (el dueño): ?tickets=1 → solo los casos sin resolver, para responderlos desde el botón de Ayuda sin salir.
     if (req.nextUrl.searchParams.get('tickets')) {
       const { rows } = await db.query(
-        `SELECT c.id, c.origen, c.estado, c.pantalla, c.created_at, c.updated_at,
+        `SELECT c.id, c.origen, c.estado, c.pantalla, c.created_at, c.updated_at, c.user_id, c.empresa_id,
                 COALESCE(u.full_name, u.username) AS persona, u.username, e.nombre AS empresa,
                 COALESCE((SELECT json_agg(json_build_object('id', m.id, 'autor', m.autor, 'texto', m.texto,
                             'adjuntos', m.adjuntos, 'created_at', m.created_at) ORDER BY m.id)
