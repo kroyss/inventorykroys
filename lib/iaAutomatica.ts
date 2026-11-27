@@ -233,9 +233,9 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
         d.publicada = r.ok && !!r.publicada
         if (!r.ok) d.error = r.error
         if (d.publicada) publicadas++; else fallas++
-      } else if (d.decision === 'revisar' && cfg.modo === 'real' && frenos && (cfg.todo === true || frenos.escapeSeguro)
+      } else if (d.decision === 'revisar' && cfg.modo === 'real' && frenos && cfg.todo === true
                  && !motivos.some(m => m.startsWith(MOTIVO_TOPE)) && (c.item?.status ?? q.item_estado) !== 'paused') {
-        // 12-11: Modo Total la usa siempre (precargada con la de fábrica); Modo Seguro solo si la activó.
+        // 27-11 (el dueño): solo Modo Total. En Seguro lo que la IA no sabe queda para el vendedor (una sola respuesta).
         const frase = fraseEscapePreguntas(frenos)
         // «Responder todo» (opcional): la pregunta no queda sin contestar; la respuesta de la IA queda escrita para ver.
         const r = await publicarRespuesta(db, q.id, frase, { fuente: 'ia_escape', base: frase })

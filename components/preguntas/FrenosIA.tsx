@@ -7,8 +7,8 @@ import { useEffect, useState } from 'react'
 type Horario = { dias: number[]; desde: string; hasta: string }
 type Frenos = { horario: Horario | null; tope: number; escape: string | null; escapePreguntas: string | null; escapeSeguro: boolean }
 // Las mismas de lib/iaFrenos.ts (ESCAPE_PREGUNTAS_FABRICA / ESCAPE_MENSAJES_FABRICA).
-const ESCAPE_FABRICA = '¡Hola! Lo verificamos y te confirmamos en breve por aquí.'
-const ESCAPE_MENSAJES_FABRICA = '¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.'
+const ESCAPE_FABRICA = '¡Hola! Para atenderte con todo el detalle, haz la compra de 1 unidad y escríbenos por la mensajería de la compra: ahí te atendemos personalmente con cantidades, pedidos al mayor o lo que necesites.'
+const ESCAPE_MENSAJES_FABRICA = '¡Hola! Gracias por escribirnos. Para más información, cambios en tu pedido o compras al mayor, en breve te atendemos personalmente por aquí.'
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 // ML no deja teléfonos, correos ni links en las respuestas de Preguntas (las rechaza o las oculta).
 const CONTACTO = /\d[\d\s.-]{6,}\d|https?:|www\.|\.com|@/i
@@ -36,53 +36,43 @@ function Estado({ fr }: { fr: FrenosEstado }) {
   return <p className={`text-xs ${fr.guardando ? 'text-neutral-500' : fr.msg?.ok ? 'text-lime-700' : 'text-red-600'}`}>{fr.guardando ? 'Guardando…' : fr.msg?.t}</p>
 }
 
-/** Frase de escape de Preguntas: va dentro de la tarjeta de Preguntas. Sin teléfonos ni links (ML no los deja). */
+/** Frase de escape de Preguntas: va dentro de la tarjeta de Preguntas. Sin teléfonos ni links (ML no los deja).
+ *  27-11 (el dueño): solo en Modo Total. El texto de fábrica se ve de fondo en el campo (no precargado): vacío = ese. */
 export function EscapePreguntas({ fr, total }: { fr: FrenosEstado; total: boolean }) {
   const f = fr.f
   if (!f) return null
-  const texto = f.escapePreguntas ?? ESCAPE_FABRICA
+  const texto = f.escapePreguntas ?? ''
   return (
     <div className="space-y-1.5 border-t border-neutral-100 pt-3">
-      <p className="text-sm font-medium text-neutral-800">Frase de escape</p>
+      <p className="text-sm font-medium text-neutral-800">Frase de escape {!total && <span className="font-normal text-neutral-400">(solo Modo Total)</span>}</p>
       <p className="text-xs text-neutral-500">{total
-        ? <>La IA contesta con esta frase la posventa (cancelar, devolver, reclamo), lo que llega fuera de tu horario o si no logró escribir nada, para que ninguna pregunta quede sin respuesta. La respuesta de la IA queda escrita para que sigas tú.</>
-        : <>Solo si marcas «Usarla también en Modo Seguro»: contesta con esta frase lo que la IA deja para revisar.</>}
-        {' '}MercadoLibre acepta <b>una sola respuesta</b> por pregunta y <b>no deja teléfonos ni links</b>.</p>
-      <textarea rows={2} maxLength={350} value={texto} onChange={e => fr.setF({ ...f, escapePreguntas: e.target.value })}
+        ? <>La IA contesta con esta frase lo que no puede responder (posventa, fuera de tu horario o si no logró escribir nada), para que ninguna pregunta quede sin respuesta.</>
+        : <>En Modo Seguro no se usa: lo que la IA no sabe queda para que lo respondas tú.</>}
+        {' '}MercadoLibre acepta <b>una sola respuesta</b> por pregunta y <b>no deja teléfonos ni links</b>. Si lo dejas vacío se usa el texto de ejemplo.</p>
+      <textarea rows={3} maxLength={350} value={texto} placeholder={ESCAPE_FABRICA} onChange={e => fr.setF({ ...f, escapePreguntas: e.target.value })}
         onBlur={() => { const t = (f.escapePreguntas ?? '').trim(); fr.guardar({ ...f, escapePreguntas: !t || t === ESCAPE_FABRICA ? null : t }) }}
-        aria-label="Frase de escape en Preguntas" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+        aria-label="Frase de escape en Preguntas" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm placeholder:text-neutral-400" />
       {CONTACTO.test(texto) && <p className="text-xs text-amber-800">Parece que tiene un teléfono, correo o link: en Preguntas MercadoLibre no lo deja. Déjalo para la frase de Mensajes.</p>}
-      {f.escapePreguntas != null && f.escapePreguntas.trim() !== ESCAPE_FABRICA && (
-        <button type="button" onClick={() => fr.guardar({ ...f, escapePreguntas: null })} className="text-xs text-neutral-500 underline-offset-2 hover:underline">Volver a la de fábrica</button>
-      )}
-      {!total && (
-        <label className="flex items-start gap-2 text-sm text-neutral-800">
-          <input type="checkbox" className="mt-0.5" checked={f.escapeSeguro} onChange={e => fr.guardar({ ...f, escapeSeguro: e.target.checked })} />
-          <span>Usarla también en <b>Modo Seguro</b> <span className="block text-xs text-neutral-500">Contesta con la frase todo lo que la IA deja para revisar (no está segura, reclamos, «no hay», fuera de horario). Sirve de noche; de día conviene responderlas tú.</span></span>
-        </label>
-      )}
       <Estado fr={fr} />
     </div>
   )
 }
 
-/** Frase de escape de Mensajes: va dentro de la tarjeta de Mensajes. Aquí sí puede llevar teléfono o web. */
+/** Frase de escape de Mensajes: va dentro de la tarjeta de Mensajes. Aquí sí puede llevar teléfono o web.
+ *  27-11 (el dueño): en los dos modos; el texto de fábrica se ve de fondo en el campo: vacío = ese. */
 export function EscapeMensajes({ fr, total }: { fr: FrenosEstado; total: boolean }) {
   const f = fr.f
   if (!f) return null
   return (
     <div className="space-y-1.5 border-t border-neutral-100 pt-3">
-      <p className="text-sm font-medium text-neutral-800">Frase de escape {!total && <span className="font-normal text-neutral-400">(opcional)</span>}</p>
+      <p className="text-sm font-medium text-neutral-800">Frase de escape</p>
       <p className="text-xs text-neutral-500">{total
-        ? <>En <b>garantías, reclamos, devoluciones o pedidos distintos a lo publicado</b> la IA no responde: manda siempre esta frase y te deja la conversación en «Por atender». Te recomendamos poner un <b>contacto directo</b> (WhatsApp o teléfono) para que el comprador te escriba y resuelvas tú cualquier duda, cambio o inconveniente.</>
-        : <>Cuando la IA deja un mensaje para tu equipo (reclamos, pagos, dudas), manda al momento esta frase corta para que el comprador no quede sin contestar. La conversación sigue en «Por atender» con la respuesta de la IA escrita. Vacía = no se manda nada.</>}
-        {' '}Una vez por conversación cada 24 h.</p>
-      <textarea rows={2} maxLength={200} value={f.escape ?? ''} onChange={e => fr.setF({ ...f, escape: e.target.value })}
-        onBlur={() => fr.guardar({ ...f, escape: f.escape?.trim() || null })}
-        aria-label="Frase de escape en Mensajes"
-        placeholder={total ? 'Ej.: Para garantías, cambios o pedidos especiales escríbenos al WhatsApp 0414-0000000 y te atendemos directo.' : 'Ej.: ¡Recibido! En un momento te confirmamos.'}
-        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
-      {total && !f.escape && <p className="text-xs text-amber-800">Vacía: en Modo Total se manda la de fábrica («{ESCAPE_MENSAJES_FABRICA}»).</p>}
+        ? <>En <b>garantías, reclamos, devoluciones o pedidos distintos a lo publicado</b> la IA no responde: manda esta frase y te deja la conversación en «Por atender».</>
+        : <>Cuando la IA deja un mensaje para tu equipo (reclamos, pagos, dudas), manda al momento esta frase para que el comprador no quede sin contestar. La conversación sigue en «Por atender».</>}
+        {' '}Puedes agregar tu <b>WhatsApp o teléfono</b>. Si lo dejas vacío se usa el texto de ejemplo. Una vez por conversación cada 24 h.</p>
+      <textarea rows={3} maxLength={200} value={f.escape ?? ''} placeholder={ESCAPE_MENSAJES_FABRICA} onChange={e => fr.setF({ ...f, escape: e.target.value })}
+        onBlur={() => { const t = (f.escape ?? '').trim(); fr.guardar({ ...f, escape: !t || t === ESCAPE_MENSAJES_FABRICA ? null : t }) }}
+        aria-label="Frase de escape en Mensajes" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm placeholder:text-neutral-400" />
       <Estado fr={fr} />
     </div>
   )

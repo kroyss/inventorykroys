@@ -351,9 +351,9 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
     técnico).
     La **posventa nunca la escribe la IA**, ni en Modo Total: en Preguntas (cancelar, devolver, reclamo) contesta con
     la frase de escape; en **Mensajes** (garantías, reclamos, devoluciones o pedidos distintos a lo publicado) manda
-    **siempre** la frase de escape de Mensajes y deja la conversación en «Por atender». Ahí se recomienda poner un
-    **contacto directo** (WhatsApp o teléfono) para que el comprador escriba y el vendedor lo resuelva; si está vacía,
-    sale la de fábrica («¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.»).
+    **siempre** la frase de escape de Mensajes y deja la conversación en «Por atender». Puedes agregarle tu
+    **WhatsApp o teléfono**; si la dejas vacía sale el texto de ejemplo («¡Hola! Gracias por escribirnos. Para más
+    información, cambios en tu pedido o compras al mayor, en breve te atendemos personalmente por aquí.»).
   - **En los dos modos cada pregunta o mensaje usa 1 crédito**, salga sola o quede escrita para revisar (la IA hace el
     mismo trabajo para decidir; en Modo Seguro te deja la respuesta lista).
 - **¿Quién respondió?** En Preguntas (Respondidas) y en las conversaciones de Mensajes, lo que salió solo dice
@@ -402,17 +402,20 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
     respuesta escrita para una persona. Sin horario responde a cualquier hora.
   - **Máximo por comprador:** cuántas respuestas automáticas recibe un mismo comprador en 24 horas (de fábrica 3);
     la siguiente queda para una persona.
-  - **Frase de escape de Mensajes** (en la tarjeta de Mensajes; puede llevar teléfono o web): si la IA no manda la respuesta sola, puede mandar una frase corta
-    («¡Recibido! En un momento te confirmamos») para que el comprador no quede sin contestar. La conversación sigue
+  - **Frase de escape de Mensajes** (en la tarjeta de Mensajes, en los dos modos; puede llevar teléfono o web): si la
+    IA no manda la respuesta sola, manda esta frase para que el comprador no quede sin contestar. El campo muestra de
+    fondo el texto de ejemplo; si lo dejas vacío se usa ese, y si escribes el tuyo se usa el tuyo. La conversación sigue
     en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas. También sale en los
     **reclamos** (garantía, devolución, llegó mal): el comprador recibe el acuse al momento y la nota RECLAMO queda en la venta.
-  - **Frase de escape de Preguntas** (en la tarjeta de Preguntas; **sin teléfonos ni links**, MercadoLibre no los deja: la pantalla avisa si pones uno): viene **escrita de fábrica** («¡Hola! Lo verificamos y te confirmamos en breve
-    por aquí.»); la cambias si quieres (o «Volver a la de fábrica»). En **Modo Total** se usa **siempre**: la posventa
-    (cancelar, devolver, reclamo: la IA no las responde), lo que llega fuera de horario o si la IA no logró escribir
-    nada se contestan con la frase, así **todo tiene respuesta**. En **Modo Seguro** solo si marcas «Usarla también en
-    Modo Seguro» (contesta con la frase todo lo que la IA deja para revisar). Ojo: MercadoLibre acepta **una sola
-    respuesta** por pregunta, así que queda respondida con la frase; la respuesta de la IA queda escrita para que sigas
-    tú. No se usa si frenó el máximo por comprador ni si la publicación está pausada.
+  - **Frase de escape de Preguntas** (en la tarjeta de Preguntas; **sin teléfonos ni links**, MercadoLibre no los
+    deja: la pantalla avisa si pones uno): **solo en Modo Total**. El campo muestra de fondo el texto de ejemplo
+    («¡Hola! Para atenderte con todo el detalle, haz la compra de 1 unidad y escríbenos por la mensajería de la compra:
+    ahí te atendemos personalmente con cantidades, pedidos al mayor o lo que necesites.»); vacío = ese. En Modo Total
+    la posventa (cancelar, devolver, reclamo), lo que llega fuera de horario o si la IA no logró escribir nada se
+    contestan con la frase, así **todo tiene respuesta** y lo especial pasa a la mensajería de la compra. **En Modo
+    Seguro no hay frase de escape**: MercadoLibre acepta **una sola respuesta** por pregunta y la frase la dejaba
+    cerrada sin que pudieras contestarla bien; lo que la IA no sabe queda para ti. No se usa si frenó el máximo por
+    comprador ni si la publicación está pausada.
 - **Mi IA** también pregunta por cambios y devoluciones, ventas al mayor, rebajas, apartados, horario de atención e
   **información extra** por secciones (la IA lee cada sección solo cuando la pregunta trata de eso).
 - En **Despacho** hay que decir **cuándo sale el pedido** (el mismo día, al siguiente día hábil o a los N días hábiles
