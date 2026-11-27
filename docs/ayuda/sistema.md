@@ -1623,6 +1623,14 @@ punto rojo, estés donde estés:
   **Telegram** e **Instagram** (@comerciantedigital.ve) por si prefieres escribirnos por ahí. El aviso de que **tu
   plan está por vencer** trae lo mismo («¿Dudas? Escríbenos aquí · Telegram · Instagram»).
   Puedes seguir escribiendo en el mismo caso; cuando se arregle, toca **Ya se resolvió**.
+- **Casos abiertos siempre a la vista:** mientras tengas un caso sin resolver, el botón de Ayuda queda en todas las
+  pantallas con su estado al lado («Caso #12 · esperando respuesta», «● Soporte te respondió»). Tocándolo abres el
+  caso. La **✕** lo oculta: si ya te respondimos te pregunta **«¿Quedó resuelto?»** (**Sí, cerrar el ticket** o **No,
+  solo ocultar**); si todavía esperas respuesta, solo lo oculta y vuelve a salir cuando te respondamos. Vuelve a
+  aparecer cada vez que el caso tiene algo nuevo.
+- **Cuándo se cierra un caso:** cuando tocas **Ya se resolvió** (o «Sí, cerrar el ticket»), cuando Soporte lo marca
+  resuelto, o solo: si ya te respondimos y no escribes nada en **3 días**. Un caso que espera nuestra respuesta nunca se
+  cierra solo. Si escribes de nuevo en un caso cerrado, se reabre.
 - Todos los usuarios de la empresa pueden escribir a soporte, no solo el administrador.
 
 **Horario:** lunes a sábado, 8:00 am a 6:00 pm (hora de Venezuela). Fuera de ese horario lo dejas escrito y te

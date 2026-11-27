@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { soloDueno } from '@/lib/plataforma'
+import { cerrarRespondidosViejos } from '@/lib/soporte'
 
 // GET /api/plataforma/casos-soporte → la bandeja única de soporte (todos los orígenes) + el gasto de la ayuda con IA.
 // ?dia=AAAA-MM-DD&origen=… (12-11, el dueño: "ver qué preguntaron, quién y qué se le respondió") → las preguntas a la
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest) {
          ORDER BY a.created_at DESC LIMIT 200`, [dia, req.nextUrl.searchParams.get('origen')])
       return NextResponse.json({ consultas: rows }, { headers: { 'Cache-Control': 'no-store' } })
     }
+    await cerrarRespondidosViejos()   // 27-11: respondidos sin novedad en 3 días → resueltos
     const [{ rows: casos }, { rows: dias }, { rows: falta }, { rows: [tot] }] = await Promise.all([
       db.query(
         `SELECT c.id, c.origen, c.estado, c.pantalla, c.navegador, c.created_at, c.updated_at,

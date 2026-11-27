@@ -98,6 +98,15 @@ async function avisarDueno(casoId: number, sigue: boolean, texto: string, adjunt
 const anotarMensajeTG = (chat: string | number, mid: number, casoId: number) =>
   dbGlobal().query(`INSERT INTO soporte_telegram (chat_id, message_id, caso_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [chat, mid, casoId])
 
+/** 27-11 (el dueño): un caso RESPONDIDO en el que el cliente no escribe en 3 días se da por resuelto (si vuelve a
+ *  escribir, se reabre solo). Nunca uno que espera respuesta del dueño. Se corre al leer los casos (tabla chica). */
+export const DIAS_CIERRE = 3
+export async function cerrarRespondidosViejos() {
+  await dbGlobal().query(
+    `UPDATE soporte_casos SET estado = 'resuelto', updated_at = NOW()
+     WHERE estado = 'respondido' AND updated_at < NOW() - make_interval(days => ${DIAS_CIERRE})`).catch(() => {})
+}
+
 /** Respuesta del dueño (desde Plataforma o Telegram). Le avisa al cliente por Telegram si lo tiene conectado. */
 export async function responderCaso(casoId: number, texto: string, autorUserId: number | null, adjuntos: Adjunto[] = []) {
   const db = dbGlobal()

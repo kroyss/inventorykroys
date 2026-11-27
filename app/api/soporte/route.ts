@@ -4,13 +4,20 @@ import { authOptions } from '@/lib/auth'
 import { apiError } from '@/lib/apiError'
 import { unauthorized } from '@/lib/session'
 import { dbGlobal } from '@/lib/db'
-import { escribirASoporte, MAX_ADJUNTOS, MAX_MB, TIPOS_ADJUNTO, type Adjunto } from '@/lib/soporte'
+import { esDuenoPlataforma } from '@/lib/empresa'
+import { cerrarRespondidosViejos, escribirASoporte, MAX_ADJUNTOS, MAX_MB, TIPOS_ADJUNTO, type Adjunto } from '@/lib/soporte'
 
 // GET /api/soporte → mis casos (los últimos 20) con sus mensajes y cuántos tienen respuesta sin ver.
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return unauthorized()
   try {
+    await cerrarRespondidosViejos()
+    // 27-11: al dueño de la plataforma, los casos de clientes que esperan su respuesta (la burbuja los muestra).
+    const dueno = esDuenoPlataforma(session.user) && !session.user.soporte && !session.user.verComo
+      ? (await dbGlobal().query(
+          `SELECT count(*)::int AS n, max(updated_at) AS ultimo, max(id) AS id FROM soporte_casos WHERE estado = 'abierto'`)).rows[0]
+      : null
     const { rows: casos } = await dbGlobal().query(
       `SELECT c.id, c.estado, c.created_at, c.updated_at,
               EXISTS (SELECT 1 FROM soporte_mensajes m WHERE m.caso_id = c.id AND m.autor = 'soporte'
@@ -20,7 +27,7 @@ export async function GET() {
                         FROM soporte_mensajes m WHERE m.caso_id = c.id), '[]') AS mensajes
        FROM soporte_casos c WHERE c.user_id = $1 AND c.origen = 'sistema'
        ORDER BY c.updated_at DESC LIMIT 20`, [Number(session.user.id)])
-    return NextResponse.json({ casos, nuevos: casos.filter(c => c.nuevo).length }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ casos, nuevos: casos.filter(c => c.nuevo).length, dueno }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     return apiError(err)
   }
